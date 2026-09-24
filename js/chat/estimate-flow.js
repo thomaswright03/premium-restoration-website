@@ -14,9 +14,14 @@
   var estimateCounter = 0;
 
   // The steps for the work chosen so far (the measurements step depends on it).
+  /**
+   * @param {JobScope | null} scope
+   * @returns {StepGroup[]}
+   */
   function buildGroups(scope) {
     var Pricing = window.BathroomPricing;
     var needs = Pricing.scopeNeeds(scope || {});
+    /** @type {StepGroup[]} */
     var groups = [
       {
         id: "scope",
@@ -57,6 +62,12 @@
     return groups;
   }
 
+  /**
+   * @param {JobValues} values
+   * @param {JobScope | null} scope
+   * @param {number} [index] the step to start on
+   * @returns {EstimateInProgress}
+   */
   function newQuoteState(values, scope, index) {
     var groups = buildGroups(scope);
     return {
@@ -69,6 +80,7 @@
   }
 
   // ---------- progress bar ----------
+  /** @param {number} pct */
   function setProgress(pct) {
     C.els.progress.hidden = false;
     C.els.progressFill.style.width = pct + "%";
@@ -92,6 +104,10 @@
   // for by typing) stays in the chat as "Continue my estimate": it reopens
   // the estimate full screen, and focus returns to it when full screen is
   // closed. It goes when the estimate is finished or cancelled.
+  /**
+   * @param {HTMLElement | null} opener
+   * @returns {HTMLElement}
+   */
   function continueButton(opener) {
     var btn = opener && document.contains(opener) ? opener : C.estimateButtonRow("");
     C.removeOffers(btn.closest(".ai-chat-offer-row"));
@@ -101,6 +117,7 @@
   }
 
   // Reopens the estimate being worked out full screen, on its current step.
+  /** @param {HTMLElement} opener */
   function resumeEstimate(opener) {
     C.enterFullscreen(opener);
     var current = C.els.messages.querySelector(
@@ -109,8 +126,9 @@
     if (current) current.focus({ preventScroll: true });
   }
 
+  /** @param {HTMLElement | null} [opener] the button that asked for it (none when it was asked for by typing) */
   function startEstimate(opener) {
-    var btn = continueButton(opener);
+    var btn = continueButton(opener || null);
     C.state.quoteState = newQuoteState({}, null, 0);
     C.els.form.hidden = true;
     // Started from a button: closing full screen goes back to it. Started by
@@ -122,6 +140,7 @@
     C.track("ESTIMATE_STARTED");
   }
 
+  /** @param {number} fromIndex */
   function removeStepRows(fromIndex) {
     var id = C.state.quoteState.id;
     Array.prototype.forEach.call(C.els.messages.querySelectorAll('[data-estimate="' + id + '"]'), function (row) {

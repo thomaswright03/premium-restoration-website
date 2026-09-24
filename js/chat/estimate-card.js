@@ -27,10 +27,12 @@
     return window.BathroomPricing;
   }
 
+  /** @param {number} fixtureCount */
   function totalLabel(fixtureCount) {
     return fixtureCount > 0 ? "Estimated Labor Total, before plumbing" : "Estimated Labor Total";
   }
 
+  /** @param {number} fixtureCount */
   function plumbingTotalNote(fixtureCount) {
     return (
       "This is not the full cost of your job: plumbing work for the " +
@@ -39,6 +41,7 @@
     );
   }
 
+  /** @param {number} fixtureCount */
   function excludedLines(fixtureCount) {
     var list = [];
     if (fixtureCount > 0) {
@@ -56,6 +59,11 @@
     return list;
   }
 
+  /**
+   * @param {JobValues} values
+   * @param {JobScope} scope
+   * @param {EstimateResult} result
+   */
   function allAssumptions(values, scope, result) {
     return Pricing()
       .estimateAssumptions(values, scope, result)
@@ -67,6 +75,7 @@
     return window.BusinessInfo.businessLine(config && config.owner.legalName);
   }
 
+  /** @param {EstimateResult} result */
   function cardHeader(result) {
     var fixtureCount = result.plumbingFixtureCount;
     var money = Pricing().money;
@@ -91,6 +100,7 @@
     return { fragment: fragment, total: totalWrap };
   }
 
+  /** @param {EstimateResult} result */
   function cardLines(result) {
     var money = Pricing().money;
     var lines = C.el("div", "ai-chat-estimate-lines");
@@ -105,6 +115,7 @@
     return lines;
   }
 
+  /** @param {number} fixtureCount */
   function cardExcluded(fixtureCount) {
     var excluded = C.el("div", "ai-chat-estimate-excluded");
     excludedLines(fixtureCount).forEach(function (x) {
@@ -116,6 +127,7 @@
     return excluded;
   }
 
+  /** @param {string[]} assumptions */
   function cardAssumptions(assumptions) {
     var wrap = C.el("div", "ai-chat-estimate-assumptions");
     wrap.appendChild(C.el("p", "ai-chat-estimate-assumptions-title", "What this estimate assumes"));
@@ -127,6 +139,10 @@
     return wrap;
   }
 
+  /**
+   * @param {ChatEstimate} estimate
+   * @param {HTMLElement} pdfStatus
+   */
   function cardActions(estimate, pdfStatus) {
     var actions = C.el("div", "ai-chat-estimate-actions");
     var exportBtn = C.el("button", "ai-chat-estimate-export", "Export as PDF");
@@ -143,6 +159,7 @@
   // The next step after an estimate: the Get a Quote form, carrying the
   // estimate with it (every link to that page is labelled "Get a Quote"), or
   // in "please call us" mode the phone number.
+  /** @param {ChatEstimate} estimate */
   function nextStepLink(estimate) {
     var Business = window.BusinessInfo;
     if (!C.leadFormEnabled()) {
@@ -161,9 +178,15 @@
   }
 
   // options.restored: shown after a reload, so focus isn't moved.
+  /**
+   * @param {JobValues} values
+   * @param {JobScope} scope
+   * @param {{ restored?: boolean }} [options]
+   */
   function appendEstimateCard(values, scope, options) {
     options = options || {};
     var result = Pricing().computePublicEstimate(values, scope);
+    /** @type {ChatEstimate} */
     var estimate = { values: values, scope: scope, result: result, assumptions: allAssumptions(values, scope, result) };
 
     var parts = C.botRow();
@@ -193,6 +216,7 @@
 
   // Scrolls the chat so the top of a new estimate card (its heading and
   // total) is in view, rather than the end of the card.
+  /** @param {HTMLElement} row */
   function showCardTop(row) {
     var messages = C.els.messages;
     var gap = 12;
@@ -204,6 +228,10 @@
   // The PDF of this estimate. Its reference is made once per estimate, so
   // exporting the same card again gives the same reference; the prices are
   // held for the owner's set period (estimates.validForDays), if there is one.
+  /**
+   * @param {ChatEstimate} estimate
+   * @returns {PdfSpec & { reference: string }}
+   */
   function pdfSpec(estimate) {
     var Pdf = window.EstimatePdf;
     var money = Pricing().money;
@@ -233,6 +261,11 @@
     };
   }
 
+  /**
+   * @param {HTMLButtonElement} button
+   * @param {HTMLElement} status
+   * @param {ChatEstimate} estimate
+   */
   function exportPdf(button, status, estimate) {
     if (button.disabled) return;
     var label = button.textContent;

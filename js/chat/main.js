@@ -24,6 +24,10 @@
   // scripted reply, an estimate button, or the estimate itself.
   // options.opener: the button that asked for the estimate (focus returns
   // to it when full screen is closed).
+  /**
+   * @param {string} message
+   * @param {{ opener?: HTMLElement }} [options]
+   */
   function sendChatMessage(message, options) {
     options = options || {};
     if (!message) return;
@@ -67,7 +71,7 @@
       // Phones only: on a wider screen the chat stays part of the page.
       if (!C.isFocusingQuietly() && phoneQuery && phoneQuery.matches) C.enterFullscreen();
     });
-    C.els.form.addEventListener("submit", function (e) {
+    C.els.form.addEventListener("submit", function (/** @type {Event} */ e) {
       e.preventDefault();
       var message = C.els.input.value.trim();
       if (!message) return;

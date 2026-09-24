@@ -9,8 +9,30 @@
 
   var fieldCounter = 0;
 
+  /**
+   * One field's parts, so its message can be shown and it can be focused.
+   * @typedef {{ wrap: HTMLElement; error: HTMLElement; focus: HTMLElement; input?: HTMLInputElement }} FieldParts
+   */
+
+  /**
+   * What the fields of one step share: their parts, the readers that copy
+   * each answer into the estimate, and a way to show a field's message.
+   * @typedef {{
+   *   fieldEls: Record<string, FieldParts>;
+   *   readers: (() => void)[];
+   *   showFieldError: (key: string, message: string | null) => void;
+   * }} StepContext
+   */
+
   // A question answered with buttons (nothing pre-selected). Returns the
   // field's parts and a reader that copies the answer into the estimate.
+  /**
+   * @param {StepField} field
+   * @param {StepContext} ctx
+   * @param {HTMLElement} wrap
+   * @param {HTMLElement} labelEl
+   * @param {HTMLElement} errorEl
+   */
   function choiceField(field, ctx, wrap, labelEl, errorEl) {
     var q = C.state.quoteState;
     var choiceWrap = C.el("div", "ai-chat-choices");
@@ -18,11 +40,13 @@
     choiceWrap.setAttribute("aria-labelledby", labelEl.id);
     choiceWrap.setAttribute("aria-describedby", errorEl.id);
     // An answer given before (Back, or after a reload) is shown again.
-    var chosen = field.options.filter(function (option) {
+    var options = field.options || [];
+    var chosen = options.filter(function (option) {
       return option.value === q.scope[field.key];
     })[0];
+    /** @type {HTMLButtonElement[]} */
     var buttons = [];
-    field.options.forEach(function (option) {
+    options.forEach(function (option) {
       var btn = C.el("button", "ai-chat-choice" + (option === chosen ? " selected" : ""), option.label);
       btn.type = "button";
       btn.setAttribute("aria-pressed", option === chosen ? "true" : "false");
@@ -48,10 +72,18 @@
   }
 
   // A typed answer (a measurement or a count).
+  /**
+   * @param {StepField} field
+   * @param {StepContext} ctx
+   * @param {HTMLElement} wrap
+   * @param {HTMLLabelElement} labelEl
+   * @param {HTMLElement} errorEl
+   */
   function inputField(field, ctx, wrap, labelEl, errorEl) {
+    /** @type {HTMLInputElement} */
     var input = C.el("input");
     input.type = "text";
-    input.inputMode = field.inputmode;
+    input.inputMode = field.inputmode || "text";
     input.autocomplete = "off";
     input.placeholder = field.placeholder || "0";
     input.id = labelEl.id.replace(/-label$/, "");
@@ -71,6 +103,10 @@
     });
   }
 
+  /**
+   * @param {StepField} field
+   * @param {StepContext} ctx
+   */
   function buildField(field, ctx) {
     var isChoice = field.type === "choice";
     var wrap = C.el("div", "ai-chat-group-field" + (isChoice ? " is-choice" : ""));
@@ -87,6 +123,12 @@
     return wrap;
   }
 
+  /**
+   * @param {string} className
+   * @param {string} text
+   * @param {(() => void) | null} onClick
+   * @param {"button" | "submit"} [type]
+   */
   function actionButton(className, text, onClick, type) {
     var btn = C.el("button", className, text);
     btn.type = type || "button";
@@ -95,6 +137,10 @@
   }
 
   // Back (after the first step), Cancel and Continue / Get My Estimate.
+  /**
+   * @param {StepGroup} group
+   * @param {() => void} disableForm
+   */
   function buildActions(group, disableForm) {
     var q = C.state.quoteState;
     var actionsWrap = C.el("div", "ai-chat-group-actions");
@@ -123,18 +169,25 @@
   // any need fixing. The last step (fixture counts) also needs at least one
   // priced item overall, so an estimate never comes to $0.00: the visitor is
   // told plainly and stays on that step.
+  /**
+   * @param {StepGroup} group
+   * @param {StepContext} ctx
+   * @param {HTMLElement} summaryError
+   */
   function checkStep(group, ctx, summaryError) {
     ctx.readers.forEach(function (read) {
       read();
     });
     var q = C.state.quoteState;
     var result = window.BathroomPricing.validateJob(q.values, q.scope, { requireWork: group.id === "fixtures" });
+    /** @type {string | null} */
     var firstBad = null;
-    group.fields.forEach(function (field) {
-      var message = result.errors[field.key] || null;
-      ctx.showFieldError(field.key, message);
-      if (message && !firstBad) firstBad = field.key;
-    });
+    for (var i = 0; i < group.fields.length; i++) {
+      var key = group.fields[i].key;
+      var message = result.errors[key] || null;
+      ctx.showFieldError(key, message);
+      if (message && !firstBad) firstBad = key;
+    }
     var problem = firstBad ? "Please fix the highlighted answers above." : result.errors.work || "";
     summaryError.hidden = !problem;
     summaryError.textContent = problem;
@@ -146,9 +199,11 @@
 
   // Adds the current step's form to the chat.
   // options.restored: shown after a reload, so focus isn't moved.
+  /** @param {{ restored?: boolean }} [options] */
   function appendGroupForm(options) {
     options = options || {};
     var q = C.state.quoteState;
+    /** @type {StepGroup} */
     var group = q.groups[q.index];
     var parts = C.botRow();
     parts.row.setAttribute("data-estimate", String(q.id));
@@ -160,6 +215,7 @@
     formEl.noValidate = true;
     formEl.setAttribute("data-group", group.id);
 
+    /** @type {StepContext} */
     var ctx = {
       fieldEls: {},
       readers: [],
@@ -189,7 +245,7 @@
     }
     formEl.appendChild(buildActions(group, disableForm));
 
-    formEl.addEventListener("submit", function (e) {
+    formEl.addEventListener("submit", function (/** @type {Event} */ e) {
       e.preventDefault();
       if (!checkStep(group, ctx, summaryError)) return;
       disableForm();

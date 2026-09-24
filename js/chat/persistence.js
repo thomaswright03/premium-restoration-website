@@ -13,6 +13,7 @@
   // The estimate summary carried to the Get a Quote form (js/lead-form.js reads it).
   var SUMMARY_KEY = "pr_estimate_summary";
 
+  /** @param {SavedEstimate | null} saved null forgets it */
   function saveEstimate(saved) {
     try {
       if (saved) sessionStorage.setItem(ESTIMATE_KEY, JSON.stringify(saved));
@@ -22,6 +23,7 @@
     }
   }
 
+  /** @returns {SavedEstimate | null} */
   function readSavedEstimate() {
     try {
       var saved = JSON.parse(sessionStorage.getItem(ESTIMATE_KEY) || "null");
@@ -39,6 +41,7 @@
     saveEstimate({ status: "active", index: q.index, values: q.values, scope: q.scope });
   }
 
+  /** @param {string} text */
   function saveSummary(text) {
     try {
       sessionStorage.setItem(SUMMARY_KEY, text);

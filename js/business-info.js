@@ -25,6 +25,7 @@
   var EMAIL = "eduardo.moroni77@gmail.com";
 
   // "tel:" link for a US number written any way, e.g. (385) 356-8733 -> tel:+13853568733.
+  /** @param {string} phone */
   function phoneHref(phone) {
     var digits = String(phone).replace(/\D/g, "");
     if (digits.length === 10) digits = "1" + digits;
@@ -33,6 +34,7 @@
 
   // Who runs the business, as printed on every PDF. legalName comes from
   // site-config.json (owner.legalName); blank = no name is shown.
+  /** @param {string | null | undefined} legalName (blank or missing: no name) */
   function businessLine(legalName) {
     var name = typeof legalName === "string" ? legalName.trim() : "";
     return NAME + ", operated by " + (name ? name + ", " : "") + "an individual (not a registered company)";

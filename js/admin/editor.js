@@ -25,43 +25,53 @@
   };
 
   function cancelQuote() {
-    (A.isDirty() ? A.confirmDiscardQuote(A.state.draft) : Promise.resolve(true)).then(function (discard) {
-      if (!discard) return;
-      A.clearDraft();
-      A.state.currentRoute = "dashboard";
-      A.navigate("dashboard");
-    });
+    (A.isDirty() ? A.confirmDiscardQuote(A.state.draft) : Promise.resolve(true)).then(
+      function (/** @type {boolean} */ discard) {
+        if (!discard) return;
+        A.clearDraft();
+        A.state.currentRoute = "dashboard";
+        A.navigate("dashboard");
+      },
+    );
   }
 
   // ------------------------------------------------------------------
   // Property and customer (top of the quote screen)
   // ------------------------------------------------------------------
+  /** @type {Record<string, string>} */
   var CUSTOMER_FIELDS = { name: "quote-customer-name", phone: "quote-customer-phone", email: "quote-customer-email" };
 
   function renderQuoteHeader() {
-    document.getElementById("quote-eyebrow").textContent = A.state.draft.isNew ? "New Quote" : "Editing Quote";
-    /** @type {HTMLInputElement} */ (document.getElementById("quote-address")).value = A.state.draft.address || "";
+    A.byId("quote-eyebrow").textContent = A.state.draft.isNew ? "New Quote" : "Editing Quote";
+    /** @type {HTMLInputElement} */ (A.byId("quote-address")).value = A.state.draft.address || "";
+    /** @type {Record<string, string>} */
     var customer = A.cleanCustomer(A.state.draft.customer);
     Object.keys(CUSTOMER_FIELDS).forEach(function (key) {
-      /** @type {HTMLInputElement} */ (document.getElementById(CUSTOMER_FIELDS[key])).value = customer[key];
+      /** @type {HTMLInputElement} */ (A.byId(CUSTOMER_FIELDS[key])).value = customer[key];
     });
     ["quote-address", "quote-customer-phone", "quote-customer-email"].forEach(function (id) {
       setInputError(id, null);
     });
   }
 
+  /**
+   * @param {string} id
+   * @param {string | null} message
+   */
   function setInputError(id, message) {
-    var input = document.getElementById(id);
-    var error = document.getElementById(id + "-error");
+    var input = A.byId(id);
+    var error = A.byId(id + "-error");
     if (message) error.textContent = message;
     error.hidden = !message;
     input.setAttribute("aria-invalid", message ? "true" : "false");
-    input.closest(".form-group").classList.toggle("has-error", !!message);
+    var group = input.closest(".form-group");
+    if (group) group.classList.toggle("has-error", !!message);
   }
 
   // Address is required; the customer's details are optional but must look
   // right if given. Returns the id of the first field with a problem.
   function validateQuoteHeader() {
+    /** @type {Record<string, string>} */
     var problems = {};
     if (!String(A.state.draft.address || "").trim()) problems["quote-address"] = "Enter the property address.";
     var c = A.cleanCustomer(A.state.draft.customer);
@@ -72,6 +82,9 @@
     if (c.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(c.email)) {
       problems["quote-customer-email"] = "Enter an email address like name@example.com, or leave it blank.";
     }
+    /**
+     * @type {string | null}
+     */
     var first = null;
     ["quote-address", "quote-customer-phone", "quote-customer-email"].forEach(function (id) {
       setInputError(id, problems[id] || null);
@@ -84,8 +97,29 @@
   // The bathroom calculator. Every row shows its own cost in one
   // right-hand column; the numbers all come from Pricing.computeEstimate.
   // ------------------------------------------------------------------
-  var calc = null; // { costCells: [{ el, keys }], errorEls: {}, recompute }
+  /**
+   * The calculator on screen: each row's cost cell and the price lines it
+   * shows, each field's row and message, and what refreshes every figure.
+   * @typedef {{
+   *   costCells: { el: HTMLElement; keys: string[] }[];
+   *   errorEls: Record<string, { row: HTMLElement; error: HTMLElement }>;
+   *   recompute: () => void;
+   * }} Calculator
+   */
 
+  /** @returns {Calculator} */
+  function newCalculator() {
+    return { costCells: [], errorEls: {}, recompute: function () {} };
+  }
+
+  var calc = newCalculator(); // replaced each time the quote screen is drawn
+
+  /**
+   * A row's control: an input, or a group (radio buttons, a checkbox) labelled by the row's label.
+   * @typedef {{ node: HTMLElement; isGroup?: boolean }} RowControl
+   */
+
+  /** @param {number} laborSubtotal */
   function jobValueWarning(laborSubtotal) {
     var cap = JOB_VALUE_CHECKPOINTS.exemptionCap;
     var affirmation = JOB_VALUE_CHECKPOINTS.affirmation;
@@ -124,6 +158,12 @@
 
   var uid = 0;
 
+  /**
+   * @param {string} labelText
+   * @param {RowControl} control
+   * @param {string[] | null} costKeys the price lines whose cost the row shows (none: no cost)
+   * @param {string} [hint]
+   */
   function calcRow(labelText, control, costKeys, hint) {
     var row = A.el("div", "calc-row");
     var labelWrap = A.el("div", "calc-label");
@@ -154,7 +194,13 @@
     return { row: row, error: error };
   }
 
+  /**
+   * @param {string} key
+   * @param {string} [inputmode]
+   * @returns {{ node: HTMLInputElement }}
+   */
   function numberInput(key, inputmode) {
+    /** @type {HTMLInputElement} */
     var input = A.el("input", "calc-input");
     input.type = "text";
     input.inputMode = inputmode || "numeric";
@@ -170,6 +216,10 @@
     return { node: input };
   }
 
+  /**
+   * @param {ScopeQuestion} question
+   * @returns {RowControl}
+   */
   function choiceGroup(question) {
     var group = A.el("div", "calc-choices");
     group.setAttribute("role", "radiogroup");
@@ -192,6 +242,11 @@
     return { node: group, isGroup: true };
   }
 
+  /**
+   * @param {string} key
+   * @param {string} text
+   * @returns {RowControl}
+   */
   function checkbox(key, text) {
     var label = A.el("label", "calc-check");
     var input = A.el("input");
@@ -207,6 +262,10 @@
     return { node: label, isGroup: true };
   }
 
+  /**
+   * @param {string} title
+   * @param {string} [note]
+   */
   function section(title, note) {
     var wrap = A.el("section", "calc-section");
     wrap.appendChild(A.el("h2", "calc-section-title", title));
@@ -214,6 +273,7 @@
     return wrap;
   }
 
+  /** @param {string} key */
   function onChange(key) {
     if (calc.errorEls[key]) setFieldError(key, null);
     refreshErrorSummary();
@@ -223,13 +283,14 @@
 
   // "Fix the N highlighted answers" counts only what is still highlighted,
   // and goes away once every answer has been fixed.
+  /** @param {number} count */
   function errorSummaryText(count) {
     return "Fix the " + (count === 1 ? "highlighted answer" : count + " highlighted answers") + " before saving.";
   }
 
   // "Nothing to price yet" goes as soon as some work is chosen.
   function refreshErrorSummary() {
-    var box = document.getElementById("quote-error");
+    var box = A.byId("quote-error");
     if (box.hidden) return;
     var kind = box.getAttribute("data-kind");
     if (kind === "work") {
@@ -242,6 +303,10 @@
     else box.hidden = true;
   }
 
+  /**
+   * @param {string} key
+   * @param {string | null} message
+   */
   function setFieldError(key, message) {
     var e = calc.errorEls[key];
     if (!e) return;
@@ -283,7 +348,7 @@
       ),
     );
     var dimGrid = A.el("div", "calc-dims");
-    A.Pricing.DIMENSIONS.forEach(function (d) {
+    window.BathroomPricing.DIMENSIONS.forEach(function (d) {
       var field = A.el("div", "calc-dim");
       var id = "calc-" + ++uid;
       var label = A.el("label", "calc-label-text", d.label + " (ft)");
@@ -310,13 +375,14 @@
 
   function workSection() {
     var work = section("Work");
+    /** @type {Record<string, string[]>} */
     var workCosts = {
       demolition: ["demolition"],
       floorFinish: ["floorTile", "flooring"],
       walls: ["wallTile", "wallPaint"],
       paintCeiling: ["ceilingPaint"],
     };
-    A.Pricing.SCOPE_QUESTIONS.forEach(function (q) {
+    window.BathroomPricing.SCOPE_QUESTIONS.forEach(function (q) {
       var r = calcRow(q.label, choiceGroup(q), workCosts[q.key]);
       calc.errorEls[q.key] = r;
       work.appendChild(r.row);
@@ -324,9 +390,10 @@
     return work;
   }
 
+  /** @param {Prices} prices */
   function fixturesSection(prices) {
     var fixtures = section("Fixtures", LICENCE_NOTES.Fixtures);
-    A.Pricing.FIXTURES.forEach(function (f) {
+    window.BathroomPricing.FIXTURES.forEach(function (f) {
       var r = calcRow(
         f.plural,
         numberInput(f.key),
@@ -339,6 +406,7 @@
     return fixtures;
   }
 
+  /** @param {Prices} prices */
   function plumbingSection(prices) {
     var plumbing = section("Plumbing", LICENCE_NOTES.Plumbing);
     var pointsOut = A.el("output", "calc-readout");
@@ -370,6 +438,7 @@
     return { section: plumbing, pointsOut: pointsOut };
   }
 
+  /** @param {Prices} prices */
   function electricalSection(prices) {
     var electrical = section("Electrical", LICENCE_NOTES.Electrical);
     var er = calcRow(
@@ -386,9 +455,16 @@
   }
 
   // Subtotal → Tax → Total, and the licensing-threshold note under it.
+  /** @param {HTMLElement} root */
   function totalsBanner(root) {
     var banner = A.el("div", "bathroom-total-banner");
     banner.setAttribute("aria-live", "polite");
+    /**
+     * @param {string} labelText
+     * @param {string} role
+     * @param {boolean} [main]
+     * @returns {{ label: HTMLElement; value: HTMLElement }}
+     */
     function totalLine(labelText, role, main) {
       var line = A.el("div", "bathroom-total-line" + (main ? " main" : ""));
       var label = A.el("span", "label", labelText);
@@ -411,11 +487,17 @@
   }
 
   // Refreshes every row's cost, the areas, the plumbing points and the totals.
+  /**
+   * @param {Prices} prices
+   * @param {{ areaText: HTMLElement; pointsOut: HTMLElement; totals: ReturnType<typeof totalsBanner> }} parts
+   */
   function recompute(prices, parts) {
+    /** @type {EstimateResult} */
     var result = A.Pricing.computeEstimate(A.state.draft.values, A.state.draft.scope, {
       prices: prices,
       includeTrade: true,
     });
+    /** @type {Record<string, PricingLine>} */
     var byKey = {};
     result.lines.forEach(function (l) {
       byKey[l.key] = l;
@@ -423,9 +505,9 @@
     calc.costCells.forEach(function (cell) {
       /** @type {PricingLine | null} */
       var line = null;
-      cell.keys.forEach(function (k) {
-        if (byKey[k]) line = byKey[k];
-      });
+      for (var i = 0; i < cell.keys.length; i++) {
+        if (byKey[cell.keys[i]]) line = byKey[cell.keys[i]];
+      }
       cell.el.innerHTML = "";
       cell.el.appendChild(A.el("span", "calc-cost-value", line ? A.money(line.cost) : "—"));
       if (line) cell.el.appendChild(A.el("span", "calc-cost-detail", line.detail));
@@ -450,14 +532,14 @@
 
   function renderEditor() {
     var prices = A.Pricing.getPrices();
-    calc = { costCells: [], errorEls: {}, recompute: null };
+    calc = newCalculator();
     renderQuoteHeader();
-    document.getElementById("quote-error").hidden = true;
-    var saveBtn = /** @type {HTMLButtonElement} */ (document.getElementById("save-quote-btn"));
+    A.byId("quote-error").hidden = true;
+    var saveBtn = /** @type {HTMLButtonElement} */ (A.byId("save-quote-btn"));
     saveBtn.disabled = false;
     saveBtn.textContent = "Save Quote";
 
-    var container = document.getElementById("quote-sections");
+    var container = A.byId("quote-sections");
     container.innerHTML = "";
     var root = A.el("div", "bathroom-calculator");
     if (A.state.draft.legacy) root.appendChild(legacyNotice());
@@ -482,10 +564,11 @@
 
   var saving = false;
 
+  /** @param {Event} e */
   function handleQuoteSubmit(e) {
     e.preventDefault();
     if (saving || !A.state.draft) return;
-    var errorBox = document.getElementById("quote-error");
+    var errorBox = A.byId("quote-error");
     var firstHeaderProblem = validateQuoteHeader();
     // A quote with no work chosen is refused rather than saved at $0.00.
     var validation = A.Pricing.validateJob(A.state.draft.values, A.state.draft.scope, {
@@ -501,22 +584,22 @@
       errorBox.setAttribute("data-kind", highlighted ? "validation" : "work");
       errorBox.hidden = false;
       if (firstHeaderProblem) {
-        document.getElementById(firstHeaderProblem).focus();
+        A.byId(firstHeaderProblem).focus();
         return;
       }
       var firstKey = Object.keys(calc.errorEls).filter(function (k) {
-        return validation.errors[k];
+        return !!validation.errors[k];
       })[0];
       var first = firstKey
         ? calc.errorEls[firstKey].row.querySelector("input")
         : document.querySelector("#quote-sections .calc-choices input");
-      if (first) first.focus();
+      if (first instanceof HTMLElement) first.focus();
       return;
     }
     errorBox.hidden = true;
 
     saving = true;
-    var saveBtn = /** @type {HTMLButtonElement} */ (document.getElementById("save-quote-btn"));
+    var saveBtn = /** @type {HTMLButtonElement} */ (A.byId("save-quote-btn"));
     saveBtn.disabled = true;
     saveBtn.textContent = "Saving…";
 
@@ -524,8 +607,9 @@
     var now = new Date().toISOString();
     // Measurements are stored in feet (5' 6" is saved as 5.5), and the total
     // is worked out from exactly what is stored, so the PDF always matches.
+    /** @type {JobValues} */
     var jobValues = {};
-    A.VALUE_KEYS.forEach(function (key) {
+    A.VALUE_KEYS.forEach(function (/** @type {string} */ key) {
       var v = A.state.draft.values[key];
       if (typeof v === "boolean") jobValues[key] = v;
       else if (A.DIMENSION_KEYS.indexOf(key) !== -1)
@@ -533,6 +617,7 @@
       else jobValues[key] = A.Pricing.parseNumber(v) || 0;
     });
     var result = A.Pricing.computeEstimate(jobValues, A.state.draft.scope, { prices: prices, includeTrade: true });
+    /** @type {BathroomData} */
     var bathroom = {
       calcVersion: A.Pricing.CALC_VERSION,
       jobValues: jobValues,
@@ -547,10 +632,12 @@
 
     // Insert or update by the draft's id, so pressing Save twice can never
     // create two quotes.
+    /** @type {Quote[]} */
     var quotes = A.getQuotes();
     var existing = quotes.filter(function (q) {
       return q.id === A.state.draft.id;
     })[0];
+    /** @type {Quote} */
     var record = Object.assign({}, existing || {}, {
       id: A.state.draft.id,
       address: A.state.draft.address.trim(),
@@ -594,4 +681,4 @@
   A.refreshErrorSummary = refreshErrorSummary;
   A.renderEditor = renderEditor;
   A.handleQuoteSubmit = handleQuoteSubmit;
-})((window.PRAdmin = window.PRAdmin || { state: {} }));
+})((window.PRAdmin = window.PRAdmin || /** @type {AdminNamespace} */ ({ state: {} })));

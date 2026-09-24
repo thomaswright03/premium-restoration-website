@@ -71,7 +71,7 @@
   }
 
   function leavePrices() {
-    (ratesDirty() ? confirmDiscardPrices() : Promise.resolve(true)).then(function (discard) {
+    (ratesDirty() ? confirmDiscardPrices() : Promise.resolve(true)).then(function (/** @type {boolean} */ discard) {
       if (!discard) return;
       A.state.ratesBaseline = null;
       A.navigate("dashboard");
@@ -80,7 +80,7 @@
 
   function renderRatesForm() {
     var prices = A.Pricing.getPrices();
-    var container = document.getElementById("rates-sections");
+    var container = A.byId("rates-sections");
     container.innerHTML = "";
     RATE_SECTIONS.forEach(function (s) {
       var group = A.el("section", "rate-group");
@@ -111,12 +111,14 @@
     A.state.ratesBaseline = ratesSnapshot();
   }
 
+  /** @param {Event} e */
   function handleRatesSubmit(e) {
     e.preventDefault();
     var prices = A.Pricing.getPrices();
+    /** @type {HTMLInputElement[]} */
     var bad = [];
     Object.keys(A.Pricing.DEFAULT_PRICES).forEach(function (key) {
-      var input = /** @type {HTMLInputElement} */ (document.querySelector('#rates-form [name="' + key + '"]'));
+      var input = /** @type {HTMLInputElement | null} */ (document.querySelector('#rates-form [name="' + key + '"]'));
       if (!input) return;
       var n = A.Pricing.parseNumber(input.value);
       var invalid = n === null || isNaN(n) || n < 0 || (key === "Labor_Tax_Rate_Percent" && n > 100);
@@ -141,4 +143,4 @@
   A.leavePrices = leavePrices;
   A.renderRatesForm = renderRatesForm;
   A.handleRatesSubmit = handleRatesSubmit;
-})((window.PRAdmin = window.PRAdmin || { state: {} }));
+})((window.PRAdmin = window.PRAdmin || /** @type {AdminNamespace} */ ({ state: {} })));

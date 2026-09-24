@@ -17,11 +17,16 @@
   // new device). So: ask the browser to keep the data, record every backup,
   // and keep a warning on the dashboard until a recent backup exists.
   // ------------------------------------------------------------------
+  /** @returns {LastBackup | null} */
   function getLastBackup() {
     var b = A.readJson(A.BACKUP_KEY, null);
     return b && typeof b.at === "string" && !isNaN(new Date(b.at).getTime()) ? b : null;
   }
 
+  /**
+   * @param {string} at
+   * @param {number} quoteCount
+   */
   function recordBackup(at, quoteCount) {
     return A.writeJson(A.BACKUP_KEY, { at: at, quoteCount: quoteCount });
   }
@@ -31,6 +36,10 @@
   A.state.persistence = null;
   A.state.persistenceAsked = false;
 
+  /**
+   * @param {boolean} [ask] also ask the browser to keep the data (not just what it has decided)
+   * @returns {Promise<string>}
+   */
   function checkPersistence(ask) {
     var storage = navigator.storage;
     if (!storage || typeof storage.persisted !== "function") {
@@ -58,6 +67,7 @@
       });
   }
 
+  /** @type {Record<string, string>} */
   var PERSISTENCE_TEXT = {
     persisted:
       "Storage: protected. This browser has agreed not to clear these quotes on its own. Clearing browsing data, " +
@@ -73,6 +83,7 @@
   };
 
   // The short version beside the backup line (the full text is in the details).
+  /** @type {Record<string, string>} */
   var PERSISTENCE_CHIP = { "not-persisted": "Storage not protected", unsupported: "Storage not guaranteed" };
 
   // The dashboard's one message when there are no quotes. If quotes were
@@ -93,6 +104,10 @@
           restore;
   }
 
+  /**
+   * @param {Quote[]} quotes
+   * @param {LastBackup | null} last
+   */
   function backupLine(quotes, last) {
     if (!quotes.length) return { text: "Nothing to back up yet.", due: false };
     if (!last) {
@@ -129,32 +144,37 @@
   function renderBackupPanel() {
     var panel = document.getElementById("backup-panel");
     if (!panel) return;
+    /** @type {Quote[]} */
     var quotes = A.getQuotes();
     var line = backupLine(quotes, getLastBackup());
-    document.getElementById("backup-status").textContent = line.text;
+    A.byId("backup-status").textContent = line.text;
     panel.classList.toggle("is-due", line.due);
     panel.setAttribute("data-backup", !quotes.length ? "empty" : line.due ? "due" : "ok");
-    var exportBtn = /** @type {HTMLButtonElement} */ (document.getElementById("export-quotes-btn"));
+    var exportBtn = /** @type {HTMLButtonElement} */ (A.byId("export-quotes-btn"));
     exportBtn.textContent = line.due ? "Export Now" : "Export Backup";
     exportBtn.className = "btn " + (line.due ? "btn-primary" : "btn-outline-dark");
     exportBtn.disabled = !quotes.length;
 
     var persistence = A.state.persistence;
-    var storageEl = document.getElementById("storage-status");
+    var storageEl = A.byId("storage-status");
     storageEl.hidden = !persistence;
     storageEl.textContent = persistence ? PERSISTENCE_TEXT[persistence] : "";
     storageEl.className = "backup-status" + (persistence && persistence !== "persisted" ? " is-warning" : "");
     storageEl.setAttribute("data-persistence", persistence || "");
-    var chip = document.getElementById("storage-chip");
+    var chip = A.byId("storage-chip");
     chip.textContent = PERSISTENCE_CHIP[persistence] || "";
     chip.hidden = !PERSISTENCE_CHIP[persistence];
-    document.getElementById("persist-retry-btn").hidden = persistence !== "not-persisted";
+    A.byId("persist-retry-btn").hidden = persistence !== "not-persisted";
     A.renderDisclosure("backup", false);
   }
 
   // ------------------------------------------------------------------
   // Export / import (JSON) so quotes can leave this browser
   // ------------------------------------------------------------------
+  /**
+   * @param {Blob | MediaSource} blob
+   * @param {string} filename
+   */
   function downloadBlob(blob, filename) {
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
@@ -172,6 +192,7 @@
   // Prices saved in this browser and the clean-up log, so a new browser or
   // device can be set up from it in one step.
   function exportQuotes() {
+    /** @type {Quote[]} */
     var quotes = A.getQuotes();
     if (!quotes.length) return A.toast("There are no quotes to back up.");
     var now = new Date().toISOString();
@@ -200,6 +221,7 @@
   // Restoring is one step: choosing the file restores it. It never deletes
   // anything: quotes not in this browser are added, and a quote already here
   // is replaced only by a newer copy.
+  /** @param {Blob} file */
   function importQuotes(file) {
     var reader = new FileReader();
     reader.onload = function () {
@@ -216,15 +238,17 @@
         return A.alertError("That file isn't a backup from this tool, so nothing was restored.");
       }
       if (!incoming.length) return A.alertError("That file has no quotes in it, so nothing was restored.");
+      /** @type {Quote[]} */
       var quotes = A.getQuotes();
       var wasEmpty = !quotes.length;
+      /** @type {Record<string, number>} */
       var byId = {};
       quotes.forEach(function (q, i) {
         byId[q.id] = i;
       });
       var added = 0;
       var updated = 0;
-      incoming.forEach(function (q) {
+      incoming.forEach(function (/** @type {Quote} */ q) {
         if (byId[q.id] === undefined) {
           quotes.push(q);
           added++;
@@ -259,14 +283,17 @@
 
   // Business Prices (only if none are saved in this browser) and the
   // clean-up log from a backup file. Returns a sentence for the message.
+  /** @param {BackupFile | Quote[] | null} parsed (an early backup was a bare list of quotes) */
   function restoreExtras(parsed) {
     if (!parsed || Array.isArray(parsed)) return "";
     var notes = "";
     var hasPrices = A.readJson(A.Pricing.RATES_KEY, null);
     if (parsed.businessPrices && typeof parsed.businessPrices === "object" && !(hasPrices && hasPrices.prices)) {
+      var saved = parsed.businessPrices;
+      /** @type {Prices} */
       var prices = {};
-      Object.keys(parsed.businessPrices).forEach(function (key) {
-        var n = Number(parsed.businessPrices[key]);
+      Object.keys(saved).forEach(function (key) {
+        var n = Number(saved[key]);
         if (Object.prototype.hasOwnProperty.call(A.Pricing.DEFAULT_PRICES, key) && isFinite(n) && n >= 0) {
           prices[key] = n;
         }
@@ -276,7 +303,9 @@
       }
     }
     if (Array.isArray(parsed.retentionLog) && parsed.retentionLog.length) {
+      /** @type {RetentionLogEntry[]} */
       var log = A.getRetentionLog();
+      /** @type {Record<string, boolean>} */
       var seen = {};
       log.forEach(function (e) {
         seen[e.type + "|" + e.date] = true;
@@ -302,4 +331,4 @@
   A.emptyListMessage = emptyListMessage;
   A.exportQuotes = exportQuotes;
   A.importQuotes = importQuotes;
-})((window.PRAdmin = window.PRAdmin || { state: {} }));
+})((window.PRAdmin = window.PRAdmin || /** @type {AdminNamespace} */ ({ state: {} })));

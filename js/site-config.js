@@ -42,6 +42,7 @@
   // whole number from 1 to 365 set by the owner, or null (not set) — then
   // the PDFs print no "held until" date. Returns a message if the setting
   // can't be used.
+  /** @param {unknown} value */
   function validForDaysProblem(value) {
     if (value === null || value === undefined || value === "") return "";
     if (typeof value === "number" && Math.floor(value) === value && value >= 1 && value <= 365) return "";
@@ -50,8 +51,10 @@
 
   // Visitor-count services the site can use (see js/analytics.js). Both
   // count without cookies and show only totals.
+  /** @type {Record<string, string>} */
   var ANALYTICS_PROVIDERS = { vercel: "Vercel Web Analytics", plausible: "Plausible Analytics" };
 
+  /** @param {unknown} value */
   function clean(value) {
     return typeof value === "string" ? value.trim() : "";
   }
@@ -61,6 +64,7 @@
 
   // Well-known form services, so the form text and the Privacy Notice name
   // the right one even if leadForm.serviceName is left blank.
+  /** @type {Record<string, string>} */
   var KNOWN_FORM_SERVICES = {
     "formspree.io": "Formspree",
     "getform.io": "Getform",
@@ -69,6 +73,7 @@
     "web3forms.com": "Web3Forms",
   };
 
+  /** @param {string} endpoint */
   function formServiceName(endpoint) {
     var m = /^https:\/\/([^/?#:]+)/i.exec(endpoint || "");
     if (!m) return "";
@@ -79,7 +84,10 @@
     return match ? KNOWN_FORM_SERVICES[match] : "";
   }
 
-  /** @returns {SiteConfigData} */
+  /**
+   * @param {Record<string, any> | null | undefined} raw the settings as read from site-config.json
+   * @returns {SiteConfigData}
+   */
   function normalize(raw) {
     raw = raw || {};
     var pe = raw.priceEstimator || {};
@@ -103,7 +111,7 @@
       // The estimator needs valid published prices: without them it stays
       // off, so a wrong price is never shown.
       priceEstimator: { enabled: pe.enabled === true && pricesOk },
-      prices: pricesOk ? priceCheck.prices : null,
+      prices: priceCheck && priceCheck.valid ? priceCheck.prices : null,
       priceProblems: priceCheck ? priceCheck.errors : [],
       leadForm: {
         // false = "please call us" mode: the Get a Quote page shows the phone
@@ -149,12 +157,22 @@
     return;
   }
 
+  // A setting by its dotted name ("owner.legalName"), or "" if there is none.
+  /**
+   * @param {SiteConfigData} config
+   * @param {string} path
+   * @returns {any}
+   */
   function lookup(config, path) {
-    return path.split(".").reduce(function (obj, key) {
+    return path.split(".").reduce(function (/** @type {any} */ obj, key) {
       return obj && obj[key] !== undefined ? obj[key] : "";
-    }, config);
+    }, /** @type {any} */ (config));
   }
 
+  /**
+   * @param {SiteConfigData} config
+   * @param {ParentNode} [scope] the part of the page to fill in (default: all of it)
+   */
   function apply(config, scope) {
     scope = scope || document;
     // Published prices in page text: <span data-price="Cabinet_Price">$60</span>.
@@ -197,9 +215,10 @@
   }
 
   // Why the settings couldn't be used, in words safe to report.
+  /** @param {unknown} err */
   function problemOf(err) {
-    if (err && /^HTTP \d+$/.test(err.message)) return "Not loaded: " + err.message;
-    if (err && err.name === "SyntaxError") return "Not loaded: not valid JSON";
+    if (err instanceof Error && /^HTTP \d+$/.test(err.message)) return "Not loaded: " + err.message;
+    if (err instanceof SyntaxError) return "Not loaded: not valid JSON";
     return "Not loaded: network error";
   }
 
@@ -223,9 +242,12 @@
       return fallback;
     });
 
+  /** @type {Promise<void>} */
   var domReady = new Promise(function (resolve) {
     if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", resolve);
+      document.addEventListener("DOMContentLoaded", function () {
+        resolve();
+      });
     } else {
       resolve();
     }

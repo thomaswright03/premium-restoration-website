@@ -1,6 +1,8 @@
 {
-  // Type check (no build): `npm run typecheck` checks the admin tool and the
-  // shared pricing module with TypeScript, reading the JSDoc in the files.
+  // Type check (no build): `npm run typecheck` checks every script in js/
+  // (public pages, chat and admin tool) with TypeScript in strict mode,
+  // reading the JSDoc in the files. Shared shapes are named in
+  // types/globals.d.ts. tests/unit/typecheck.test.js keeps it strict.
   "compilerOptions": {
     "allowJs": true,
     "checkJs": true,
@@ -11,8 +13,8 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "types": [],
-    "strict": false,
+    "strict": true,
     "skipLibCheck": true
   },
-  "include": ["types/*.d.ts", "js/*.js", "js/admin/*.js"]
+  "include": ["types/*.d.ts", "js/*.js", "js/admin/*.js", "js/chat/*.js"]
 }

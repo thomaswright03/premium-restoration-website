@@ -25,6 +25,9 @@
 (function (/** @type {any} */ root) {
   "use strict";
 
+  /** @typedef {any} JsPdfDocument jsPDF's document (the self-hosted library has no type declarations) */
+  /** @typedef {Record<string, string>} FontFiles font file name -> its bytes as a binary string */
+
   var node = typeof module === "object" && module.exports && typeof require === "function";
 
   // ------------------------------------------------------------------
@@ -33,13 +36,16 @@
   // No 0/O or 1/I, so a reference read out over the phone is unambiguous.
   var CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
+  /** @param {Date} date */
   function ymd(date) {
+    /** @param {number} n */
     var pad = function (n) {
       return (n < 10 ? "0" : "") + n;
     };
     return String(date.getFullYear()) + pad(date.getMonth() + 1) + pad(date.getDate());
   }
 
+  /** @param {number} length */
   function randomCode(length) {
     var bytes = new Uint8Array(length);
     var cryptoApi = root.crypto;
@@ -55,6 +61,7 @@
   // A new, random reference for a visitor's estimate: "PR-E-20260924-7K3F".
   // It is made in the browser and identifies that document only; it is not
   // recorded anywhere unless the visitor sends it with a quote request.
+  /** @param {Date} [date] */
   function estimateReference(date) {
     return "PR-E-" + ymd(date || new Date()) + "-" + randomCode(4);
   }
@@ -62,6 +69,7 @@
   // An admin quote's reference comes from the quote itself (the date it was
   // created and its id), so every PDF of the same quote carries the same
   // one: "PR-Q-20260924-K3M9QX".
+  /** @param {Pick<Quote, "id" | "createdAt"> & Partial<Quote>} quote */
   function quoteReference(quote) {
     var created = new Date(quote.createdAt || quote.updatedAt || Date.now());
     if (isNaN(created.getTime())) created = new Date();
@@ -80,6 +88,7 @@
     return "PR-Q-" + ymd(created) + "-" + code;
   }
 
+  /** @param {Date} date */
   function longDate(date) {
     return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   }
@@ -87,6 +96,11 @@
   // The last day prices are held: `days` calendar days after the issue date,
   // or null when the owner hasn't set a period (estimates.validForDays in
   // site-config.json), in which case no date is printed.
+  /**
+   * @param {Date} issued
+   * @param {number | null | undefined} days
+   * @returns {Date | null}
+   */
   function heldUntil(issued, days) {
     if (!(typeof days === "number" && days > 0)) return null;
     return new Date(issued.getFullYear(), issued.getMonth(), issued.getDate() + days);
@@ -96,6 +110,7 @@
   // until when the owner has set a period.
   var PRICES_MAY_CHANGE = "Prices are current as of the date generated and may change.";
 
+  /** @param {Date | null} until */
   function pricesSentence(until) {
     return until
       ? "Prices are current as of the date generated and are held until " +
@@ -105,6 +120,10 @@
   }
 
   // Replaces the "may change" sentence of a disclaimer with pricesSentence().
+  /**
+   * @param {string} text
+   * @param {Date | null} until
+   */
   function withHeldUntil(text, until) {
     return String(text).replace(PRICES_MAY_CHANGE, pricesSentence(until));
   }
@@ -127,12 +146,16 @@
   var script = /** @type {HTMLScriptElement | null} */ (document.currentScript);
   var base = script && script.src ? script.src : new URL("js/estimate-pdf.js", location.href).href;
   var JSPDF_SRC = new URL("vendor/jspdf.umd.min.js", base).href;
+  // File -> [font name, style] as registered with jsPDF.
+  /** @type {Record<string, [string, string]>} */
   var FONT_FILES = {
     "inter-regular.ttf": ["Inter", "normal"],
     "inter-semibold.ttf": ["Inter", "bold"],
     "playfair-display-bold.ttf": ["PlayfairDisplay", "bold"],
   };
+  /** @type {Promise<unknown> | null} */
   var loading = null;
+  /** @type {Promise<FontFiles | null> | null} */
   var fontsLoading = null;
 
   function loadLibrary() {
@@ -153,6 +176,7 @@
     });
   }
 
+  /** @param {ArrayBuffer} buffer */
   function binaryString(buffer) {
     var bytes = new Uint8Array(buffer);
     var out = "";
@@ -176,6 +200,7 @@
       }),
     ).then(
       function (buffers) {
+        /** @type {FontFiles} */
         var files = {};
         names.forEach(function (name, i) {
           files[name] = binaryString(buffers[i]);
@@ -190,6 +215,7 @@
     return fontsLoading;
   }
 
+  /** @type {FontFiles | null} */
   var fonts = null;
 
   function load() {
@@ -220,26 +246,24 @@
 
   // Registers the embedded fonts with this document, and returns how to set
   // each text style (with the standard fonts if the site's didn't load).
+  /** @param {JsPdfDocument} doc */
   function setUpFonts(doc) {
     if (fonts) {
-      Object.keys(FONT_FILES).forEach(function (name) {
-        doc.addFileToVFS(name, fonts[name]);
-        doc.addFont(name, FONT_FILES[name][0], FONT_FILES[name][1], "Identity-H");
-      });
+      var names = Object.keys(FONT_FILES);
+      for (var i = 0; i < names.length; i++) {
+        doc.addFileToVFS(names[i], fonts[names[i]]);
+        doc.addFont(names[i], FONT_FILES[names[i]][0], FONT_FILES[names[i]][1], "Identity-H");
+      }
       return { text: "Inter", display: "PlayfairDisplay", displayStyle: "bold", embedded: true };
     }
     return { text: "helvetica", display: "times", displayStyle: "bold", embedded: false };
   }
 
-  // spec: {
-  //   title, reference, issued (Date), heldUntil? (Date),
-  //   preparedFor?, contact?, intro?,
-  //   lines: [{ label, detail, amount }],
-  //   excluded: [{ label, value }],
-  //   totals: [{ label, value, strong? }],
-  //   afterTotal: [string], sections: [{ title, items: [string] }],
-  //   footer: { business, phone, email }
-  // }
+  // Lays out a PdfSpec (types/globals.d.ts) and returns the jsPDF document.
+  /**
+   * @param {PdfSpec} spec
+   * @returns {JsPdfDocument}
+   */
   function build(spec) {
     var doc = new window.jspdf.jsPDF({ unit: "pt", format: "letter" });
     var face = setUpFonts(doc);
@@ -254,6 +278,7 @@
 
     // Letters the font doesn't have (e.g. in a customer's name) are written
     // without their accents rather than as empty boxes.
+    /** @param {string} text */
     function safe(text) {
       text = String(text).replace(/→/g, "->").replace(/←/g, "<-");
       if (!face.embedded) return text;
@@ -266,6 +291,11 @@
       });
     }
 
+    /**
+     * @param {string} kind "normal", "strong" or "display"
+     * @param {number} size
+     * @param {number[]} color
+     */
     function style(kind, size, color) {
       if (kind === "display") doc.setFont(face.display, face.displayStyle);
       else doc.setFont(face.text, kind === "strong" ? "bold" : "normal");
@@ -273,10 +303,16 @@
       doc.setTextColor(color[0], color[1], color[2]);
     }
 
+    /**
+     * @param {string} text
+     * @param {number} maxWidth
+     * @returns {string[]}
+     */
     function lines(text, maxWidth) {
       return doc.splitTextToSize(safe(text), maxWidth);
     }
 
+    /** @param {number} height */
     function ensure(height) {
       if (y + height > bottom) {
         doc.addPage();
@@ -284,6 +320,13 @@
       }
     }
 
+    /**
+     * @param {string} text
+     * @param {number} size
+     * @param {number[]} color
+     * @param {string} kind
+     * @param {number} [gap]
+     */
     function paragraph(text, size, color, kind, gap) {
       style(kind || "normal", size, color);
       var lineHeight = size * 1.4;
@@ -295,6 +338,10 @@
       y += gap === undefined ? 6 : gap;
     }
 
+    /**
+     * @param {number[]} color
+     * @param {number} [thickness]
+     */
     function rule(color, thickness) {
       ensure(12);
       doc.setDrawColor(color[0], color[1], color[2]);
@@ -395,7 +442,7 @@
     });
 
     var total = doc.getNumberOfPages();
-    var f = spec.footer || {};
+    var f = spec.footer || { phone: window.BusinessInfo.PHONE, email: window.BusinessInfo.EMAIL };
     for (var i = 1; i <= total; i++) {
       doc.setPage(i);
       doc.setDrawColor(LINE[0], LINE[1], LINE[2]);

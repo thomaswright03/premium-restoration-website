@@ -11,7 +11,9 @@
 (function (C) {
   "use strict";
 
+  /** @type {HTMLElement | null} */
   var returnFocus = null;
+  /** @type {HTMLElement[]} */
   var inertElements = [];
   var focusingQuietly = false;
 
@@ -23,6 +25,7 @@
     if (C.els.toolbar) C.els.toolbar.hidden = C.els.progress.hidden && C.els.close.hidden;
   }
 
+  /** @param {boolean} on */
   function setBackgroundInert(on) {
     inertElements.forEach(function (node) {
       node.inert = false;
@@ -42,10 +45,11 @@
 
   // opener: the control that asked for full screen, to get focus back when
   // it closes (by default whatever has focus now).
+  /** @param {HTMLElement | null} [opener] */
   function enterFullscreen(opener) {
     if (isFullscreen()) return;
     var section = C.els.section;
-    returnFocus = opener || document.activeElement;
+    returnFocus = opener || /** @type {HTMLElement | null} */ (document.activeElement);
     section.classList.add("is-fullscreen");
     section.setAttribute("role", "dialog");
     section.setAttribute("aria-modal", "true");
@@ -58,6 +62,7 @@
     C.els.messages.scrollTop = C.els.messages.scrollHeight;
   }
 
+  /** @param {HTMLElement} node */
   function focusQuietly(node) {
     focusingQuietly = true;
     node.focus({ preventScroll: true });
@@ -68,12 +73,16 @@
     return focusingQuietly;
   }
 
+  /**
+   * @param {HTMLElement | null} node
+   * @returns {node is HTMLElement}
+   */
   function usable(node) {
     return !!(
       node &&
       node !== document.body &&
       document.contains(node) &&
-      !node.disabled &&
+      !(/** @type {HTMLButtonElement} */ (node).disabled) &&
       node.getClientRects().length > 0
     );
   }
@@ -97,15 +106,17 @@
     if (target && target.scrollIntoView) target.scrollIntoView({ block: "nearest" });
   }
 
+  /** @returns {HTMLElement[]} */
   function focusableInChat() {
     return Array.prototype.filter.call(
       C.els.section.querySelectorAll("button, input, a[href], select, textarea, [tabindex]:not([tabindex='-1'])"),
       function (node) {
-        return !node.disabled && node.getClientRects().length > 0;
+        return !(/** @type {HTMLButtonElement} */ (node).disabled) && node.getClientRects().length > 0;
       },
     );
   }
 
+  /** @returns {HTMLElement | null} */
   function firstFocusableInChat() {
     var active = C.els.messages.querySelector(
       ".ai-chat-group-form:not(.is-done) input, .ai-chat-group-form:not(.is-done) button",
@@ -114,6 +125,7 @@
   }
 
   // Escape closes full screen; Tab stays inside it.
+  /** @param {KeyboardEvent} e */
   function onKeydown(e) {
     if (!isFullscreen()) return;
     if (e.key === "Escape") {

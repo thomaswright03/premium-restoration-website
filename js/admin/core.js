@@ -46,6 +46,11 @@
   // Storage. Every write is checked: if the browser refuses (storage full,
   // blocked, private mode), the person is told and nothing on screen is lost.
   // ------------------------------------------------------------------
+  /**
+   * @param {string} key
+   * @param {unknown} fallback returned when nothing (or nothing readable) is saved
+   * @returns {any}
+   */
   function readJson(key, fallback) {
     try {
       var raw = localStorage.getItem(key);
@@ -55,6 +60,10 @@
     }
   }
 
+  /**
+   * @param {string} key
+   * @param {unknown} value
+   */
   function writeJson(key, value) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
@@ -64,6 +73,7 @@
     }
   }
 
+  /** @param {string} key */
   function removeKey(key) {
     try {
       localStorage.removeItem(key);
@@ -72,11 +82,13 @@
     }
   }
 
+  /** @returns {Quote[]} */
   function getQuotes() {
     var quotes = readJson(QUOTES_KEY, []);
     return Array.isArray(quotes) ? quotes : [];
   }
 
+  /** @param {Quote[]} quotes */
   function saveQuotes(quotes) {
     return writeJson(QUOTES_KEY, quotes);
   }
@@ -86,12 +98,18 @@
 
   // Calendar days, not 24-hour periods: a backup made at 11 pm is
   // "yesterday" by 8 am (js/admin/dates.js).
+  /** @param {string | number | Date} iso */
   function daysSince(iso) {
     return window.CalendarDays.calendarDaysBetween(iso, Date.now());
   }
 
   var describeAge = window.CalendarDays.describeAge;
 
+  /**
+   * @param {number} n
+   * @param {string} one
+   * @param {string} [many] (default: one + "s")
+   */
   function plural(n, one, many) {
     return n + " " + (n === 1 ? one : many || one + "s");
   }
@@ -116,20 +134,25 @@
   // button) and stay until dismissed, replaced, or the screen changes.
   A.state.toastRoute = null;
 
+  /**
+   * @param {string} text
+   * @param {string} [route] the screen it belongs to (default: the one shown)
+   */
   function toast(text, route) {
-    document.getElementById("admin-toast").textContent = text;
-    document.getElementById("admin-toast-box").hidden = false;
+    byId("admin-toast").textContent = text;
+    byId("admin-toast-box").hidden = false;
     A.state.toastRoute = route || A.state.currentRoute;
   }
 
   function hideToast() {
-    document.getElementById("admin-toast-box").hidden = true;
-    document.getElementById("admin-toast").textContent = "";
+    byId("admin-toast-box").hidden = true;
+    byId("admin-toast").textContent = "";
     A.state.toastRoute = null;
   }
 
+  /** @param {string} text */
   function alertError(text) {
-    var el = document.getElementById("admin-alert");
+    var el = byId("admin-alert");
     el.textContent = text || "";
     el.hidden = !text;
     if (text) el.scrollIntoView({ block: "nearest" });
@@ -141,20 +164,35 @@
   //   askDialog({ title, message, actions: [{ id, label, style }], cancelLabel })
   //   resolves to the chosen action's id, or null for Cancel / Escape.
   // ------------------------------------------------------------------
+  /** @type {Promise<string | null> | null} */
   var dialogPending = null;
 
+  /**
+   * @typedef {{
+   *   title: string;
+   *   message?: string;
+   *   actions?: { id: string; label: string; style?: string }[];
+   *   cancelLabel?: string;
+   *   returnFocus?: HTMLElement | null;
+   * }} DialogOptions
+   */
+
+  /**
+   * @param {DialogOptions} options
+   * @returns {Promise<string | null>}
+   */
   function askDialog(options) {
-    var dialog = /** @type {HTMLDialogElement} */ (document.getElementById("admin-dialog"));
+    var dialog = /** @type {HTMLDialogElement} */ (byId("admin-dialog"));
     if (dialogPending) return Promise.resolve(null);
     if (typeof dialog.showModal !== "function") {
       // Very old browsers: fall back to the plain confirm box.
       var ok = window.confirm(options.title + "\n\n" + (options.message || ""));
       return Promise.resolve(ok && options.actions && options.actions[0] ? options.actions[0].id : null);
     }
-    var opener = document.activeElement;
-    document.getElementById("admin-dialog-title").textContent = options.title;
-    document.getElementById("admin-dialog-message").textContent = options.message || "";
-    var actions = document.getElementById("admin-dialog-actions");
+    var opener = /** @type {HTMLElement | null} */ (document.activeElement);
+    byId("admin-dialog-title").textContent = options.title;
+    byId("admin-dialog-message").textContent = options.message || "";
+    var actions = byId("admin-dialog-actions");
     actions.innerHTML = "";
     var cancel = el("button", "btn btn-outline-dark", options.cancelLabel || "Cancel");
     cancel.type = "submit";
@@ -173,7 +211,8 @@
     });
     actions.appendChild(cancel);
     dialog.returnValue = "";
-    dialogPending = new Promise(function (resolve) {
+    /** @type {Promise<string | null>} */
+    var pending = new Promise(function (resolve) {
       dialog.addEventListener(
         "close",
         function () {
@@ -186,11 +225,19 @@
         { once: true },
       );
     });
+    dialogPending = pending;
     dialog.showModal();
     cancel.focus();
-    return dialogPending;
+    return pending;
   }
 
+  /**
+   * @param {string} title
+   * @param {string} message
+   * @param {string} label the button that goes ahead
+   * @param {string} [style] "danger" (default) or "primary"
+   * @returns {Promise<boolean>}
+   */
   function confirmAction(title, message, label, style) {
     return askDialog({
       title: title,
@@ -201,12 +248,18 @@
     });
   }
 
+  /** @param {string | number | Date} iso */
   function formatDate(iso) {
     var d = new Date(iso);
     if (isNaN(d.getTime())) return "unknown date";
     return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
   }
 
+  /**
+   * @param {string} text
+   * @param {string} className
+   * @param {(this: HTMLButtonElement, ev: MouseEvent) => void} onClick
+   */
   function makeButton(text, className, onClick) {
     var btn = document.createElement("button");
     btn.type = "button";
@@ -216,14 +269,31 @@
     return btn;
   }
 
+  /** @param {string} text */
   function capitalize(text) {
     return text.charAt(0).toUpperCase() + text.slice(1);
   }
 
+  /**
+   * @template {keyof HTMLElementTagNameMap} K
+   * @param {K} tag
+   * @param {string | null} [className]
+   * @param {string | number | null} [text]
+   * @returns {HTMLElementTagNameMap[K]}
+   */
   function el(tag, className, text) {
     var node = document.createElement(tag);
     if (className) node.className = className;
-    if (text !== undefined && text !== null) node.textContent = text;
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    return node;
+  }
+
+  // An element admin/index.html always has. A missing one is a mistake in
+  // the page, so it stops with a clear message rather than failing later.
+  /** @param {string} id */
+  function byId(id) {
+    var node = document.getElementById(id);
+    if (!node) throw new Error("admin/index.html has no #" + id);
     return node;
   }
 
@@ -234,17 +304,25 @@
   // ------------------------------------------------------------------
   A.state.disclosures = {};
 
+  /**
+   * @param {string} name
+   * @param {boolean} autoOpen open unless the owner chose otherwise
+   */
   function renderDisclosure(name, autoOpen) {
-    var toggle = /** @type {HTMLElement} */ (document.getElementById(name + "-toggle"));
-    var details = /** @type {HTMLElement} */ (document.getElementById(name + "-details"));
+    var toggle = byId(name + "-toggle");
+    var details = byId(name + "-details");
     var chosen = A.state.disclosures[name];
     var open = typeof chosen === "boolean" ? chosen : autoOpen;
     details.hidden = !open;
     toggle.setAttribute("aria-expanded", open ? "true" : "false");
   }
 
+  /**
+   * @param {string} name
+   * @param {() => void} render
+   */
   function initDisclosure(name, render) {
-    var toggle = /** @type {HTMLElement} */ (document.getElementById(name + "-toggle"));
+    var toggle = byId(name + "-toggle");
     toggle.addEventListener("click", function () {
       A.state.disclosures[name] = toggle.getAttribute("aria-expanded") !== "true";
       render();
@@ -286,4 +364,5 @@
   A.makeButton = makeButton;
   A.capitalize = capitalize;
   A.el = el;
-})((window.PRAdmin = window.PRAdmin || { state: {} }));
+  A.byId = byId;
+})((window.PRAdmin = window.PRAdmin || /** @type {AdminNamespace} */ ({ state: {} })));

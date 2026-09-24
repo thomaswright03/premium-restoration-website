@@ -10,6 +10,10 @@
   // ------------------------------------------------------------------
   // Customer-ready PDF of a saved quote (same style as the public estimate)
   // ------------------------------------------------------------------
+  /**
+   * @param {Quote} quote
+   * @param {HTMLButtonElement} button
+   */
   function downloadQuotePdf(quote, button) {
     if (!A.pricesReady()) return;
     var bathroom = quote.data.bathroom;
@@ -23,6 +27,7 @@
         var scope = bathroom.scope || {};
         var prices = Object.assign({}, A.Pricing.DEFAULT_PRICES, bathroom.prices || {});
         var result = A.Pricing.computeEstimate(values, scope, { prices: prices, includeTrade: true });
+        /** @type {NonNullable<PdfSpec["totals"]>} */
         var totals = [{ label: "Labor subtotal", value: A.money(result.subtotal) }];
         if (result.taxRatePercent > 0) {
           totals.push({ label: "Tax (" + result.taxRatePercent + "%)", value: A.money(result.taxAmount) });
@@ -41,7 +46,7 @@
           preparedFor: [customer.name, quote.address].filter(Boolean).join(", "),
           contact: [customer.phone, customer.email].filter(Boolean).join("  ·  "),
           intro: "Labor estimate for the work listed below.",
-          lines: result.lines.map(function (l) {
+          lines: result.lines.map(function (/** @type {PricingLine} */ l) {
             return { label: l.label, detail: l.detail, amount: A.money(l.cost) };
           }),
           excluded: [
@@ -90,4 +95,4 @@
 
   // Used by the other parts of the admin tool.
   A.downloadQuotePdf = downloadQuotePdf;
-})((window.PRAdmin = window.PRAdmin || { state: {} }));
+})((window.PRAdmin = window.PRAdmin || /** @type {AdminNamespace} */ ({ state: {} })));

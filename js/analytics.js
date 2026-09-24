@@ -51,23 +51,38 @@
     );
   }
 
+  /**
+   * Sends one event: its name, and for an error report a few details.
+   * @typedef {(name: string, props?: Record<string, string>) => void} Send
+   */
+
+  /**
+   * @param {string} src
+   * @param {Record<string, string>} [attrs]
+   */
   function addScript(src, attrs) {
     var el = document.createElement("script");
     el.src = src;
     el.defer = true;
-    Object.keys(attrs || {}).forEach(function (key) {
-      el.setAttribute(key, attrs[key]);
+    var extra = attrs || {};
+    Object.keys(extra).forEach(function (key) {
+      el.setAttribute(key, extra[key]);
     });
     document.head.appendChild(el);
   }
 
   // Returns a function that sends one event, or null when nothing is counted.
+  /**
+   * @param {SiteConfigData | null} config
+   * @returns {Send | null}
+   */
   function start(config) {
     var a = config && config.analytics;
     if (!a || !a.enabled || privacySignal()) return null;
     if (document.documentElement.hasAttribute("data-no-analytics")) return null;
     if (a.provider === "vercel") {
-      // Vercel Web Analytics (served from this website's own domain).
+      // Vercel Web Analytics (served from this website's own domain). Until
+      // its script has loaded, events wait in window.vaq.
       window.va =
         window.va ||
         function () {
@@ -75,17 +90,23 @@
         };
       addScript(a.scriptUrl || VERCEL_SCRIPT);
       return function (name, props) {
-        window.va("event", props ? { name: name, data: props } : { name: name });
+        // Looked up each time: the provider's script replaces window.va once loaded.
+        if (window.va) window.va("event", props ? { name: name, data: props } : { name: name });
       };
     }
     if (a.provider === "plausible") {
-      window.plausible =
-        window.plausible ||
-        function () {
-          (window.plausible.q = window.plausible.q || []).push(arguments);
-        };
+      if (!window.plausible) {
+        // Until its script has loaded, events wait in plausible.q.
+        var waiting = /** @type {NonNullable<Window["plausible"]>} */ (
+          function () {
+            (waiting.q = waiting.q || []).push(Array.prototype.slice.call(arguments));
+          }
+        );
+        window.plausible = waiting;
+      }
       addScript(a.scriptUrl || PLAUSIBLE_SCRIPT, { "data-domain": a.domain || window.location.hostname });
       return function (name, props) {
+        if (!window.plausible) return;
         if (props) window.plausible(name, { props: props });
         else window.plausible(name);
       };
@@ -99,6 +120,7 @@
   var MAX_REPORTS = 5;
 
   // A same-origin address as its path only (no query or #), else "other site".
+  /** @param {string} url */
   function ownPath(url) {
     try {
       var u = new URL(url, window.location.href);
@@ -110,34 +132,53 @@
 
   // Only a standard kind of error ("TypeError"): a name of letters ending in
   // "Error", never its message.
+  /** @param {unknown} error */
   function kindOf(error) {
-    var name = error && typeof error.name === "string" ? error.name : "";
+    var name = error instanceof Error ? error.name : "";
     return /^[A-Za-z]{0,31}Error$/.test(name) ? name : "Error";
   }
 
   // The first place in the stack that is on this website: "/js/x.js:12:5".
+  /** @param {unknown} error */
   function placeInStack(error) {
-    var stack = error && typeof error.stack === "string" ? error.stack : "";
+    var stack = error instanceof Error && typeof error.stack === "string" ? error.stack : "";
     var m = /(https?:\/\/[^\s)]+?):(\d+):(\d+)/.exec(stack);
     return m && ownPath(m[1]) !== "other site" ? ownPath(m[1]) + ":" + m[2] + ":" + m[3] : "unknown";
   }
 
   // What is sent for one error event: { kind, source } only.
+  /**
+   * @param {Event} e an "error" or "unhandledrejection" event
+   * @returns {Record<string, string>}
+   */
   function describe(e) {
-    if (e && e.type === "unhandledrejection") return { kind: kindOf(e.reason), source: placeInStack(e.reason) };
-    var target = e && e.target;
-    if (target && target !== window && (target.src || target.href)) {
-      return { kind: "File failed to load", source: ownPath(target.src || target.href) };
+    if (e.type === "unhandledrejection") {
+      var reason = /** @type {PromiseRejectionEvent} */ (e).reason;
+      return { kind: kindOf(reason), source: placeInStack(reason) };
     }
-    var where = e && e.filename ? ownPath(e.filename) : "unknown";
+    // A script, stylesheet or image that couldn't be loaded.
+    var target = e.target;
+    var address = target instanceof Element ? target.getAttribute("src") || target.getAttribute("href") : null;
+    if (address) return { kind: "File failed to load", source: ownPath(address) };
+    if (!(e instanceof ErrorEvent)) return { kind: "Error", source: "unknown" };
+    var where = e.filename ? ownPath(e.filename) : "unknown";
     if (where !== "other site" && where !== "unknown" && e.lineno) where += ":" + e.lineno + ":" + (e.colno || 0);
-    return { kind: kindOf(e && e.error), source: where };
+    return { kind: kindOf(e.error), source: where };
   }
 
+  /**
+   * @param {SiteConfigData} config
+   * @param {Send} send
+   */
   function startErrorReports(config, send) {
     var queue = window.__prErrors || [];
+    /** @type {Record<string, boolean>} */
     var seen = {};
     var sent = 0;
+    /**
+     * @param {string} event
+     * @param {Record<string, string>} props
+     */
     function report(event, props) {
       var key = event + "|" + JSON.stringify(props);
       if (seen[key] || sent >= MAX_REPORTS) return;
@@ -158,7 +199,9 @@
       report(EVENTS.SCRIPT_ERROR, describe(e));
       return 0;
     };
-    waiting.forEach(queue.push);
+    waiting.forEach(function (e) {
+      queue.push(e);
+    });
   }
 
   function stopKeepingErrors() {
@@ -173,7 +216,7 @@
   var ready = (window.SiteConfig ? window.SiteConfig.ready : Promise.resolve(null))
     .then(function (config) {
       var send = start(config);
-      if (send && config.errorReports && config.errorReports.enabled) startErrorReports(config, send);
+      if (config && send && config.errorReports.enabled) startErrorReports(config, send);
       else stopKeepingErrors();
       return send;
     })
@@ -182,6 +225,7 @@
       return null;
     });
 
+  /** @param {string} name one of EVENTS */
   function track(name) {
     ready.then(function (send) {
       if (!send) return;

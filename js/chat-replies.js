@@ -18,6 +18,13 @@
 
 (function (/** @type {any} */ root) {
   "use strict";
+
+  /**
+   * A reply: text to show (null when the estimate starts straight away) and
+   * what the chat does next ("offerEstimate", "startEstimate" or null).
+   * @typedef {{ text: string | null, action: string | null }} ChatReply
+   */
+  /** @typedef {ReturnType<typeof wording>} Wording */
   var node = typeof module === "object" && module.exports && typeof require === "function";
   /** @type {typeof import("./bathroom-pricing.js")} */
   var Pricing = node ? require("./bathroom-pricing.js") : root.BathroomPricing;
@@ -33,12 +40,17 @@
   var PLUMBING_EXTRA =
     "Installing it also needs plumbing work, which isn't included in our online prices and will add to the cost.";
 
+  /**
+   * @param {string} text
+   * @param {string | RegExp} pattern
+   */
   function has(text, pattern) {
     return new RegExp(pattern).test(text);
   }
 
   // Lower-case, straight apostrophes removed ("don't" -> "dont"), and every
   // other non-letter/digit turned into a space.
+  /** @param {unknown} message */
   function normalize(message) {
     return (
       " " +
@@ -226,6 +238,7 @@
 
   // The non-bathroom work or rooms a message names, ignoring room words that
   // only say where the bathroom is.
+  /** @param {string} t */
   function otherWorkNamed(t) {
     var rest = t
       .replace(new RegExp("\\b" + ROOM_WORDS + "\\s+" + BATHROOM_WORDS + "\\b", "g"), " bathroom ")
@@ -240,9 +253,10 @@
         ),
         " bathroom ",
       );
+    /** @type {string[]} */
     var found = [];
     [OTHER_WORK, OTHER_ROOMS].forEach(function (pattern) {
-      (rest.match(new RegExp(pattern, "g")) || []).forEach(function (word) {
+      (rest.match(new RegExp(pattern, "g")) || []).forEach(function (/** @type {string} */ word) {
         word = word.trim();
         if (found.indexOf(word) === -1) found.push(word);
       });
@@ -250,6 +264,7 @@
     return found;
   }
 
+  /** @param {string[]} words */
   function listWords(words) {
     if (words.length === 1) return words[0];
     return words.slice(0, -1).join(", ") + " and " + words[words.length - 1];
@@ -453,6 +468,10 @@
   // settings: with the Get a Quote form switched off ("please call us" mode)
   // nothing sends the visitor to the form, and with the estimator off nothing
   // offers an estimate or a price.
+  /**
+   * @param {boolean} estimator
+   * @param {boolean} formOn
+   */
   function wording(estimator, formOn) {
     var orForm = formOn ? " or use the Get a Quote page" : " or email " + EMAIL;
     var callOrForm = "call " + PHONE + orForm;
@@ -571,9 +590,14 @@
     };
   }
 
+  /**
+   * @param {string} t
+   * @param {boolean} estimator
+   */
   function unpricedReply(t, estimator) {
+    /** @type {string[]} */
     var names = [];
-    (t.match(new RegExp(UNPRICED, "g")) || []).forEach(function (word) {
+    (t.match(new RegExp(UNPRICED, "g")) || []).forEach(function (/** @type {string} */ word) {
       word = word.trim();
       if (names.indexOf(word) === -1) names.push(word);
     });
@@ -592,6 +616,7 @@
     );
   }
 
+  /** @param {boolean} estimator */
   function heatedFloorReply(estimator) {
     return (
       "A heated floor needs electrical work, which isn't included in our online prices and adds to the cost, and we do not currently hold a contractor licence. " +
@@ -611,6 +636,10 @@
   // Questions answered on their own subject, even when they name an item
   // ("Is there a warranty on the tile?"). Licence and insurance can both be
   // asked at once; availability wins over a general timeline question.
+  /**
+   * @param {string} t
+   * @param {Wording} w
+   */
   function topicalAnswers(t, w) {
     var list = [];
     if (has(t, LICENCE)) list.push(w.licence);
@@ -621,6 +650,12 @@
     return list.join(" ");
   }
 
+  /**
+   * @param {string[]} others
+   * @param {boolean} estimator
+   * @param {Wording} w
+   * @returns {ChatReply}
+   */
   function mixedReply(others, estimator, w) {
     var text =
       "We can help with the bathroom, but we only take on bathroom restorations, so we can't quote the " +
@@ -635,7 +670,9 @@
 
   // Published item prices named in the message (after unpriced words are
   // taken out, so "vanity top" is not priced as a vanity).
+  /** @param {string} t */
   function itemPrices(t) {
+    /** @type {string[]} */
     var matched = [];
     var rest = t.replace(new RegExp(UNPRICED, "g"), " ");
     ITEMS.forEach(function (item) {
@@ -651,6 +688,11 @@
   // What the visitor is asking about before any price is considered: who is
   // answering, the language, a person, work we don't do, and questions that
   // only a call can answer. Returns a reply, or null to carry on.
+  /**
+   * @param {string} t
+   * @param {boolean} estimator
+   * @param {Wording} w
+   */
   function firstChecks(t, estimator, w) {
     if (has(t, IDENTITY)) return { text: IDENTITY_REPLY, action: null };
     if (has(t, OTHER_LANGUAGE)) return { text: OTHER_LANGUAGE_REPLY, action: null };
@@ -673,11 +715,22 @@
     return null;
   }
 
+  /**
+   * @param {boolean} estimator
+   * @param {string} text
+   * @returns {ChatReply}
+   */
   function offerIf(estimator, text) {
     return estimator ? { text: text + " " + ESTIMATE_OFFER, action: "offerEstimate" } : { text: text, action: null };
   }
 
   // Prices, unpriced items and estimate requests. Returns a reply, or null.
+  /**
+   * @param {string} t
+   * @param {boolean} estimator
+   * @param {Wording} w
+   * @param {string} topical
+   */
   function priceChecks(t, estimator, w, topical) {
     var asksPrice = has(t, PRICE_WORDS);
     if (topical && !asksPrice) return { text: topical, action: null };
@@ -703,6 +756,11 @@
   }
 
   // Everything else: photos, services, privacy, area, hours, contact, greetings.
+  /**
+   * @param {string} t
+   * @param {boolean} estimator
+   * @param {Wording} w
+   */
   function generalChecks(t, estimator, w) {
     if (has(t, PHOTOS)) return { text: w.photos, action: null };
     if (has(t, TIMELINE)) return { text: w.timeline, action: null };
@@ -718,6 +776,11 @@
 
   // options: { estimatorEnabled, leadFormEnabled } (the form counts as on
   // unless leadFormEnabled is false).
+  /**
+   * @param {unknown} message what the visitor typed
+   * @param {{ estimatorEnabled?: boolean, leadFormEnabled?: boolean }} [options]
+   * @returns {ChatReply | null}
+   */
   function reply(message, options) {
     options = options || {};
     var estimator = options.estimatorEnabled === true;

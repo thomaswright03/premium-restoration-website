@@ -12,12 +12,17 @@
 
   var DAY_MS = 24 * 60 * 60 * 1000;
 
+  /** @param {Date} date */
   function localMidnight(date) {
     return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   }
 
   // Whole calendar days from `earlier` to `later` (0 on the same day; never
   // negative). Both are Dates, ISO strings or timestamps.
+  /**
+   * @param {string | number | Date} earlier
+   * @param {string | number | Date} later
+   */
   function calendarDaysBetween(earlier, later) {
     var a = localMidnight(new Date(earlier));
     var b = localMidnight(new Date(later));
@@ -26,6 +31,7 @@
     return Math.max(0, Math.round((b - a) / DAY_MS));
   }
 
+  /** @param {number} days */
   function describeAge(days) {
     return days === 0 ? "today" : days === 1 ? "yesterday" : days + " days ago";
   }

@@ -19,6 +19,7 @@
     }
   }
 
+  /** @param {string} choice */
   function apply(choice) {
     if (choice === "light" || choice === "dark") {
       document.documentElement.setAttribute("data-theme", choice);
@@ -30,6 +31,7 @@
     });
   }
 
+  /** @param {string} choice */
   function choose(choice) {
     try {
       if (choice === "system") localStorage.removeItem(KEY);

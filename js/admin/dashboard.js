@@ -13,6 +13,7 @@
   // ------------------------------------------------------------------
   // Quotes marked as booked jobs are customer records: never
   // counted as past retention or deleted by the bulk clean-up.
+  /** @param {Quote} quote */
   function isPastRetention(quote) {
     if (quote.ledToWork === true) return false;
     var last = new Date(quote.updatedAt || quote.createdAt).getTime();
@@ -20,11 +21,16 @@
     return Date.now() - last > A.QUOTE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
   }
 
+  /** @returns {RetentionLogEntry[]} */
   function getRetentionLog() {
     var log = A.readJson(A.RETENTION_LOG_KEY, []);
     return Array.isArray(log) ? log : [];
   }
 
+  /**
+   * @param {string} type "quote-purge" or "monthly-clean-up"
+   * @param {number | null} deletedCount
+   */
   function addRetentionLogEntry(type, deletedCount) {
     var log = getRetentionLog();
     log.push({ date: new Date().toISOString(), type: type, deleted: deletedCount });
@@ -35,6 +41,10 @@
   // this many days old (or none is logged and a quote is older than that).
   var CLEAN_UP_DUE_DAYS = 31;
 
+  /**
+   * @param {RetentionLogEntry[]} log
+   * @param {string} type
+   */
   function lastLogged(log, type) {
     return log
       .filter(function (e) {
@@ -43,13 +53,22 @@
       .pop();
   }
 
+  /**
+   * @param {Quote[]} quotes
+   * @param {RetentionLogEntry | undefined} lastCleanUp
+   */
   function cleanUpOverdue(quotes, lastCleanUp) {
     if (lastCleanUp) return A.daysSince(lastCleanUp.date) > CLEAN_UP_DUE_DAYS;
     return quotes.some(function (q) {
-      return q.createdAt && A.daysSince(q.createdAt) > CLEAN_UP_DUE_DAYS;
+      return !!q.createdAt && A.daysSince(q.createdAt) > CLEAN_UP_DUE_DAYS;
     });
   }
 
+  /**
+   * @param {Quote[]} expired
+   * @param {RetentionLogEntry | undefined} lastCleanUp
+   * @param {boolean} overdue
+   */
   function retentionSummary(expired, lastCleanUp, overdue) {
     if (expired.length) {
       return A.plural(expired.length, "quote") + " past the " + A.QUOTE_RETENTION_DAYS + "-day retention period.";
@@ -67,6 +86,7 @@
     );
   }
 
+  /** @param {Quote[]} expired */
   function deleteOldEnquiries(expired) {
     A.confirmAction(
       "Delete old enquiries?",
@@ -114,9 +134,10 @@
 
   // One line about retention. It opens, and is marked, only while something
   // is due: quotes past the retention period, or the monthly clean-up.
+  /** @param {Quote[]} quotes */
   function renderRetentionBar(quotes) {
-    var bar = document.getElementById("retention-bar");
-    var details = document.getElementById("retention-details");
+    var bar = A.byId("retention-bar");
+    var details = A.byId("retention-details");
     var expired = quotes.filter(isPastRetention);
     var log = getRetentionLog();
     var lastCleanUp = lastLogged(log, "monthly-clean-up");
@@ -126,7 +147,7 @@
     bar.hidden = false;
     bar.classList.toggle("is-due", due);
     bar.setAttribute("data-retention", due ? "due" : "ok");
-    document.getElementById("retention-summary").textContent = retentionSummary(expired, lastCleanUp, overdue);
+    A.byId("retention-summary").textContent = retentionSummary(expired, lastCleanUp, overdue);
 
     details.innerHTML = "";
     details.appendChild(
@@ -208,17 +229,17 @@
   // its own Resume and Discard. Drafts are kept per quote, so starting or
   // opening another quote never throws one away.
   function renderDraftBanner() {
-    var banner = document.getElementById("draft-banner");
+    var banner = A.byId("draft-banner");
     var drafts = A.unsavedDrafts();
-    var list = document.getElementById("draft-list");
+    var list = A.byId("draft-list");
     list.innerHTML = "";
     banner.hidden = !drafts.length;
     if (!drafts.length) return;
-    document.getElementById("draft-banner-text").textContent =
+    A.byId("draft-banner-text").textContent =
       drafts.length === 1
         ? "You have unsaved changes to " + A.describeDraft(drafts[0]) + "."
         : "You have unsaved changes to " + drafts.length + " quotes.";
-    drafts.forEach(function (d) {
+    drafts.forEach(function (/** @type {Draft} */ d) {
       var item = A.el("li", "draft-item");
       item.setAttribute("data-draft-id", d.id);
       if (drafts.length > 1) item.appendChild(A.el("span", "draft-item-label", A.capitalize(A.describeDraft(d))));
@@ -228,12 +249,12 @@
       });
       resume.setAttribute("aria-label", "Resume " + A.describeDraft(d));
       var discard = A.makeButton("Discard", "btn btn-outline-dark", function () {
-        A.confirmDiscardQuote(A.readDraft(d.id) || d).then(function (ok) {
+        A.confirmDiscardQuote(A.readDraft(d.id) || d).then(function (/** @type {boolean} */ ok) {
           if (!ok) return;
           A.removeDraft(d.id);
           if (A.state.draft && A.state.draft.id === d.id) A.clearDraft();
           renderDashboard();
-          document.getElementById("create-quote-btn").focus();
+          A.byId("create-quote-btn").focus();
         });
       });
       discard.setAttribute("aria-label", "Discard unsaved changes to " + A.describeDraft(d));
@@ -244,6 +265,7 @@
     });
   }
 
+  /** @param {string} id */
   function resumeDraft(id) {
     if (!A.pricesReady()) return;
     var stored = A.readDraft(id);
@@ -255,6 +277,10 @@
 
   // Search by address, customer name, email or phone (digits match however
   // the number was typed).
+  /**
+   * @param {Quote} quote
+   * @param {string} filter
+   */
   function matchesFilter(quote, filter) {
     var c = A.cleanCustomer(quote.customer);
     var text = [quote.address, c.name, c.email, c.phone].join(" ").toLowerCase();
@@ -273,24 +299,24 @@
     renderRetentionBar(all);
     renderDraftBanner();
 
-    var driftSlot = document.getElementById("price-drift-notice");
+    var driftSlot = A.byId("price-drift-notice");
     driftSlot.innerHTML = "";
     var driftNotice = buildPriceDriftNotice();
     driftSlot.hidden = !driftNotice;
     if (driftNotice) driftSlot.appendChild(driftNotice);
 
-    var filter = /** @type {HTMLInputElement} */ (document.getElementById("quote-filter")).value.trim().toLowerCase();
+    var filter = /** @type {HTMLInputElement} */ (A.byId("quote-filter")).value.trim().toLowerCase();
     var quotes = filter
       ? all.filter(function (q) {
           return matchesFilter(q, filter);
         })
       : all;
 
-    var list = document.getElementById("quote-list");
-    var empty = document.getElementById("quote-list-empty");
-    document.getElementById("dashboard-empty").hidden = all.length > 0;
-    document.getElementById("quote-filter-wrap").hidden = !all.length;
-    var count = document.getElementById("quote-count");
+    var list = A.byId("quote-list");
+    var empty = A.byId("quote-list-empty");
+    A.byId("dashboard-empty").hidden = all.length > 0;
+    A.byId("quote-filter-wrap").hidden = !all.length;
+    var count = A.byId("quote-count");
     list.innerHTML = "";
     empty.textContent = all.length ? "" : A.emptyListMessage();
     count.textContent = !all.length
@@ -325,6 +351,10 @@
 
       var chips = document.createElement("div");
       chips.className = "quote-chips";
+      /**
+       * @param {string} text
+       * @param {string} [extra] another class
+       */
       function chip(text, extra) {
         var c = document.createElement("span");
         c.className = "quote-chip" + (extra ? " " + extra : "");
@@ -374,7 +404,7 @@
           A.removeDraft(quote.id);
           A.toast("Quote for " + quote.address + " deleted.");
           renderDashboard();
-          document.getElementById("quote-filter").focus();
+          A.byId("quote-filter").focus();
         });
       });
       deleteBtn.setAttribute("aria-label", "Delete the quote for " + quote.address);
@@ -385,12 +415,18 @@
     });
   }
 
+  /**
+   * @param {string} id
+   * @param {boolean} value
+   */
   function setLedToWork(id, value) {
     var now = new Date().toISOString();
     var quotes = A.getQuotes().map(function (q) {
       if (q.id !== id) return q;
-      var updated = Object.assign({}, q, { ledToWork: value, statusChangedAt: now });
-      if (!value) delete updated.ledToWork;
+      /** @type {Quote} */
+      var updated = Object.assign({}, q, { statusChangedAt: now });
+      if (value) updated.ledToWork = true;
+      else delete updated.ledToWork;
       return updated;
     });
     if (!A.saveQuotes(quotes)) return A.alertError(A.STORAGE_ERROR);
@@ -411,6 +447,7 @@
 
   // Opening a quote carries on with its unsaved changes if there are any;
   // unsaved changes to other quotes are kept (each quote has its own draft).
+  /** @param {string} id */
   function openQuoteForEdit(id) {
     if (!A.pricesReady()) return;
     var quote = A.getQuotes().filter(function (q) {
@@ -446,4 +483,4 @@
     renderRetentionBar(A.getQuotes());
   };
   A.startNewQuote = startNewQuote;
-})((window.PRAdmin = window.PRAdmin || { state: {} }));
+})((window.PRAdmin = window.PRAdmin || /** @type {AdminNamespace} */ ({ state: {} })));

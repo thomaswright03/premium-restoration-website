@@ -35,6 +35,7 @@
   // Anonymous event counts, only when switched on in site-config.json
   // (js/analytics.js). That script is deferred, so it is looked up when an
   // event happens. key: a name from SiteAnalytics.EVENTS, e.g. "ESTIMATE_STARTED".
+  /** @param {string} key */
   function track(key) {
     var analytics = window.SiteAnalytics;
     if (analytics && analytics.EVENTS[key]) analytics.track(analytics.EVENTS[key]);
@@ -52,6 +53,7 @@
 
   // The page's chat elements. Returns false when this page has no chat.
   function findElements() {
+    /** @param {string} id */
     var byId = function (id) {
       return document.getElementById(id);
     };
@@ -74,10 +76,17 @@
     return !!(C.els.form && C.els.input && C.els.messages && window.BathroomPricing && window.ChatReplies);
   }
 
+  /**
+   * @template {keyof HTMLElementTagNameMap} K
+   * @param {K} tag
+   * @param {string} [className]
+   * @param {string | null} [text]
+   * @returns {HTMLElementTagNameMap[K]}
+   */
   function el(tag, className, text) {
     var node = document.createElement(tag);
     if (className) node.className = className;
-    if (text !== undefined) node.textContent = text;
+    if (text !== undefined && text !== null) node.textContent = text;
     return node;
   }
 
@@ -97,13 +106,17 @@
     avatar.setAttribute("aria-hidden", "true");
     inner.appendChild(avatar);
     row.appendChild(inner);
-    return { row: row, inner: inner };
+    return { row: row, inner: inner, avatar: avatar };
   }
 
+  /**
+   * @param {string} role "user" or "bot"
+   * @param {string} text
+   */
   function appendChatRow(role, text) {
     var parts = botRow();
     parts.row.className = "ai-chat-row " + role;
-    parts.inner.firstChild.textContent = role === "user" ? "YOU" : "PR";
+    parts.avatar.textContent = role === "user" ? "YOU" : "PR";
     parts.inner.appendChild(el("div", "ai-chat-text", text));
     C.els.messages.appendChild(parts.row);
     scrollToEnd();
@@ -112,6 +125,7 @@
 
   // Only the latest "estimate" button is kept, so they never pile up.
   // keep: a row to leave in place (the button that started the estimate).
+  /** @param {Element | null} [keep] */
   function removeOffers(keep) {
     Array.prototype.forEach.call(C.els.messages.querySelectorAll(".ai-chat-offer-row"), function (row) {
       if (row !== keep) row.remove();
@@ -124,6 +138,7 @@
   // start with). While an estimate is being worked out it reads "Continue my
   // estimate" and reopens it full screen, so closing full screen can put
   // focus back on the button that opened it.
+  /** @param {HTMLButtonElement} btn */
   function onEstimateButton(btn) {
     if (C.state.quoteState) {
       C.resumeEstimate(btn);
@@ -139,6 +154,7 @@
   }
 
   // A chat row holding one estimate button. Returns the button.
+  /** @param {string} label */
   function estimateButtonRow(label) {
     var parts = botRow();
     parts.row.classList.add("ai-chat-offer-row");

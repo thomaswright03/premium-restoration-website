@@ -15,6 +15,7 @@
   var ADMIN_PASSWORD = "templein26)";
 
   // "new" is the old address of the first quote step; it now opens the one quote screen.
+  /** @type {Record<string, string>} */
   var ROUTES = { dashboard: "screen-dashboard", details: "screen-quote", new: "screen-quote", prices: "screen-rates" };
 
   // ------------------------------------------------------------------
@@ -28,6 +29,7 @@
     }
   }
 
+  /** @param {boolean} value */
   function setAuthed(value) {
     try {
       if (value) sessionStorage.setItem(A.AUTH_KEY, "true");
@@ -47,6 +49,7 @@
     return m && ROUTES[m[1]] ? m[1] : "dashboard";
   }
 
+  /** @param {string} id */
   function showScreen(id) {
     Array.prototype.forEach.call(document.querySelectorAll(".admin-screen"), function (el) {
       el.hidden = el.id !== id;
@@ -59,6 +62,10 @@
     }
   }
 
+  /**
+   * @param {string} route
+   * @param {{ replace?: boolean }} [options] replace: don't add a history entry
+   */
   function navigate(route, options) {
     var hash = "#/" + route;
     if (window.location.hash === hash) {
@@ -73,6 +80,7 @@
     }
   }
 
+  /** @param {string} route */
   function render(route) {
     if (!isAuthed()) {
       showScreen("screen-login");
@@ -90,13 +98,15 @@
     if ((leavingEditor && A.state.draft && A.isDirty()) || (leavingPrices && A.ratesDirty())) {
       var from = A.state.currentRoute;
       history.replaceState(null, "", "#/" + from);
-      (leavingEditor ? A.confirmDiscardQuote(A.state.draft) : A.confirmDiscardPrices()).then(function (discard) {
-        if (!discard || A.state.currentRoute !== from) return;
-        if (leavingEditor) A.clearDraft();
-        A.state.ratesBaseline = null;
-        A.state.currentRoute = null;
-        navigate(route);
-      });
+      (leavingEditor ? A.confirmDiscardQuote(A.state.draft) : A.confirmDiscardPrices()).then(
+        function (/** @type {boolean} */ discard) {
+          if (!discard || A.state.currentRoute !== from) return;
+          if (leavingEditor) A.clearDraft();
+          A.state.ratesBaseline = null;
+          A.state.currentRoute = null;
+          navigate(route);
+        },
+      );
       return;
     }
     if (leavingEditor) A.clearDraft();
@@ -131,10 +141,10 @@
     var stored = A.readDraft(A.tabDraftId());
     if (stored) A.state.draft = stored;
 
-    document.getElementById("login-form").addEventListener("submit", function (e) {
+    A.byId("login-form").addEventListener("submit", function (e) {
       e.preventDefault();
-      var input = /** @type {HTMLInputElement} */ (document.getElementById("login-password"));
-      var error = document.getElementById("login-error");
+      var input = /** @type {HTMLInputElement} */ (A.byId("login-password"));
+      var error = A.byId("login-error");
       if (input.value === ADMIN_PASSWORD) {
         setAuthed(true);
         error.hidden = true;
@@ -146,30 +156,30 @@
         error.hidden = false;
       }
     });
-    document.getElementById("logout-btn").addEventListener("click", function () {
+    A.byId("logout-btn").addEventListener("click", function () {
       setAuthed(false);
       render("dashboard");
     });
-    document.getElementById("create-quote-btn").addEventListener("click", A.startNewQuote);
-    document.getElementById("open-rates-btn").addEventListener("click", function () {
+    A.byId("create-quote-btn").addEventListener("click", A.startNewQuote);
+    A.byId("open-rates-btn").addEventListener("click", function () {
       if (!A.pricesReady()) return;
       navigate("prices");
     });
-    document.getElementById("export-quotes-btn").addEventListener("click", A.exportQuotes);
+    A.byId("export-quotes-btn").addEventListener("click", A.exportQuotes);
     A.initDisclosure("backup", A.renderBackupPanel);
-    document.getElementById("empty-restore-btn").addEventListener("click", function () {
-      document.getElementById("import-quotes-input").click();
+    A.byId("empty-restore-btn").addEventListener("click", function () {
+      A.byId("import-quotes-input").click();
     });
     A.initDisclosure("retention", A.renderRetentionBar);
-    document.getElementById("import-quotes-input").addEventListener("change", function (e) {
+    A.byId("import-quotes-input").addEventListener("change", function (e) {
       var picker = /** @type {HTMLInputElement} */ (e.target);
       var file = picker.files && picker.files[0];
       if (file) A.importQuotes(file);
       picker.value = "";
     });
-    document.getElementById("quote-filter").addEventListener("input", A.renderDashboard);
-    document.getElementById("persist-retry-btn").addEventListener("click", function () {
-      A.checkPersistence(true).then(function (state) {
+    A.byId("quote-filter").addEventListener("input", A.renderDashboard);
+    A.byId("persist-retry-btn").addEventListener("click", function () {
+      A.checkPersistence(true).then(function (/** @type {string} */ state) {
         A.toast(
           state === "persisted"
             ? "The browser has agreed to keep this tool's data."
@@ -184,9 +194,9 @@
         A.renderDashboard();
       }
     });
-    document.getElementById("admin-toast-close").addEventListener("click", A.hideToast);
-    document.getElementById("rates-form").addEventListener("submit", A.handleRatesSubmit);
-    document.getElementById("quote-address").addEventListener("input", function (e) {
+    A.byId("admin-toast-close").addEventListener("click", A.hideToast);
+    A.byId("rates-form").addEventListener("submit", A.handleRatesSubmit);
+    A.byId("quote-address").addEventListener("input", function (e) {
       if (!A.state.draft) return;
       A.state.draft.address = /** @type {HTMLInputElement} */ (e.target).value;
       A.setInputError("quote-address", null);
@@ -194,7 +204,7 @@
       A.persistDraft();
     });
     Object.keys(A.CUSTOMER_FIELDS).forEach(function (key) {
-      var input = /** @type {HTMLInputElement} */ (document.getElementById(A.CUSTOMER_FIELDS[key]));
+      var input = /** @type {HTMLInputElement} */ (A.byId(A.CUSTOMER_FIELDS[key]));
       input.addEventListener("input", function () {
         if (!A.state.draft) return;
         A.state.draft.customer = A.cleanCustomer(A.state.draft.customer);
@@ -204,7 +214,7 @@
         A.persistDraft();
       });
     });
-    document.getElementById("quote-form").addEventListener("submit", A.handleQuoteSubmit);
+    A.byId("quote-form").addEventListener("submit", A.handleQuoteSubmit);
     Array.prototype.forEach.call(document.querySelectorAll('[data-action="cancel-quote"]'), function (btn) {
       btn.addEventListener("click", A.cancelQuote);
     });
@@ -227,4 +237,4 @@
 
   // Used by the other parts of the admin tool.
   A.navigate = navigate;
-})((window.PRAdmin = window.PRAdmin || { state: {} }));
+})((window.PRAdmin = window.PRAdmin || /** @type {AdminNamespace} */ ({ state: {} })));

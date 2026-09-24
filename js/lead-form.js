@@ -19,15 +19,18 @@
   // Anonymous event counts, only when switched on in site-config.json
   // (js/analytics.js, a deferred script, so it is looked up when needed).
   // key: a name from SiteAnalytics.EVENTS.
+  /** @param {string} key */
   function track(key) {
     var analytics = window.SiteAnalytics;
     if (analytics && analytics.EVENTS[key]) analytics.track(analytics.EVENTS[key]);
   }
 
+  /** @param {string} id */
   function byId(id) {
     return document.getElementById(id);
   }
 
+  /** @param {string} id */
   function value(id) {
     var el = /** @type {HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null} */ (byId(id));
     if (!el) return "";
@@ -35,6 +38,10 @@
     return el.value.trim();
   }
 
+  /**
+   * @param {string} href
+   * @param {string} text
+   */
   function link(href, text) {
     var a = document.createElement("a");
     a.href = href;
@@ -42,6 +49,7 @@
     return a;
   }
 
+  /** @param {string} text */
   function strong(text) {
     var s = document.createElement("strong");
     s.textContent = text;
@@ -49,6 +57,7 @@
   }
 
   // ---------- estimate carried over from the chat ----------
+  /** @param {HTMLTextAreaElement | null} message */
   function prefillFromEstimate(message) {
     if (!/[?&]from=estimate\b/.test(window.location.search)) return;
     var summary = null;
@@ -69,9 +78,11 @@
 
   // ---------- character counter for the project details ----------
   // Returns a function that refreshes it (the field stops at its maxlength).
+  /** @param {HTMLTextAreaElement | null} message */
   function initCounter(message) {
     var counter = byId("message-count");
     var counterLive = byId("message-count-live");
+    /** @type {string | null} */
     var lastAnnounced = null;
     function update() {
       if (!message || !counter) return;
@@ -104,6 +115,10 @@
   }
 
   // ---------- validation ----------
+  /**
+   * @param {string} id
+   * @param {string | null} text
+   */
   function setError(id, text) {
     var input = byId(id);
     var err = byId(id + "-error");
@@ -115,6 +130,7 @@
   }
 
   function validate() {
+    /** @type {Record<string, string>} */
     var errors = {};
     if (!value("name")) errors.name = "Enter your name.";
     var phone = value("phone");
@@ -134,13 +150,19 @@
   }
 
   // ---------- status messages ----------
+  /**
+   * @param {string} kind "info", "success" or "error"
+   * @param {(string | Node)[]} nodes
+   */
   function showStatus(kind, nodes) {
     var status = byId("form-status");
+    if (!status) return;
     status.className = "form-status is-" + kind;
     status.innerHTML = "";
-    nodes.forEach(function (n) {
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
       status.appendChild(typeof n === "string" ? document.createTextNode(n) : n);
-    });
+    }
     status.hidden = false;
     status.focus({ preventScroll: false });
   }
@@ -193,6 +215,10 @@
     window.location.href = href;
   }
 
+  /**
+   * @param {HTMLFormElement} form
+   * @param {() => void} updateCounter
+   */
   function showSent(form, updateCounter) {
     form.reset();
     updateCounter();
@@ -229,6 +255,10 @@
   }
 
   // POSTs the form to the form service; 15 seconds without a reply counts as a failure.
+  /**
+   * @param {HTMLFormElement} form
+   * @param {string} endpoint the form service's https:// address
+   */
   function post(form, endpoint) {
     var data = new FormData(form);
     data.set("service", value("service"));
@@ -261,7 +291,11 @@
 
   function initLeadForm() {
     var form = /** @type {HTMLFormElement | null} */ (byId("lead-form"));
-    if (!form) return;
+    if (form) wireLeadForm(form);
+  }
+
+  /** @param {HTMLFormElement} form */
+  function wireLeadForm(form) {
     var submit = /** @type {HTMLButtonElement} */ (byId("lead-submit"));
     var message = /** @type {HTMLTextAreaElement | null} */ (byId("message"));
     prefillFromEstimate(message);
@@ -277,6 +311,7 @@
       }
     });
 
+    /** @param {string} endpoint */
     function sendToEndpoint(endpoint) {
       if (sending) return;
       sending = true;
@@ -305,7 +340,8 @@
         return errors[id];
       })[0];
       if (first) {
-        byId(first).focus();
+        var field = byId(first);
+        if (field) field.focus();
         return;
       }
       configReady.then(function (config) {

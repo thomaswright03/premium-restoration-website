@@ -57,7 +57,7 @@ Every link to the Get a Quote page (nav, hero, calls to action, footers, the 404
 │     editor.js               quote screen: property, customer, calculator, save
 │     prices.js               Business Prices screen
 │     main.js                 log-in, screens and addresses, wiring
-├── tsconfig.json, types/     type check of all site scripts (npm run typecheck; no build)
+├── tsconfig.json, types/     strict type check of every site script (npm run typecheck; no build); types/globals.d.ts names the shared shapes (Quote, Draft, EstimateResult, PdfSpec…)
 ├── js/vendor/                jsPDF 4.2.1 (MIT, self-hosted) + its licence
 ├── fonts/                    self-hosted Inter + Playfair Display, with OFL licence texts
 ├── fonts/pdf/                the same typefaces as fixed-weight .ttf files for the PDFs (made by scripts/make-pdf-fonts.py)
@@ -66,7 +66,7 @@ Every link to the Get a Quote page (nav, hero, calls to action, footers, the 404
 ├── scripts/check-placeholders.mjs   fails if a [BRACKETED PLACEHOLDER] is visible
 ├── scripts/serve.mjs         local server that behaves like Vercel (404.html for unknown URLs)
 ├── scripts/check-deploy.mjs  checks a deployed site serves exactly this checkout (npm run check:deploy -- <url>)
-├── tests/unit/               Node unit tests (pricing, chat replies, settings file, page sync, contact details)
+├── tests/unit/               Node unit tests (pricing, chat replies, settings file, page sync, contact details, dates, PDF references, type-check settings)
 ├── tests/fixtures/           test-prices.json: the fixed prices the tests use
 ├── tests/e2e/                Playwright browser tests
 └── .github/workflows/ci.yml  runs every check on each push and pull request
@@ -316,12 +316,12 @@ Development tools need Node 20+ and `npm install`.
 ```bash
 npm test          # everything below, in order
 npm run lint      # ESLint (zero warnings allowed; no function over 150 lines)
-npm run typecheck # TypeScript checks the JavaScript through its JSDoc (tsconfig.json; nothing is built)
+npm run typecheck # TypeScript in strict mode checks every script in js/ through its JSDoc (tsconfig.json; nothing is built)
 npm run format:check   # Prettier (npm run format to fix)
 npm run check:pages    # shared header/footer and contact details are in sync (notice if price text is older than site-config.json)
 npm run check:placeholders   # no [BRACKETED PLACEHOLDER] visible on any page
 npm run check:deploy -- <url>  # (not part of npm test) a deployed site serves exactly this checkout
-npm run test:unit      # pricing, chat-reply, settings-file (incl. prices), page-sync and contact-details unit tests (node --test)
+npm run test:unit      # pricing, chat-reply, settings-file (incl. prices), page-sync, contact-details, date, PDF-reference and type-check-settings unit tests (node --test)
 npm run test:e2e       # Playwright browser tests (Chromium)
 ```
 

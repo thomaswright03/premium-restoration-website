@@ -9,6 +9,7 @@
 (function (A) {
   "use strict";
 
+  /** @param {Draft | null} d */
   function confirmDiscardQuote(d) {
     return A.confirmAction(
       "Discard unsaved changes?",
@@ -17,6 +18,7 @@
     );
   }
 
+  /** @param {Draft | null} d */
   function describeDraft(d) {
     return d && d.address ? "the quote for " + d.address : "a new quote";
   }
@@ -26,6 +28,8 @@
   // ------------------------------------------------------------------
   A.state.draft = null;
 
+  // What is compared to tell whether a draft has unsaved changes.
+  /** @param {Pick<Draft, "address" | "values" | "scope"> & { customer?: Partial<Customer> | null }} d */
   function snapshot(d) {
     return JSON.stringify({
       address: d.address,
@@ -36,19 +40,26 @@
   }
 
   // Optional customer details kept with a quote.
+  /**
+   * @param {Partial<Customer> | null} [c]
+   * @returns {Customer}
+   */
   function cleanCustomer(c) {
-    c = c || {};
+    var given = c || {};
+    /** @param {unknown} v */
     function text(v) {
       return typeof v === "string" ? v.trim() : "";
     }
-    return { name: text(c.name), phone: text(c.phone), email: text(c.email) };
+    return { name: text(given.name), phone: text(given.phone), email: text(given.email) };
   }
 
-  function customerSummary(c) {
-    c = cleanCustomer(c);
+  /** @param {Partial<Customer> | undefined} customer */
+  function customerSummary(customer) {
+    var c = cleanCustomer(customer);
     return [c.name, c.phone, c.email].filter(Boolean).join(" · ");
   }
 
+  /** @param {Draft | null} stored */
   function hasUnsavedDraft(stored) {
     return !!(stored && stored.id && snapshot(stored) !== stored.baseline);
   }
@@ -59,10 +70,12 @@
 
   var draftWarned = false;
 
+  /** @param {string} id */
   function draftKey(id) {
     return A.DRAFT_PREFIX + id;
   }
 
+  /** @param {string | null} id */
   function setTabDraft(id) {
     try {
       if (id) sessionStorage.setItem(A.TAB_DRAFT_KEY, id);
@@ -92,12 +105,16 @@
   }
 
   // A draft saved before customer details existed: compare like with like.
+  /**
+   * @param {Draft | null} d
+   * @returns {Draft | null}
+   */
   function upgradeDraft(d) {
     if (!d || !d.id) return null;
     if (!d.customer) {
       d.customer = cleanCustomer();
       try {
-        var base = JSON.parse(d.baseline);
+        var base = JSON.parse(String(d.baseline));
         d.baseline = snapshot({ address: base.address, customer: null, values: base.values, scope: base.scope });
       } catch (e) {
         /* no usable baseline: treated as changed */
@@ -107,19 +124,22 @@
   }
 
   // The unsaved copy of one quote kept in this browser, if any.
+  /** @param {string} id */
   function readDraft(id) {
     return id ? upgradeDraft(A.readJson(draftKey(id), null)) : null;
   }
 
   // Every quote with unsaved changes in this browser (from any tab), oldest first.
+  /** @returns {Draft[]} */
   function unsavedDrafts() {
+    /** @type {Draft[]} */
     var list = [];
     try {
       for (var i = 0; i < localStorage.length; i++) {
         var key = localStorage.key(i);
         if (key && key.indexOf(A.DRAFT_PREFIX) === 0) {
           var d = readDraft(key.slice(A.DRAFT_PREFIX.length));
-          if (hasUnsavedDraft(d)) list.push(d);
+          if (d && hasUnsavedDraft(d)) list.push(d);
         }
       }
     } catch (e) {
@@ -138,6 +158,7 @@
     A.removeKey(A.OLD_DRAFT_KEY);
   }
 
+  /** @param {string | null | undefined} id */
   function removeDraft(id) {
     if (id) A.removeKey(draftKey(id));
   }
@@ -148,7 +169,9 @@
     setTabDraft(null);
   }
 
+  /** @returns {Draft} */
   function newDraft() {
+    /** @type {Draft} */
     var d = {
       id: "q_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
       isNew: true,
@@ -163,19 +186,25 @@
 
   var VALUE_KEYS = ["Bathroom_Width_Ft", "Bathroom_Length_Ft", "Bathroom_Height_Ft", "Electrical_Points"]
     .concat(
-      A.Pricing.FIXTURES.map(function (f) {
+      window.BathroomPricing.FIXTURES.map(function (f) {
         return f.key;
       }),
     )
     .concat(["No_Stack_Surcharge_Included", "Bad_Valve_Surcharge_Included"]);
 
-  var DIMENSION_KEYS = A.Pricing.DIMENSIONS.map(function (d) {
+  var DIMENSION_KEYS = window.BathroomPricing.DIMENSIONS.map(function (d) {
     return d.key;
   });
 
+  /**
+   * @param {Quote} quote
+   * @returns {Draft}
+   */
   function draftFromQuote(quote) {
+    /** @type {BathroomData} */
     var bathroom = (quote.data && quote.data.bathroom) || {};
     var jobValues = bathroom.jobValues || {};
+    /** @type {JobValues} */
     var values = {};
     VALUE_KEYS.forEach(function (key) {
       var v = jobValues[key];
@@ -183,6 +212,7 @@
       else if (v !== undefined && v !== null && v !== "" && v !== 0) values[key] = String(v);
     });
     var legacy = A.Pricing.isLegacyQuoteData(bathroom);
+    /** @type {Draft} */
     var d = {
       id: quote.id,
       isNew: false,
@@ -205,8 +235,9 @@
   }
 
   // When a quote last changed: an edit, or marking it as a booked job.
+  /** @param {Pick<Quote, "updatedAt" | "statusChangedAt">} q */
   function lastChanged(q) {
-    return Math.max(new Date(q.updatedAt).getTime() || 0, new Date(q.statusChangedAt).getTime() || 0);
+    return Math.max(new Date(q.updatedAt).getTime() || 0, new Date(q.statusChangedAt || 0).getTime() || 0);
   }
 
   // Used by the other parts of the admin tool.
@@ -228,4 +259,4 @@
   A.DIMENSION_KEYS = DIMENSION_KEYS;
   A.draftFromQuote = draftFromQuote;
   A.lastChanged = lastChanged;
-})((window.PRAdmin = window.PRAdmin || { state: {} }));
+})((window.PRAdmin = window.PRAdmin || /** @type {AdminNamespace} */ ({ state: {} })));
