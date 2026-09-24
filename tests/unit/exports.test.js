@@ -21,7 +21,13 @@ const SOURCES = [...filesIn("js", /\.js$/), ...filesIn("scripts", /\.mjs$/), ...
   .filter((f) => !f.endsWith("exports.test.js"))
   .map((f) => ({ file: f, text: fs.readFileSync(path.join(ROOT, f), "utf8") }));
 
-const MODULES = ["js/bathroom-pricing.js", "js/chat-replies.js", "js/business-info.js", "js/site-config.js"];
+const MODULES = [
+  "js/bathroom-pricing.js",
+  "js/chat-replies.js",
+  "js/business-info.js",
+  "js/site-config.js",
+  "js/admin/dates.js",
+];
 
 for (const mod of MODULES) {
   test(`${mod} exports only what is used elsewhere`, () => {

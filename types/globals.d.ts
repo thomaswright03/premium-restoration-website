@@ -56,6 +56,7 @@ interface Window {
   EstimatePdf: { load: () => Promise<unknown>; build: (options: object) => { save: (filename: string) => void } };
   ChatReplies: typeof import("../js/chat-replies.js");
   SiteAnalytics: { EVENTS: Record<string, string>; track: (event: string) => void };
+  CalendarDays: typeof import("../js/admin/dates.js");
   PRAdmin: any;
   PRChat: any;
   __prAuthed?: boolean;

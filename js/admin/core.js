@@ -33,7 +33,6 @@
   // After this many days without a backup the dashboard warns (and it warns
   // straight away if quotes have never been backed up).
   var BACKUP_REMINDER_DAYS = 3;
-  var DAY_MS = 24 * 60 * 60 * 1000;
   var Business = window.BusinessInfo;
   var configReady = window.SiteConfig ? window.SiteConfig.ready : Promise.resolve(null);
 
@@ -84,13 +83,13 @@
   var STORAGE_ERROR =
     "Couldn't save in this browser — its storage is full or blocked (for example in a private window). Nothing on screen has been lost. Try again, free up space by deleting old quotes, or use Export Backup to keep a copy.";
 
+  // Calendar days, not 24-hour periods: a backup made at 11 pm is
+  // "yesterday" by 8 am (js/admin/dates.js).
   function daysSince(iso) {
-    return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / DAY_MS));
+    return window.CalendarDays.calendarDaysBetween(iso, Date.now());
   }
 
-  function describeAge(days) {
-    return days === 0 ? "today" : days === 1 ? "yesterday" : days + " days ago";
-  }
+  var describeAge = window.CalendarDays.describeAge;
 
   function plural(n, one, many) {
     return n + " " + (n === 1 ? one : many || one + "s");

@@ -48,6 +48,7 @@ Every link to the Get a Quote page (nav, hero, calls to action, footers, the 404
 │     estimate-card.js        the finished estimate card and its PDF
 │     main.js                 sending messages, wiring
 ├── js/admin/                 admin tool, in parts sharing window.PRAdmin (loaded in this order by admin/index.html):
+│     dates.js                "today / yesterday / N days ago" in calendar days (window.CalendarDays)
 │     core.js                 settings keys, checked storage, messages, confirmation dialog
 │     drafts.js               the quote being edited: one draft per quote, per tab
 │     backup.js               backup panel, persistent-storage request, export / one-step restore
@@ -199,7 +200,7 @@ Every row shows its own cost (quantity × rate) in one right-hand column on a co
 Because quotes exist only in one browser, the dashboard's **Backups** panel:
 
 - **Asks the browser to keep the data** (`navigator.storage.persist()`) once per visit, and says what it answered: "Storage: protected" (the browser agreed not to clear it on its own), "Storage: not protected" (it may delete the quotes without warning — shown in red, with **Ask Browser to Keep Data** to ask again; Firefox asks you, Chrome and Edge decide for themselves and are more likely to agree once the page is bookmarked) or "Storage: not guaranteed" (the browser can't say). Even "protected" doesn't survive clearing browsing data, Safari's 7-day rule or a new device, so backups are still needed.
-- **Records every backup** (`pr_last_backup`: date and number of quotes) and shows "Last backup: today / yesterday / N days ago", with how many quotes were added or changed since.
+- **Records every backup** (`pr_last_backup`: date and number of quotes) and shows "Last backup: today / yesterday / N days ago", counted in calendar days on the device's clock (a backup made at 11 pm is "yesterday" at 8 am; `js/admin/dates.js`), with how many quotes were added or changed since.
 - **Warns until a backup is recent**: with quotes saved and no backup, or a backup 3 days old or more (`BACKUP_REMINDER_DAYS` in `js/admin/core.js`), the panel turns red with "Last backup: … — Export now" and an **Export Now** button. It can't be dismissed; exporting clears it.
 - **Export** downloads `premium-restoration-quotes-<date>.json` with every quote (including customer details), the Business Prices saved in that browser and the clean-up log. Keep it somewhere other than that browser (e.g. the business's cloud drive). It holds customers' personal details: store it privately and delete old backup files in the monthly clean-up.
 - **Restore from Backup is one step**: choose the file and it is restored straight away. It never deletes anything: quotes that aren't in the browser are added, a quote already there is replaced only by a newer copy, and Business Prices are restored only if that browser has none. When the dashboard is empty it says the browser may have cleared its storage and points to Restore from Backup.
