@@ -1,0 +1,18 @@
+{
+  // Type check (no build): `npm run typecheck` checks the admin tool and the
+  // shared pricing module with TypeScript, reading the JSDoc in the files.
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "target": "ES2020",
+    "lib": ["DOM", "DOM.Iterable", "ES2020"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "types": [],
+    "strict": false,
+    "skipLibCheck": true
+  },
+  "include": ["types/*.d.ts", "js/*.js", "js/admin/*.js"]
+}

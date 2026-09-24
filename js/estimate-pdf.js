@@ -1,5 +1,5 @@
 // Premium Restoration — estimate PDF builder, shared by the public chat
-// estimate (js/script.js) and the admin quote export (js/admin.js).
+// estimate (js/script.js) and the admin quote export (js/admin/pdf.js).
 //
 // jsPDF is self-hosted (js/vendor/jspdf.umd.min.js, MIT licence) and only
 // loaded when someone asks for a PDF, so normal page views never load it and
@@ -11,7 +11,7 @@
 (function () {
   "use strict";
 
-  var script = document.currentScript;
+  var script = /** @type {HTMLScriptElement | null} */ (document.currentScript);
   var JSPDF_SRC =
     script && script.src ? new URL("vendor/jspdf.umd.min.js", script.src).href : "js/vendor/jspdf.umd.min.js";
   var loading = null;

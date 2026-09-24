@@ -7,7 +7,7 @@
 // the local files, and checks that removed pages (gallery.html) answer 404.
 // Exit code 0 = the deploy matches this commit; 1 = something differs.
 
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { PAGES } from "./sync-pages.mjs";
@@ -19,21 +19,13 @@ if (!/^https?:\/\//.test(base)) {
   process.exit(2);
 }
 
-const FILES = [
-  ...PAGES.map((p) => p.file),
-  "site-config.json",
-  "css/style.css",
-  "css/admin.css",
-  "js/admin.js",
-  "js/analytics.js",
-  "js/bathroom-pricing.js",
-  "js/business-info.js",
-  "js/chat-replies.js",
-  "js/estimate-pdf.js",
-  "js/script.js",
-  "js/site-config.js",
-  "js/theme.js",
-];
+// Every page, stylesheet and script (including js/admin/ and js/vendor/), and the settings.
+const assets = (await readdir(join(root, "js"), { recursive: true }))
+  .map((f) => "js/" + f)
+  .concat((await readdir(join(root, "css"))).map((f) => "css/" + f))
+  .filter((f) => /\.(js|css)$/.test(f))
+  .sort();
+const FILES = [...PAGES.map((p) => p.file), "site-config.json", ...assets];
 const GONE = ["gallery.html"];
 
 const problems = [];

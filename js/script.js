@@ -27,7 +27,7 @@ document.addEventListener("DOMContentLoaded", function () {
     el.textContent = String(new Date().getFullYear());
   });
 
-  var toggle = document.querySelector(".nav-toggle");
+  var toggle = /** @type {HTMLElement | null} */ (document.querySelector(".nav-toggle"));
   var links = document.querySelector(".nav-links");
   if (toggle && links) {
     var setMenu = function (open) {
@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", function () {
       setMenu(!links.classList.contains("open"));
     });
     links.addEventListener("click", function (e) {
-      if (e.target.closest("a")) setMenu(false);
+      if (/** @type {Element} */ (e.target).closest("a")) setMenu(false);
     });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && links.classList.contains("open")) {
@@ -110,9 +110,9 @@ document.addEventListener("DOMContentLoaded", function () {
   // =====================================================================
   function initChat() {
     var chatForm = document.getElementById("ai-chat-form");
-    var chatInput = document.getElementById("ai-chat-input");
+    var chatInput = /** @type {HTMLInputElement} */ (document.getElementById("ai-chat-input"));
     var chatMessages = document.getElementById("ai-chat-messages");
-    var chatSend = document.getElementById("ai-chat-send");
+    var chatSend = /** @type {HTMLButtonElement} */ (document.getElementById("ai-chat-send"));
     if (!chatForm || !chatInput || !chatMessages || !window.BathroomPricing || !window.ChatReplies) return;
 
     var Pricing = window.BathroomPricing;
@@ -224,7 +224,11 @@ document.addEventListener("DOMContentLoaded", function () {
       });
       inertElements = [];
       if (!on) return;
-      for (var node = chatSection; node && node.parentNode && node !== document.body; node = node.parentNode) {
+      for (
+        var node = /** @type {Node} */ (chatSection);
+        node && node.parentNode && node !== document.body;
+        node = node.parentNode
+      ) {
         Array.prototype.forEach.call(node.parentNode.children, function (sibling) {
           if (sibling === node || sibling.tagName === "SCRIPT" || sibling.inert) return;
           sibling.inert = true;
@@ -341,6 +345,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function buildGroups(scope) {
       var needs = Pricing.scopeNeeds(scope || {});
+      /** @type {Array<{ id: string, intro: string, fields: Array<Object> }>} */
       var groups = [
         {
           id: "scope",
@@ -531,6 +536,7 @@ document.addEventListener("DOMContentLoaded", function () {
       formEl.noValidate = true;
       formEl.setAttribute("data-group", group.id);
 
+      /** @type {Record<string, { wrap: HTMLElement, error: HTMLElement, focus: HTMLElement, input?: HTMLInputElement }>} */
       var fieldEls = {};
       var readers = [];
 
@@ -538,7 +544,7 @@ document.addEventListener("DOMContentLoaded", function () {
         var fieldWrap = document.createElement("div");
         fieldWrap.className = "ai-chat-group-field" + (field.type === "choice" ? " is-choice" : "");
         var fieldId = "ai-chat-field-" + ++fieldCounter;
-        var labelEl = document.createElement(field.type === "choice" ? "p" : "label");
+        var labelEl = /** @type {HTMLLabelElement} */ (document.createElement(field.type === "choice" ? "p" : "label"));
         labelEl.className = "ai-chat-field-label";
         labelEl.textContent = field.label;
         labelEl.id = fieldId + "-label";
@@ -692,7 +698,7 @@ document.addEventListener("DOMContentLoaded", function () {
       chatMessages.appendChild(parts.row);
       scrollToEnd();
       if (options.restored) return; // don't move focus or scroll the page on load
-      var first = formEl.querySelector("input, .ai-chat-choice");
+      var first = /** @type {HTMLElement | null} */ (formEl.querySelector("input, .ai-chat-choice"));
       if (first) first.focus({ preventScroll: true });
     }
 
@@ -968,11 +974,11 @@ document.addEventListener("DOMContentLoaded", function () {
   // Without it, the visitor's own email app opens with the request filled in.
   // =====================================================================
   function initLeadForm() {
-    var form = document.getElementById("lead-form");
+    var form = /** @type {HTMLFormElement} */ (document.getElementById("lead-form"));
     if (!form) return;
     var status = document.getElementById("form-status");
-    var submit = document.getElementById("lead-submit");
-    var message = document.getElementById("message");
+    var submit = /** @type {HTMLButtonElement} */ (document.getElementById("lead-submit"));
+    var message = /** @type {HTMLTextAreaElement} */ (document.getElementById("message"));
     var SUMMARY_KEY = "pr_estimate_summary";
 
     // Pre-fill the project details from "Contact Us About This".
@@ -1026,7 +1032,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function value(id) {
-      var el = document.getElementById(id);
+      var el = /** @type {HTMLInputElement & HTMLSelectElement} */ (document.getElementById(id));
       if (!el) return "";
       if (el.tagName === "SELECT") return el.options[el.selectedIndex].text;
       return el.value.trim();
@@ -1163,7 +1169,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (controller) controller.abort();
       }, 15000);
 
-      var honeypot = document.getElementById("company-website");
+      var honeypot = /** @type {HTMLInputElement} */ (document.getElementById("company-website"));
       var request =
         honeypot && honeypot.value
           ? Promise.resolve({ ok: true })

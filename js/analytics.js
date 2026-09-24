@@ -59,7 +59,7 @@
       window.va =
         window.va ||
         function () {
-          (window.vaq = window.vaq || []).push(arguments);
+          (window.vaq = window.vaq || []).push(Array.prototype.slice.call(arguments));
         };
       addScript(a.scriptUrl || VERCEL_SCRIPT);
       return function (name) {

@@ -1,7 +1,7 @@
 // Premium Restoration — shared bathroom pricing model.
 //
 // The single source of truth for bathroom labor prices AND for the
-// calculation itself. Both the admin quoting tool (js/admin.js) and the
+// calculation itself. Both the admin quoting tool (js/admin/) and the
 // public chat estimate (js/script.js) call computeEstimate() below, so the
 // two always agree for the same inputs. The admin tool may add plumbing,
 // electrical and surcharge lines (includeTrade: true); the public estimate
@@ -31,8 +31,10 @@
   var api = factory();
   if (node) {
     try {
-      var path = require("path");
-      var raw = JSON.parse(require("fs").readFileSync(path.join(__dirname, "..", "site-config.json"), "utf8"));
+      // (Through a variable, so the browser-side type check doesn't look for Node's modules.)
+      var nodeRequire = require;
+      var path = nodeRequire("path");
+      var raw = JSON.parse(nodeRequire("fs").readFileSync(path.join(__dirname, "..", "site-config.json"), "utf8"));
       var check = api.validatePublishedPrices(raw.prices);
       if (check.valid) api.setPublishedPrices(check.prices);
     } catch (e) {
@@ -40,7 +42,7 @@
     }
     module.exports = api;
   } else {
-    root.BathroomPricing = api;
+    /** @type {any} */ (root).BathroomPricing = api;
   }
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
@@ -120,6 +122,7 @@
       return { valid: false, prices: null, errors: ['site-config.json has no "prices" section.'] };
     }
     var known = {};
+    /** @type {Record<string, number>} */
     var prices = {};
     PUBLISHED_PRICES.forEach(function (p) {
       known[p.setting] = true;

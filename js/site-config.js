@@ -67,6 +67,7 @@
     return match ? KNOWN_FORM_SERVICES[match] : "";
   }
 
+  /** @returns {SiteConfigData} */
   function normalize(raw) {
     raw = raw || {};
     var pe = raw.priceEstimator || {};
@@ -154,7 +155,7 @@
     });
   }
 
-  var script = document.currentScript;
+  var script = /** @type {HTMLScriptElement | null} */ (document.currentScript);
   var url = script && script.src ? new URL("../site-config.json", script.src).href : "site-config.json";
 
   var loaded = fetch(url, { cache: "no-cache" })

@@ -12,7 +12,7 @@
 //
 // Loads as a plain browser script (window.ChatReplies) and as a Node module.
 
-(function (root, factory) {
+(function (/** @type {any} */ root, factory) {
   "use strict";
   var node = typeof module === "object" && module.exports && typeof require === "function";
   var api = factory(

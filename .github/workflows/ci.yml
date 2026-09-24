@@ -26,6 +26,9 @@ jobs:
       - name: Lint (ESLint, zero warnings)
         run: npm run lint
 
+      - name: Type check (TypeScript on the JavaScript, no build)
+        run: npm run typecheck
+
       - name: Formatting (Prettier)
         run: npm run format:check
 

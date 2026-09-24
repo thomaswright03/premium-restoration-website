@@ -15,7 +15,7 @@
   if (typeof module === "object" && module.exports) {
     module.exports = api;
   } else {
-    root.BusinessInfo = api;
+    /** @type {any} */ (root).BusinessInfo = api;
   }
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";

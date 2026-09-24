@@ -55,7 +55,7 @@
       <div id="admin-alert" class="admin-alert" role="alert" hidden></div>
     </div>
 
-    <!-- Confirmation dialog (js/admin.js askDialog) -->
+    <!-- Confirmation dialog (js/admin/core.js askDialog) -->
     <dialog
       id="admin-dialog"
       class="admin-dialog"
@@ -87,7 +87,7 @@
       </header>
 
       <!-- Backups: quotes live only in this browser, so this panel always says when the last backup was
-           made and whether the browser has agreed to keep the data (js/admin.js renderBackupPanel). -->
+           made and whether the browser has agreed to keep the data (js/admin/backup.js renderBackupPanel). -->
       <section id="backup-panel" class="backup-panel" aria-labelledby="backup-panel-title">
         <div class="backup-panel-text">
           <h2 id="backup-panel-title" class="backup-panel-title">Backups</h2>
@@ -242,6 +242,13 @@
     <script src="../js/site-config.js"></script>
     <script src="../js/theme.js"></script>
     <script src="../js/estimate-pdf.js"></script>
-    <script src="../js/admin.js"></script>
+    <script src="../js/admin/core.js"></script>
+    <script src="../js/admin/drafts.js"></script>
+    <script src="../js/admin/backup.js"></script>
+    <script src="../js/admin/dashboard.js"></script>
+    <script src="../js/admin/pdf.js"></script>
+    <script src="../js/admin/editor.js"></script>
+    <script src="../js/admin/prices.js"></script>
+    <script src="../js/admin/main.js"></script>
   </body>
 </html>

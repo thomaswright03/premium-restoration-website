@@ -38,7 +38,16 @@ The site says "Get a Quote" / "Request a Quote", not "Free Quote": nothing confi
 ├── js/theme.js               Light / Dark / System switch
 ├── js/estimate-pdf.js        PDF layout shared by the chat estimate and admin quotes
 ├── js/script.js              public-page behaviour (nav, FAQ, chat, estimate card, contact form)
-├── js/admin.js               admin tool
+├── js/admin/                 admin tool, in parts sharing window.PRAdmin (loaded in this order by admin/index.html):
+│     core.js                 settings keys, checked storage, messages, confirmation dialog
+│     drafts.js               the quote being edited: one draft per quote, per tab
+│     backup.js               backup panel, persistent-storage request, export / one-step restore
+│     dashboard.js            quote list, search, retention clean-up, unsaved drafts, price warning
+│     pdf.js                  customer PDF of a saved quote
+│     editor.js               quote screen: property, customer, calculator, save
+│     prices.js               Business Prices screen
+│     main.js                 log-in, screens and addresses, wiring
+├── tsconfig.json, types/     type check of all site scripts (npm run typecheck; no build)
 ├── js/vendor/                jsPDF 4.2.1 (MIT, self-hosted) + its licence
 ├── fonts/                    self-hosted Inter + Playfair Display, with OFL licence texts
 ├── scripts/partials/         the ONE copy of the shared <head> bits, header/nav and footer
@@ -156,7 +165,7 @@ Visit `/admin/` (e.g. `http://localhost:8000/admin/`). Log in and click **Create
 - **Plumbing** — points counted automatically from the toilets, sinks, showers and bathtubs, plus the "no existing stack" and "bad valve" surcharges.
 - **Electrical** — points (lamps, outlets, fans, switches, electric toilet).
 
-Every row shows its own cost (quantity × rate) in one right-hand column on a computer; on a phone each row stacks label → input → cost. The total shows Subtotal → Tax → Total. A note under the total compares labor with the $3,000 and $7,000 thresholds of Utah's small-project exemption from contractor licensing (`JOB_VALUE_CHECKPOINTS` in `js/admin.js`; Utah is assumed, not confirmed). The notes only warn; they never change a price.
+Every row shows its own cost (quantity × rate) in one right-hand column on a computer; on a phone each row stacks label → input → cost. The total shows Subtotal → Tax → Total. A note under the total compares labor with the $3,000 and $7,000 thresholds of Utah's small-project exemption from contractor licensing (`JOB_VALUE_CHECKPOINTS` in `js/admin/editor.js`; Utah is assumed, not confirmed). The notes only warn; they never change a price.
 
 - **Nothing is lost**: each screen has its own address (`#/dashboard`, `#/details` for the quote, `#/prices`; the old `#/new` opens the quote screen), so the browser's Back/Forward work. Each quote being edited is kept as its own draft in the browser (`pr_quote_draft:<quote id>`), and each tab remembers which one it is editing, so reloading the page keeps every value and two tabs editing different quotes never overwrite or discard each other's changes. Leaving a quote with unsaved changes (Cancel or the browser's Back) asks "Discard unsaved changes?". The dashboard lists every quote with unsaved changes, each with **Resume** and **Discard** (Discard asks first); opening a quote that has unsaved changes carries on with them, and starting or opening another quote keeps them. Leaving **Business Prices** with changed fields asks too.
 - **Confirmations** use the tool's own dialog: a title, a button naming the action ("Delete quote", "Discard changes"), Cancel focused first, Escape to cancel, and focus back on the button that opened it. (A browser too old for `<dialog>` falls back to its plain OK/Cancel box.)
@@ -170,7 +179,7 @@ Every row shows its own cost (quantity × rate) in one right-hand column on a co
 
 **Important limitations (no backend):**
 
-- **The password gate is client-side only.** The password is in plain text in `js/admin.js` (`ADMIN_PASSWORD`); anyone who reads the source can skip the login. It deters casual access only. Don't put sensitive data behind it until there is a real backend with server-side authentication.
+- **The password gate is client-side only.** The password is in plain text in `js/admin/main.js` (`ADMIN_PASSWORD`); anyone who reads the source can skip the login. It deters casual access only. Don't put sensitive data behind it until there is a real backend with server-side authentication.
 - **Quotes, prices and the retention log are saved in the browser's local storage**, not a server: they stay on that device/browser, are deleted if browser data is cleared (and Safari deletes them by itself if the tool isn't opened for 7 days), and don't sync. The tool protects against this as far as a browser allows (next section), but only a server-side store makes quotes survive on their own — see "Owner inputs still needed".
 - The calculator prices **labor** only — no materials, overhead, permits or profit margin.
 
@@ -180,13 +189,13 @@ Because quotes exist only in one browser, the dashboard's **Backups** panel:
 
 - **Asks the browser to keep the data** (`navigator.storage.persist()`) once per visit, and says what it answered: "Storage: protected" (the browser agreed not to clear it on its own), "Storage: not protected" (it may delete the quotes without warning — shown in red, with **Ask Browser to Keep Data** to ask again; Firefox asks you, Chrome and Edge decide for themselves and are more likely to agree once the page is bookmarked) or "Storage: not guaranteed" (the browser can't say). Even "protected" doesn't survive clearing browsing data, Safari's 7-day rule or a new device, so backups are still needed.
 - **Records every backup** (`pr_last_backup`: date and number of quotes) and shows "Last backup: today / yesterday / N days ago", with how many quotes were added or changed since.
-- **Warns until a backup is recent**: with quotes saved and no backup, or a backup 3 days old or more (`BACKUP_REMINDER_DAYS` in `js/admin.js`), the panel turns red with "Last backup: … — Export now" and an **Export Now** button. It can't be dismissed; exporting clears it.
+- **Warns until a backup is recent**: with quotes saved and no backup, or a backup 3 days old or more (`BACKUP_REMINDER_DAYS` in `js/admin/core.js`), the panel turns red with "Last backup: … — Export now" and an **Export Now** button. It can't be dismissed; exporting clears it.
 - **Export** downloads `premium-restoration-quotes-<date>.json` with every quote (including customer details), the Business Prices saved in that browser and the clean-up log. Keep it somewhere other than that browser (e.g. the business's cloud drive). It holds customers' personal details: store it privately and delete old backup files in the monthly clean-up.
 - **Restore from Backup is one step**: choose the file and it is restored straight away. It never deletes anything: quotes that aren't in the browser are added, a quote already there is replaced only by a newer copy, and Business Prices are restored only if that browser has none. When the dashboard is empty it says the browser may have cleared its storage and points to Restore from Backup.
 
 To move to another device or browser: Export Backup on the old one, open `/admin/` on the new one, log in, Restore from Backup.
 
-**Retention:** each quote shows its created/updated dates. The owner keeps enquiries for about a month, so `QUOTE_RETENTION_DAYS` in `js/admin.js` is 30 and the Privacy Notice says "about a month"; change both together. Press **Mark Job Booked** on a quote that became a job: it is then a customer record, shows "Job booked", and is never flagged or deleted by the clean-up (press **Undo Job Booked** to undo). The dashboard flags the other quotes not updated within that period and offers **Delete Old Enquiries**, which deletes only those. Each deletion is logged with its date and count, and **Log This Month's Clean-Up** logs the date the whole monthly routine was done. That log (`pr_retention_log`) holds only dates and counts, and lives only in that browser.
+**Retention:** each quote shows its created/updated dates. The owner keeps enquiries for about a month, so `QUOTE_RETENTION_DAYS` in `js/admin/core.js` is 30 and the Privacy Notice says "about a month"; change both together. Press **Mark Job Booked** on a quote that became a job: it is then a customer record, shows "Job booked", and is never flagged or deleted by the clean-up (press **Undo Job Booked** to undo). The dashboard flags the other quotes not updated within that period and offers **Delete Old Enquiries**, which deletes only those. Each deletion is logged with its date and count, and **Log This Month's Clean-Up** logs the date the whole monthly routine was done. That log (`pr_retention_log`) holds only dates and counts, and lives only in that browser.
 
 ## Retention and privacy requests routine
 
@@ -274,6 +283,7 @@ Development tools need Node 20+ and `npm install`.
 ```bash
 npm test          # everything below, in order
 npm run lint      # ESLint (zero warnings allowed)
+npm run typecheck # TypeScript checks the JavaScript through its JSDoc (tsconfig.json; nothing is built)
 npm run format:check   # Prettier (npm run format to fix)
 npm run check:pages    # shared header/footer and contact details are in sync (notice if price text is older than site-config.json)
 npm run check:placeholders   # no [BRACKETED PLACEHOLDER] visible on any page
@@ -284,7 +294,7 @@ npm run test:e2e       # Playwright browser tests (Chromium)
 
 The browser tests cover the chat estimate (including validation, feet and inches, Back, reload, the PDF, and the card opening on its total at phone and desktop sizes), the chat's full-screen/focus behaviour and replies, the estimator switch, the contact form in both modes (including the email-app fallback), visitor counts on and off, the admin tool (one-screen quote with customer details, save/edit/delete, double save, reload, per-quote drafts across two tabs, the unsaved-changes prompts, the error summary counting down, styled dialogs, job booked and retention, messages, old quotes, storage failure, phone layout), admin backups (never-backed-up and overdue warnings, the backup date, one-step restore after the browser's storage is cleared, Business Prices carried to a new browser, and each answer from the browser about keeping data), both PDFs' business line, a price changed in the settings reaching every page, the chat, the estimate and admin quotes (and invalid prices switching the estimator off), every page at 375/390/768/1280px (no sideways scroll, no placeholders, no console errors or missing files), prices in page text, the 404 page, favicon, focus rings, tap-target sizes, and colour contrast in light and dark themes (axe-core). First-time Playwright setup on a new machine: `npx playwright install chromium`.
 
-**CI:** `.github/workflows/ci.yml` runs all of the above on every push and pull request, as one check named **"Lint, format, page sync, placeholders, unit and browser tests"** (workflow "CI"). CI only reports; it does **not** stop a failing change being merged until branch protection is turned on for the production branch — a GitHub setting a repository admin changes (still to do, see "Owner inputs"):
+**CI:** `.github/workflows/ci.yml` runs all of the above (except `check:deploy`) on every push and pull request, as one check named **"Lint, format, page sync, placeholders, unit and browser tests"** (workflow "CI"). CI only reports; it does **not** stop a failing change being merged until branch protection is turned on for the production branch — a GitHub setting a repository admin changes (still to do, see "Owner inputs"):
 
 1. On GitHub, open the repository → **Settings** → (under "Code and automation") **Rules** → **Rulesets** → **New ruleset** → **New branch ruleset**. (Classic alternative: **Settings** → **Branches** → **Add classic branch protection rule**.)
 2. Give it a name (e.g. "Production needs CI"), set **Enforcement status** to **Active**.
@@ -319,7 +329,7 @@ These are decisions or facts only the owner can supply. Until then, the site lea
 - **Privacy-request response period** (e.g. "30 days") → `privacy.responsePeriod`.
 - **Customer-record retention period** → then un-comment the wording in `privacy.html`.
 - **Governing state** for the Terms → then un-comment the clause in `terms.html`.
-- **A durable, shared store for admin quotes**: quotes are kept only in the browser that created them (see "Backups and moving to another device"). For quotes to survive on their own and be shared between devices, the owner needs to choose and create an account with a hosted database or back-end service (for example Supabase, Firebase or a Vercel storage product), which also brings real server-side log-in. That account, its cost and where customer data is stored are the owner's decisions; once chosen, the admin tool's storage functions in `js/admin.js` can be moved onto it, and the Privacy Notice updated to name it. Until then, export a backup at the end of every working day.
+- **A durable, shared store for admin quotes**: quotes are kept only in the browser that created them (see "Backups and moving to another device"). For quotes to survive on their own and be shared between devices, the owner needs to choose and create an account with a hosted database or back-end service (for example Supabase, Firebase or a Vercel storage product), which also brings real server-side log-in. That account, its cost and where customer data is stored are the owner's decisions; once chosen, the admin tool's storage functions (`js/admin/core.js`, `drafts.js`, `backup.js`) can be moved onto it, and the Privacy Notice updated to name it. Until then, export a backup at the end of every working day.
 - **Form service**: whether to use one (e.g. Formspree) and its endpoint → `leadForm.*`, then the go-live checklist in "Contact / lead form" (a real test request must arrive in the business inbox). Until then, the form uses the visitor's email app, and the site can't tell whether a request was sent.
 - **Tile floor rate**: the owner said "$5 per square foot for flooring". The site charges $5/sq ft for **other flooring** but prices a **tile floor** at the tile rate, **$4/sq ft** (`prices.tilePerSqFt` in `site-config.json`), in the chat estimate, chat answers, admin quotes and PDFs. Confirm in writing which is right. If tile floors should be $5/sq ft, that is a change to the calculation, not just a price: the floor-tile line in `computeEstimate()` (`js/bathroom-pricing.js`) must use the flooring rate (changing `tilePerSqFt` would also change wall tile), the chat's flooring/tile answers and the "Surfaces" note in the admin must say so, and the pricing unit tests must be updated to pin the confirmed rate. No price has been changed until then.
 - **Visitor counts**: whether to switch on anonymous counts, and with which provider (Vercel Web Analytics or Plausible) → `analytics.*` (see "Visitor counts").
