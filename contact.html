@@ -134,10 +134,14 @@
               <p class="form-consent" data-show-if="leadForm.endpoint" hidden>
                 <strong>How this form works:</strong> when you press Send Request, what you entered above is sent to us
                 through <span data-fill="leadForm.serviceName"></span>, the form service we use, which stores it and
-                emails it to us. We use your details to respond to your enquiry and prepare your quote, and, if you hire
-                us, to carry out and manage the work and keep the business records we are required to keep. We don't
-                sell them. See our <a href="privacy.html">Privacy Notice</a> for how long we keep them and how to ask us
-                to access or delete them.
+                emails it to us<span data-show-if="leadForm.servicePrivacyUrl" hidden>
+                  (<a data-fill-href="leadForm.servicePrivacyUrl" rel="noopener" target="_blank">its privacy policy</a
+                  >)</span
+                >. If sending fails, you'll be offered your own email app instead. We use your details to respond to
+                your enquiry and prepare your quote, and, if you hire us, to carry out and manage the work and keep the
+                business records we are required to keep. We don't sell them. See our
+                <a href="privacy.html">Privacy Notice</a> for how long we keep them and how to ask us to access or
+                delete them.
               </p>
 
               <button type="submit" class="btn btn-primary btn-block" id="lead-submit">

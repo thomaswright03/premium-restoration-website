@@ -12,6 +12,9 @@
 // safe defaults below apply (price estimator off, email-app lead form).
 //
 // Other scripts use: SiteConfig.ready.then(function (config) { ... })
+//
+// normalize() also loads in Node, so the unit tests can check the committed
+// site-config.json the same way the pages read it.
 
 (function () {
   "use strict";
@@ -27,6 +30,29 @@
     return typeof value === "string" ? value.trim() : "";
   }
 
+  // Shown when a form service is connected but not named in the settings.
+  var GENERIC_FORM_SERVICE = "our form service provider";
+
+  // Well-known form services, so the form text and the Privacy Notice name
+  // the right one even if leadForm.serviceName is left blank.
+  var KNOWN_FORM_SERVICES = {
+    "formspree.io": "Formspree",
+    "getform.io": "Getform",
+    "usebasin.com": "Basin",
+    "formsubmit.co": "FormSubmit",
+    "web3forms.com": "Web3Forms",
+  };
+
+  function formServiceName(endpoint) {
+    var m = /^https:\/\/([^/?#:]+)/i.exec(endpoint || "");
+    if (!m) return "";
+    var host = m[1].toLowerCase();
+    var match = Object.keys(KNOWN_FORM_SERVICES).filter(function (domain) {
+      return host === domain || host.slice(-(domain.length + 1)) === "." + domain;
+    })[0];
+    return match ? KNOWN_FORM_SERVICES[match] : "";
+  }
+
   function normalize(raw) {
     raw = raw || {};
     var pe = raw.priceEstimator || {};
@@ -40,12 +66,22 @@
       leadForm: {
         // Only an https:// address is used; anything else keeps the email-app form.
         endpoint: /^https:\/\/[^\s]+$/.test(endpoint) ? endpoint : "",
-        serviceName: clean(lf.serviceName) || "our form service provider",
+        serviceName: clean(lf.serviceName) || formServiceName(endpoint) || GENERIC_FORM_SERVICE,
         servicePrivacyUrl: /^https:\/\//.test(clean(lf.servicePrivacyUrl)) ? clean(lf.servicePrivacyUrl) : "",
       },
       owner: { legalName: clean(owner.legalName), contactAddress: clean(owner.contactAddress) },
       privacy: { responsePeriod: clean(privacy.responsePeriod) },
     };
+  }
+
+  if (typeof module === "object" && module.exports) {
+    module.exports = {
+      DEFAULTS: DEFAULTS,
+      GENERIC_FORM_SERVICE: GENERIC_FORM_SERVICE,
+      normalize: normalize,
+      formServiceName: formServiceName,
+    };
+    return;
   }
 
   function lookup(config, path) {

@@ -87,6 +87,60 @@ test.describe("contact form with a form endpoint (site-config.json leadForm.endp
     await expect(status).not.toContainText("Request sent.");
     await expect(page.locator("#name")).toHaveValue("Test Person");
     await expect(page.locator("#lead-submit")).toBeEnabled();
+    // The visitor's own email app is offered as the fallback, filled in.
+    const fallback = page.locator("#mailto-fallback");
+    await expect(fallback).toHaveText("send it with your email app instead");
+    const href = await fallback.getAttribute("href");
+    expect(href).toMatch(/^mailto:eduardo\.moroni77@gmail\.com\?subject=/);
+    const body = decodeURIComponent(href.split("&body=")[1]);
+    expect(body).toContain("Name: Test Person");
+    expect(body).toContain("Project details:\nSmall bathroom, new floor.");
+  });
+
+  test("a network failure or timeout is also reported, never as sent", async ({ page }) => {
+    await useConfig(page, { leadForm: { endpoint: ENDPOINT, serviceName: "Formspree" } });
+    await page.route(ENDPOINT, (route) => route.abort("failed"));
+    await page.goto("/contact.html");
+    await fillValid(page);
+    await page.click("#lead-submit");
+    await expect(page.locator("#form-status")).toContainText("Sorry, your request wasn't sent.");
+    await expect(page.locator("#mailto-fallback")).toBeVisible();
+  });
+
+  test("the estimate summary from the chat is sent with the request", async ({ page }) => {
+    await useConfig(page, { leadForm: { endpoint: ENDPOINT, serviceName: "Formspree" } });
+    let body = "";
+    await page.route(ENDPOINT, async (route) => {
+      body = route.request().postData() || "";
+      await route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' });
+    });
+    await page.goto("/index.html");
+    await page.evaluate(() =>
+      sessionStorage.setItem("pr_estimate_summary", "My bathroom estimate from your website:\n- Cabinets 3"),
+    );
+    await page.goto("/contact.html?from=estimate");
+    await expect(page.locator("#message")).toHaveValue(/Cabinets 3/);
+    await page.fill("#name", "Test Person");
+    await page.fill("#phone", "(385) 555-0100");
+    await page.fill("#email", "test@example.com");
+    await page.click("#lead-submit");
+    await expect(page.locator("#form-status")).toContainText("Request sent.");
+    expect(body).toContain("My bathroom estimate from your website:");
+    expect(body).toContain("Cabinets 3");
+  });
+
+  test("a well-known form service is named even if serviceName is left blank", async ({ page }) => {
+    const FORMSPREE = "https://formspree.io/f/testform";
+    await useConfig(page, {
+      leadForm: { endpoint: FORMSPREE, serviceName: "", servicePrivacyUrl: "https://example.test/privacy" },
+    });
+    await page.goto("/contact.html");
+    await expect(page.locator(".form-consent:visible")).toContainText("sent to us through Formspree");
+    await expect(
+      page.locator(".form-consent:visible").getByRole("link", { name: "its privacy policy" }),
+    ).toHaveAttribute("href", "https://example.test/privacy");
+    await page.goto("/privacy.html");
+    await expect(page.locator("main")).toContainText("Formspree receives and stores what you send");
   });
 
   test("the Privacy Notice names the form service once one is configured", async ({ page }) => {

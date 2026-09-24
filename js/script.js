@@ -1054,14 +1054,21 @@ document.addEventListener("DOMContentLoaded", function () {
       );
     }
 
-    function sendByEmailApp() {
-      var href =
-        "mailto:" +
-        EMAIL +
+    // The request as an email in the visitor's own email app: the only way
+    // to send it when no form service is set, and the fallback when sending
+    // through the form service fails.
+    function mailtoHref() {
+      return (
+        Business.EMAIL_HREF +
         "?subject=" +
         encodeURIComponent("Bathroom quote request from " + value("name")) +
         "&body=" +
-        encodeURIComponent(body());
+        encodeURIComponent(body())
+      );
+    }
+
+    function sendByEmailApp() {
+      var href = mailtoHref();
       var again = link(href, "open it again");
       again.id = "mailto-link";
       showStatus("info", [
@@ -1070,7 +1077,7 @@ document.addEventListener("DOMContentLoaded", function () {
         " — we don't receive anything until you do. If nothing opened, ",
         again,
         ", email us at ",
-        link("mailto:" + EMAIL, EMAIL),
+        link(Business.EMAIL_HREF, EMAIL),
         " or call ",
         link(PHONE_HREF, PHONE),
         ".",
@@ -1127,12 +1134,16 @@ document.addEventListener("DOMContentLoaded", function () {
           ]);
         })
         .catch(function () {
+          var fallback = link(mailtoHref(), "send it with your email app instead");
+          fallback.id = "mailto-fallback";
           showStatus("error", [
             strong("Sorry, your request wasn't sent."),
-            " Nothing you entered has been lost — please try again, or call us at ",
+            " Nothing you entered has been lost. Please try again, ",
+            fallback,
+            " (it opens a filled-in email that you then send), call us at ",
             link(PHONE_HREF, PHONE),
             " or email ",
-            link("mailto:" + EMAIL, EMAIL),
+            link(Business.EMAIL_HREF, EMAIL),
             ".",
           ]);
         })
