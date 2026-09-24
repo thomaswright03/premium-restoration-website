@@ -37,7 +37,16 @@ The site says "Get a Quote" / "Request a Quote", not "Free Quote": nothing confi
 ├── js/analytics.js           optional anonymous visitor counts (off unless switched on)
 ├── js/theme.js               Light / Dark / System switch
 ├── js/estimate-pdf.js        PDF layout shared by the chat estimate and admin quotes
-├── js/script.js              public-page behaviour (nav, FAQ, chat, estimate card, contact form)
+├── js/script.js              page behaviour every public page shares (menu, header, scroll-reveal, FAQ)
+├── js/lead-form.js           the Get a Quote form (checks, email app / form service, status messages)
+├── js/chat/                  home-page chat, in parts sharing window.PRChat (loaded in this order by index.html):
+│     core.js                 chat elements, settings, message rows, the estimate button
+│     fullscreen.js           full-screen dialog mode (title, focus kept inside, Escape)
+│     persistence.js          keeping the estimate in this tab across reloads
+│     step-form.js            one step of the estimate (a small grouped form)
+│     estimate-flow.js        the steps, Back, Cancel, finishing and restoring
+│     estimate-card.js        the finished estimate card and its PDF
+│     main.js                 sending messages, wiring
 ├── js/admin/                 admin tool, in parts sharing window.PRAdmin (loaded in this order by admin/index.html):
 │     core.js                 settings keys, checked storage, messages, confirmation dialog
 │     drafts.js               the quote being edited: one draft per quote, per tab
@@ -282,7 +291,7 @@ Development tools need Node 20+ and `npm install`.
 
 ```bash
 npm test          # everything below, in order
-npm run lint      # ESLint (zero warnings allowed)
+npm run lint      # ESLint (zero warnings allowed; no function over 150 lines)
 npm run typecheck # TypeScript checks the JavaScript through its JSDoc (tsconfig.json; nothing is built)
 npm run format:check   # Prettier (npm run format to fix)
 npm run check:pages    # shared header/footer and contact details are in sync (notice if price text is older than site-config.json)

@@ -57,6 +57,7 @@ interface Window {
   ChatReplies: typeof import("../js/chat-replies.js");
   SiteAnalytics: { EVENTS: Record<string, string>; track: (event: string) => void };
   PRAdmin: any;
+  PRChat: any;
   __prAuthed?: boolean;
   // Third-party scripts: jsPDF (self-hosted) and the optional visitor-count services.
   jspdf: any;

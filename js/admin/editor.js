@@ -245,42 +245,28 @@
     if (input) input.setAttribute("aria-invalid", message ? "true" : "false");
   }
 
-  function renderEditor() {
-    var prices = A.Pricing.getPrices();
-    calc = { costCells: [], errorEls: {}, recompute: null };
-    renderQuoteHeader();
-    document.getElementById("quote-error").hidden = true;
-    var saveBtn = /** @type {HTMLButtonElement} */ (document.getElementById("save-quote-btn"));
-    saveBtn.disabled = false;
-    saveBtn.textContent = "Save Quote";
-
-    var container = document.getElementById("quote-sections");
-    container.innerHTML = "";
-    var root = A.el("div", "bathroom-calculator");
-
-    if (A.state.draft.legacy) {
-      var legacyBox = A.el("div", "admin-warning");
-      legacyBox.setAttribute("data-testid", "legacy-notice");
-      var text =
-        "This quote was saved with the old calculator, which charged demolition, tile, flooring and painting for every room" +
-        (A.state.draft.legacy.total ? " (it came to " + A.money(A.state.draft.legacy.total) + ")" : "") +
-        ". The work it included wasn't recorded, so choose the work below. The saved total only changes when you save.";
-      if (!A.state.draft.legacy.hadDimensions && (A.state.draft.legacy.floorSqFt || A.state.draft.legacy.wallSqFt)) {
-        text +=
-          " It had no room dimensions — only " +
-          A.Pricing.formatQty(A.state.draft.legacy.floorSqFt) +
-          " sq ft of floor and " +
-          A.Pricing.formatQty(A.state.draft.legacy.wallSqFt) +
-          " sq ft of wall — so enter the width, length and height.";
-      }
-      legacyBox.appendChild(A.el("p", null, text));
-      root.appendChild(legacyBox);
+  function legacyNotice() {
+    var legacy = A.state.draft.legacy;
+    var legacyBox = A.el("div", "admin-warning");
+    legacyBox.setAttribute("data-testid", "legacy-notice");
+    var text =
+      "This quote was saved with the old calculator, which charged demolition, tile, flooring and painting for every room" +
+      (legacy.total ? " (it came to " + A.money(legacy.total) + ")" : "") +
+      ". The work it included wasn't recorded, so choose the work below. The saved total only changes when you save.";
+    if (!legacy.hadDimensions && (legacy.floorSqFt || legacy.wallSqFt)) {
+      text +=
+        " It had no room dimensions — only " +
+        A.Pricing.formatQty(legacy.floorSqFt) +
+        " sq ft of floor and " +
+        A.Pricing.formatQty(legacy.wallSqFt) +
+        " sq ft of wall — so enter the width, length and height.";
     }
+    legacyBox.appendChild(A.el("p", null, text));
+    return legacyBox;
+  }
 
-    var drift = A.buildPriceDriftNotice();
-    if (drift) root.appendChild(drift);
-
-    // Room size
+  // Room size: width, length and height, with the areas they give.
+  function roomSizeSection() {
     var dims = section("Room size");
     dims.appendChild(
       A.el(
@@ -312,9 +298,10 @@
     var areaText = A.el("p", "calc-areas");
     areaText.setAttribute("aria-live", "polite");
     dims.appendChild(areaText);
-    root.appendChild(dims);
+    return { section: dims, areaText: areaText };
+  }
 
-    // Work
+  function workSection() {
     var work = section("Work");
     var workCosts = {
       demolition: ["demolition"],
@@ -327,9 +314,10 @@
       calc.errorEls[q.key] = r;
       work.appendChild(r.row);
     });
-    root.appendChild(work);
+    return work;
+  }
 
-    // Fixtures
+  function fixturesSection(prices) {
     var fixtures = section("Fixtures", LICENCE_NOTES.Fixtures);
     A.Pricing.FIXTURES.forEach(function (f) {
       var r = calcRow(
@@ -341,9 +329,10 @@
       calc.errorEls[f.key] = r;
       fixtures.appendChild(r.row);
     });
-    root.appendChild(fixtures);
+    return fixtures;
+  }
 
-    // Plumbing
+  function plumbingSection(prices) {
     var plumbing = section("Plumbing", LICENCE_NOTES.Plumbing);
     var pointsOut = A.el("output", "calc-readout");
     var pointsRow = calcRow(
@@ -371,9 +360,10 @@
         A.Pricing.shortMoney(prices.Bad_Valve_Surcharge_Price) + " flat",
       ).row,
     );
-    root.appendChild(plumbing);
+    return { section: plumbing, pointsOut: pointsOut };
+  }
 
-    // Electrical
+  function electricalSection(prices) {
     var electrical = section("Electrical", LICENCE_NOTES.Electrical);
     var er = calcRow(
       "Electrical points",
@@ -385,9 +375,11 @@
     );
     calc.errorEls.Electrical_Points = er;
     electrical.appendChild(er.row);
-    root.appendChild(electrical);
+    return electrical;
+  }
 
-    // Totals
+  // Subtotal → Tax → Total, and the licensing-threshold note under it.
+  function totalsBanner(root) {
     var banner = A.el("div", "bathroom-total-banner");
     banner.setAttribute("aria-live", "polite");
     function totalLine(labelText, role, main) {
@@ -400,55 +392,83 @@
       banner.appendChild(line);
       return { label: label, value: value };
     }
-    var subtotalLine = totalLine("Subtotal", "subtotal");
-    var taxLine = totalLine("Tax", "tax");
-    var totalLineEls = totalLine("Total Bathroom Price", "price", true);
+    var totals = {
+      subtotal: totalLine("Subtotal", "subtotal"),
+      tax: totalLine("Tax", "tax"),
+      total: totalLine("Total Bathroom Price", "price", true),
+      note: A.el("p", "admin-warning-inline"),
+    };
     root.appendChild(banner);
-    var jobValueNote = A.el("p", "admin-warning-inline");
-    root.appendChild(jobValueNote);
+    root.appendChild(totals.note);
+    return totals;
+  }
+
+  // Refreshes every row's cost, the areas, the plumbing points and the totals.
+  function recompute(prices, parts) {
+    var result = A.Pricing.computeEstimate(A.state.draft.values, A.state.draft.scope, {
+      prices: prices,
+      includeTrade: true,
+    });
+    var byKey = {};
+    result.lines.forEach(function (l) {
+      byKey[l.key] = l;
+    });
+    calc.costCells.forEach(function (cell) {
+      /** @type {PricingLine | null} */
+      var line = null;
+      cell.keys.forEach(function (k) {
+        if (byKey[k]) line = byKey[k];
+      });
+      cell.el.innerHTML = "";
+      cell.el.appendChild(A.el("span", "calc-cost-value", line ? A.money(line.cost) : "—"));
+      if (line) cell.el.appendChild(A.el("span", "calc-cost-detail", line.detail));
+      cell.el.classList.toggle("is-zero", !line);
+    });
+    parts.pointsOut.textContent = A.Pricing.formatQty(result.plumbingFixtureCount);
+    var needs = A.Pricing.scopeNeeds(A.state.draft.scope);
+    parts.areaText.textContent =
+      "Floor / ceiling: " +
+      A.Pricing.formatQty(result.floorSqFt) +
+      " sq ft · Walls: " +
+      A.Pricing.formatQty(result.wallSqFt) +
+      " sq ft" +
+      (needs.floorArea ? "" : " (not used by the work chosen so far)");
+    parts.totals.subtotal.value.textContent = A.money(result.subtotal);
+    parts.totals.tax.label.textContent = "Tax (" + result.taxRatePercent + "%)";
+    parts.totals.tax.value.textContent = A.money(result.taxAmount);
+    parts.totals.total.value.textContent = A.money(result.total);
+    parts.totals.note.textContent = jobValueWarning(result.subtotal);
+    return result;
+  }
+
+  function renderEditor() {
+    var prices = A.Pricing.getPrices();
+    calc = { costCells: [], errorEls: {}, recompute: null };
+    renderQuoteHeader();
+    document.getElementById("quote-error").hidden = true;
+    var saveBtn = /** @type {HTMLButtonElement} */ (document.getElementById("save-quote-btn"));
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save Quote";
+
+    var container = document.getElementById("quote-sections");
+    container.innerHTML = "";
+    var root = A.el("div", "bathroom-calculator");
+    if (A.state.draft.legacy) root.appendChild(legacyNotice());
+    var drift = A.buildPriceDriftNotice();
+    if (drift) root.appendChild(drift);
+
+    var room = roomSizeSection();
+    root.appendChild(room.section);
+    root.appendChild(workSection());
+    root.appendChild(fixturesSection(prices));
+    var plumbing = plumbingSection(prices);
+    root.appendChild(plumbing.section);
+    root.appendChild(electricalSection(prices));
+    var parts = { areaText: room.areaText, pointsOut: plumbing.pointsOut, totals: totalsBanner(root) };
 
     calc.recompute = function () {
-      var result = A.Pricing.computeEstimate(A.state.draft.values, A.state.draft.scope, {
-        prices: prices,
-        includeTrade: true,
-      });
-      var byKey = {};
-      result.lines.forEach(function (l) {
-        byKey[l.key] = l;
-      });
-      calc.costCells.forEach(function (cell) {
-        /** @type {PricingLine | null} */
-        var line = null;
-        cell.keys.forEach(function (k) {
-          if (byKey[k]) line = byKey[k];
-        });
-        cell.el.innerHTML = "";
-        if (line) {
-          cell.el.appendChild(A.el("span", "calc-cost-value", A.money(line.cost)));
-          cell.el.appendChild(A.el("span", "calc-cost-detail", line.detail));
-          cell.el.classList.remove("is-zero");
-        } else {
-          cell.el.appendChild(A.el("span", "calc-cost-value", "—"));
-          cell.el.classList.add("is-zero");
-        }
-      });
-      pointsOut.textContent = A.Pricing.formatQty(result.plumbingFixtureCount);
-      var needs = A.Pricing.scopeNeeds(A.state.draft.scope);
-      areaText.textContent =
-        "Floor / ceiling: " +
-        A.Pricing.formatQty(result.floorSqFt) +
-        " sq ft · Walls: " +
-        A.Pricing.formatQty(result.wallSqFt) +
-        " sq ft" +
-        (needs.floorArea ? "" : " (not used by the work chosen so far)");
-      subtotalLine.value.textContent = A.money(result.subtotal);
-      taxLine.label.textContent = "Tax (" + result.taxRatePercent + "%)";
-      taxLine.value.textContent = A.money(result.taxAmount);
-      totalLineEls.value.textContent = A.money(result.total);
-      jobValueNote.textContent = jobValueWarning(result.subtotal);
-      return result;
+      return recompute(prices, parts);
     };
-
     container.appendChild(root);
     calc.recompute();
   }

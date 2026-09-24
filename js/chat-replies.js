@@ -12,20 +12,13 @@
 //
 // Loads as a plain browser script (window.ChatReplies) and as a Node module.
 
-(function (/** @type {any} */ root, factory) {
+(function (/** @type {any} */ root) {
   "use strict";
   var node = typeof module === "object" && module.exports && typeof require === "function";
-  var api = factory(
-    node ? require("./bathroom-pricing.js") : root.BathroomPricing,
-    node ? require("./business-info.js") : root.BusinessInfo,
-  );
-  if (typeof module === "object" && module.exports) {
-    module.exports = api;
-  } else {
-    root.ChatReplies = api;
-  }
-})(typeof globalThis !== "undefined" ? globalThis : this, function (Pricing, Business) {
-  "use strict";
+  /** @type {typeof import("./bathroom-pricing.js")} */
+  var Pricing = node ? require("./bathroom-pricing.js") : root.BathroomPricing;
+  /** @type {typeof import("./business-info.js")} */
+  var Business = node ? require("./business-info.js") : root.BusinessInfo;
 
   var PHONE = Business.PHONE;
   var EMAIL = Business.EMAIL;
@@ -590,11 +583,14 @@
     return fallback;
   }
 
-  return {
+  var api = {
     reply: reply,
     normalize: normalize,
     CALL_FOR_PRICE: CALL_FOR_PRICE,
     PHONE: PHONE,
     EMAIL: EMAIL,
   };
-});
+
+  if (node) module.exports = api;
+  else root.ChatReplies = api;
+})(typeof globalThis !== "undefined" ? globalThis : this);

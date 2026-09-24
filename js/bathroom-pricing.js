@@ -25,26 +25,7 @@
 // module (for the unit tests and scripts/sync-pages.mjs), which reads
 // site-config.json itself.
 
-(function (root, factory) {
-  "use strict";
-  var node = typeof module === "object" && module.exports && typeof require === "function";
-  var api = factory();
-  if (node) {
-    try {
-      // (Through a variable, so the browser-side type check doesn't look for Node's modules.)
-      var nodeRequire = require;
-      var path = nodeRequire("path");
-      var raw = JSON.parse(nodeRequire("fs").readFileSync(path.join(__dirname, "..", "site-config.json"), "utf8"));
-      var check = api.validatePublishedPrices(raw.prices);
-      if (check.valid) api.setPublishedPrices(check.prices);
-    } catch (e) {
-      /* unreadable settings: hasPublishedPrices() stays false; the unit tests say why */
-    }
-    module.exports = api;
-  } else {
-    /** @type {any} */ (root).BathroomPricing = api;
-  }
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+(function (root) {
   "use strict";
 
   var RATES_KEY = "pr_business_rates";
@@ -666,7 +647,7 @@
     return !!bathroomData && !(Number(bathroomData.calcVersion) >= CALC_VERSION);
   }
 
-  return {
+  var api = {
     CALC_VERSION: CALC_VERSION,
     RATES_KEY: RATES_KEY,
     DEFAULT_PRICES: DEFAULT_PRICES,
@@ -702,4 +683,21 @@
     buildEstimateSummary: buildEstimateSummary,
     isLegacyQuoteData: isLegacyQuoteData,
   };
-});
+
+  var node = typeof module === "object" && module.exports && typeof require === "function";
+  if (node) {
+    try {
+      // (Through a variable, so the browser-side type check doesn't look for Node's modules.)
+      var nodeRequire = require;
+      var path = nodeRequire("path");
+      var raw = JSON.parse(nodeRequire("fs").readFileSync(path.join(__dirname, "..", "site-config.json"), "utf8"));
+      var check = api.validatePublishedPrices(raw.prices);
+      if (check.valid) api.setPublishedPrices(check.prices);
+    } catch (e) {
+      /* unreadable settings: hasPublishedPrices() stays false; the unit tests say why */
+    }
+    module.exports = api;
+  } else {
+    /** @type {any} */ (root).BathroomPricing = api;
+  }
+})(typeof globalThis !== "undefined" ? globalThis : this);
