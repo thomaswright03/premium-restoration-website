@@ -1,0 +1,668 @@
+/* Admin quoting tool — internal, functional styling on top of the shared design tokens in style.css */
+
+.admin-body {
+  background: var(--color-bg);
+}
+
+.admin-screen {
+  min-height: 100vh;
+  padding: 48px 24px 80px;
+}
+
+.admin-muted {
+  color: var(--color-muted);
+}
+
+/* Login */
+.admin-login-screen {
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(160deg, var(--color-dark) 0%, #1f1b15 55%, var(--color-dark-soft) 100%);
+}
+
+.admin-login-screen:not([hidden]) {
+  display: flex;
+}
+
+.admin-login-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: 48px 44px;
+  max-width: 380px;
+  width: 100%;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.admin-login-card h1 {
+  font-size: 1.8rem;
+  margin: 0 0 10px;
+}
+
+.admin-login-card .eyebrow {
+  justify-content: center;
+}
+
+.admin-login-card .eyebrow::before {
+  display: none;
+}
+
+.admin-login-card p {
+  margin-bottom: 28px;
+}
+
+.admin-login-card .form-group {
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.admin-btn-block {
+  width: 100%;
+}
+
+.admin-error {
+  color: #b5462f;
+  font-size: 0.85rem;
+  margin: -10px 0 20px;
+  text-align: left;
+}
+
+/* Shared header for post-login screens */
+.admin-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: 860px;
+  margin: 0 auto 40px;
+}
+
+.admin-header h1 {
+  font-size: 2rem;
+  margin: 6px 0 0;
+}
+
+.admin-header .eyebrow {
+  margin-bottom: 4px;
+}
+
+.admin-link-btn {
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 8px 0;
+  flex-shrink: 0;
+}
+
+.admin-link-btn:hover {
+  color: var(--color-accent);
+}
+
+.admin-toolbar {
+  max-width: 860px;
+  margin: 0 auto 32px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Quote list */
+.quote-list {
+  max-width: 860px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.quote-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  padding: 22px 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.quote-card-main h3 {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+}
+
+.quote-card-meta {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.quote-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.quote-chip {
+  background: var(--color-bg);
+  border: 1px solid var(--color-line);
+  color: var(--color-ink-soft);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.quote-card-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.quote-card-actions button {
+  background: none;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  color: var(--color-ink-soft);
+}
+
+.quote-card-actions button:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.quote-card-actions button.danger:hover {
+  border-color: #b5462f;
+  color: #b5462f;
+}
+
+/* Forms panel */
+.admin-panel {
+  max-width: 860px;
+  margin: 0 auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  padding: 40px 44px;
+}
+
+.admin-panel .form-group {
+  margin-bottom: 28px;
+}
+
+.admin-panel label {
+  color: var(--color-ink-soft);
+}
+
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.checkbox-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  cursor: pointer;
+  text-transform: none;
+  font-size: 1rem;
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+.checkbox-tile:has(input:checked) {
+  border-color: var(--color-accent);
+  background: #faf3e8;
+}
+
+.checkbox-tile input {
+  width: auto;
+  accent-color: var(--color-accent);
+}
+
+.checkbox-tile.coming-soon {
+  position: relative;
+  overflow: hidden;
+  padding-top: 32px;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.checkbox-tile.coming-soon input,
+.checkbox-tile.coming-soon span {
+  cursor: not-allowed;
+}
+
+.coming-soon-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: var(--color-dark);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 5px 0;
+}
+
+.btn-outline-dark {
+  background: transparent;
+  border: 1px solid var(--color-line);
+  color: var(--color-ink-soft);
+}
+
+.btn-outline-dark:hover {
+  border-color: var(--color-ink);
+  color: var(--color-ink);
+}
+
+.admin-form-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+/* Category sections inside step 2 */
+.category-section {
+  margin-bottom: 44px;
+  padding-bottom: 36px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.category-section:last-child {
+  border-bottom: none;
+  margin-bottom: 12px;
+  padding-bottom: 0;
+}
+
+.category-section h2 {
+  font-size: 1.4rem;
+  margin: 0 0 22px;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px dashed var(--color-line);
+  flex-wrap: wrap;
+}
+
+.field-row:last-child {
+  border-bottom: none;
+}
+
+.field-row-label {
+  flex: 0 0 220px;
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--color-ink);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.field-row-label input[type="checkbox"] {
+  width: auto;
+  accent-color: var(--color-accent);
+}
+
+.field-row-control {
+  flex: 1 1 220px;
+  min-width: 200px;
+}
+
+.field-row-control select,
+.field-row-control input[type="number"],
+.field-row-control input[type="text"] {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: var(--color-bg);
+}
+
+.field-row-control input[hidden] {
+  display: none;
+}
+
+.exterior-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px 20px;
+}
+
+.exterior-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+  font-weight: 400;
+  text-transform: none;
+  color: var(--color-ink-soft);
+}
+
+.exterior-option input {
+  width: auto;
+  accent-color: var(--color-accent);
+}
+
+.exterior-other-input {
+  margin-top: 14px;
+}
+
+/* Business Rates & Hours screen */
+.rates-intro {
+  max-width: 640px;
+  margin: 0 0 32px;
+}
+
+.rate-group-title {
+  font-size: 1.1rem;
+  margin: 0 0 4px;
+  color: var(--color-ink);
+}
+
+.rate-group-subtitle {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  margin: 0 0 18px;
+}
+
+.rate-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--color-line);
+  flex-wrap: wrap;
+}
+
+.rate-row:last-child {
+  border-bottom: none;
+}
+
+.rate-row-label {
+  flex: 1 1 320px;
+  font-size: 0.92rem;
+  color: var(--color-ink);
+}
+
+.rate-row-hint {
+  display: block;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  margin-top: 2px;
+}
+
+.rate-row-control {
+  flex: 0 0 140px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rate-row-control input {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  background: var(--color-bg);
+  width: 100%;
+}
+
+.rate-row-prefix {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+/* Bathroom line-item calculator (inside a category-section) */
+.bathroom-subsection {
+  margin-bottom: 30px;
+}
+
+.bathroom-subsection-title {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0 0 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--color-line);
+}
+
+.bathroom-subsection:first-child .bathroom-subsection-title {
+  border-top: none;
+  padding-top: 0;
+}
+
+.line-item-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+  flex-wrap: wrap;
+}
+
+.line-item-label {
+  flex: 1 1 160px;
+  font-size: 0.9rem;
+  color: var(--color-ink);
+}
+
+.line-item-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+}
+
+.line-item-inputs input,
+.line-item-inputs select {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  background: var(--color-bg);
+  width: 100px;
+}
+
+.line-item-inputs .unit-label {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.line-item-cost {
+  flex: 0 0 90px;
+  text-align: right;
+  font-weight: 600;
+  color: var(--color-ink);
+  font-size: 0.9rem;
+}
+
+.line-item-cost.zero {
+  color: var(--color-muted);
+  font-weight: 400;
+}
+
+.bathroom-dimensions {
+  background: var(--color-bg);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: 16px 18px 4px;
+}
+
+.computed-input {
+  background: var(--color-line) !important;
+  color: var(--color-ink-soft);
+  cursor: default;
+}
+
+.reused-note {
+  flex: 1 1 auto;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  font-style: italic;
+}
+
+.wiring-subblock {
+  background: var(--color-bg);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin: 0 0 14px;
+}
+
+.wiring-status-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wiring-status-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 400;
+  text-transform: none;
+  color: var(--color-ink-soft);
+  cursor: pointer;
+}
+
+.wiring-status-option input {
+  width: auto;
+  accent-color: var(--color-accent);
+}
+
+.wiring-split-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-line);
+}
+
+.wiring-split-inputs input {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  background: var(--color-surface);
+  width: 80px;
+}
+
+.wiring-split-inputs .unit-label {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+
+.bathroom-total-banner {
+  margin-top: 24px;
+  padding: 20px 24px;
+  background: var(--color-dark);
+  color: #fff;
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bathroom-total-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.bathroom-total-line .label {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.bathroom-total-line .value {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.bathroom-total-line.main {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.bathroom-total-line.main .label {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.bathroom-total-line.main .value {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  color: #fff;
+}
+
+.quote-price-chip {
+  background: var(--color-dark);
+  color: #fff;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .field-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .field-row-label {
+    flex-basis: auto;
+  }
+
+  .field-row-control {
+    flex-basis: auto;
+    width: 100%;
+  }
+
+  .admin-panel {
+    padding: 32px 24px;
+  }
+
+  .rate-row,
+  .line-item-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .rate-row-control {
+    flex-basis: auto;
+    width: 100%;
+  }
+
+  .line-item-cost {
+    flex-basis: auto;
+    text-align: left;
+  }
+}

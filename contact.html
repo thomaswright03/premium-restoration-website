@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Get a Quote | Premium Restoration</title>
+<meta name="description" content="Request a free quote from Premium Restoration for your home restoration project." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav">
+    <a href="index.html" class="nav-brand">Premium Restoration</a>
+    <button class="nav-toggle" aria-label="Toggle navigation">&#9776;</button>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="gallery.html">Our Work</a></li>
+      <li><a href="about.html">About Us</a></li>
+      <li><a href="faq.html">FAQs</a></li>
+      <li><a href="contact.html" class="nav-cta current">Get a Quote</a></li>
+    </ul>
+  </nav>
+</header>
+
+<section class="hero" style="padding: 200px 32px 110px;">
+  <div class="hero-inner">
+    <span class="eyebrow center">Let's Talk</span>
+    <h1>Get a Free <em>Quote</em></h1>
+    <p>Tell us a bit about your project and we'll be in touch to schedule a consultation.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="contact-wrap">
+
+    <div>
+      <div id="form-success" class="form-success">
+        Thanks! Your request has been received. We'll be in touch shortly.
+      </div>
+
+      <form id="lead-form">
+        <div class="form-group">
+          <label for="name">Full Name</label>
+          <input type="text" id="name" name="name" required />
+        </div>
+
+        <div class="form-group">
+          <label for="phone">Phone Number</label>
+          <input type="tel" id="phone" name="phone" required />
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" name="email" required />
+        </div>
+
+        <div class="form-group">
+          <label for="service">Service Interested In</label>
+          <select id="service" name="service">
+            <option value="full-home">Full Home Restoration</option>
+            <option value="kitchen-bath">Kitchen &amp; Bath Restoration</option>
+            <option value="damage-repair">Water / Fire / Storm Damage</option>
+            <option value="design">Design &amp; Material Consultation</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="message">Tell Us About Your Project</label>
+          <textarea id="message" name="message" placeholder="Property type, rough timeline, and anything else we should know..."></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%;">Request Free Quote</button>
+        <p class="form-note">
+          This is a front-end demo form — submissions aren't sent anywhere yet.
+          Connect it to a form service (e.g. Formspree, Netlify Forms) or your own backend before launch.
+        </p>
+      </form>
+    </div>
+
+    <div class="contact-info-card">
+      <h3>Contact Us Directly</h3>
+      <div class="contact-info-row">
+        <span class="icon">&#128222;</span>
+        <a href="tel:+13853568733">(385) 356-8733</a>
+      </div>
+      <div class="contact-info-row">
+        <span class="icon">&#9993;</span>
+        <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+      </div>
+      <p class="note">
+        Prefer to talk it through first? Give us a call or send an email and we'll get back to you as soon as possible.
+      </p>
+    </div>
+
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-col">
+      <p class="footer-brand">Premium Restoration</p>
+      <p style="max-width:260px; font-size: 0.9rem;">Quality home restoration services.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Explore</h4>
+      <a href="index.html">Home</a>
+      <a href="gallery.html">Our Work</a>
+      <a href="about.html">About Us</a>
+      <a href="faq.html">FAQs</a>
+      <a href="contact.html">Get a Quote</a>
+    </div>
+    <div class="footer-col">
+      <h4>Contact</h4>
+      <a href="tel:+13853568733">(385) 356-8733</a>
+      <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    &copy; <span id="year"></span> Premium Restoration. All rights reserved.
+  </div>
+</footer>
+
+<script src="js/script.js"></script>
+<script>document.getElementById("year").textContent = new Date().getFullYear();</script>
+</body>
+</html>
