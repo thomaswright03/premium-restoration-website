@@ -1363,13 +1363,6 @@ body.ai-chat-locked {
   margin-bottom: var(--space-1);
 }
 
-/* Gallery (kept for when real project photos are added) */
-.gallery-empty {
-  max-width: 640px;
-  margin: 0 auto;
-  text-align: center;
-}
-
 /* FAQ accordion */
 .faq-list {
   max-width: 820px;

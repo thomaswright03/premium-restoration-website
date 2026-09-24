@@ -5,16 +5,7 @@ const AxeBuilder = require("@axe-core/playwright").default;
 const Pricing = require("../../js/bathroom-pricing.js");
 const { useConfig } = require("./helpers");
 
-const PUBLIC_PAGES = [
-  "index.html",
-  "about.html",
-  "faq.html",
-  "contact.html",
-  "privacy.html",
-  "terms.html",
-  "gallery.html",
-  "404.html",
-];
+const PUBLIC_PAGES = ["index.html", "about.html", "faq.html", "contact.html", "privacy.html", "terms.html", "404.html"];
 const PLACEHOLDER = /\[[A-Z][A-Z0-9 #/-]*[A-Z#]\]/;
 
 test.describe("every public page", () => {
@@ -78,10 +69,11 @@ test.describe("every public page", () => {
     );
   });
 
-  test("no link leads to the empty Our Work page", async ({ page }) => {
-    for (const file of PUBLIC_PAGES.filter((f) => f !== "gallery.html")) {
+  test("there is no empty Our Work page: it isn't deployed and nothing links to it", async ({ page, request }) => {
+    expect((await request.get("/gallery.html")).status()).toBe(404);
+    for (const file of PUBLIC_PAGES) {
       await page.goto("/" + file);
-      await expect(page.locator('a[href*="gallery.html"]')).toHaveCount(0);
+      await expect(page.locator('a[href*="gallery"]')).toHaveCount(0);
     }
   });
 

@@ -37,7 +37,6 @@ export const PAGES = [
   { file: "contact.html", base: "" },
   { file: "privacy.html", base: "" },
   { file: "terms.html", base: "" },
-  { file: "gallery.html", base: "" },
   { file: "404.html", base: "/" },
   { file: "admin/index.html", base: "../" },
 ];
