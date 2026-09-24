@@ -146,14 +146,16 @@ document.addEventListener("DOMContentLoaded", function () {
     return sum;
   }
 
-  // Business identity shown on estimates. Replace the bracketed
-  // placeholders with the real details (they must match privacy.html,
+  // Business identity shown on estimates. Premium Restoration is currently
+  // an unregistered business run by one individual (no company, LLC,
+  // registered business name or registered address). Replace the bracketed
+  // placeholder with the owner's legal name (it must match privacy.html,
   // terms.html and every page footer).
-  // The licence line is left empty on purpose: only fill it in once the
-  // licence is confirmed and verifiable, e.g.
+  // There is currently no contractor licence, so the licence line is left
+  // empty on purpose. Only fill it in once a licence is actually issued, e.g.
   // "Contractor License # [CONTRACTOR LICENSE #] ([LICENSE CLASSIFICATION])".
   var BUSINESS_IDENTITY = {
-    legalName: "[COMPANY LEGAL NAME]",
+    legalName: "Premium Restoration, operated by [OWNER LEGAL NAME], an individual (not a registered company)",
     license: "",
     phone: "(385) 356-8733",
     email: "eduardo.moroni77@gmail.com",
@@ -172,6 +174,18 @@ document.addEventListener("DOMContentLoaded", function () {
     return PLUMBING_FIXTURE_KEYS.reduce(function (sum, key) {
       return sum + (parseFloat(answers[key]) || 0);
     }, 0);
+  }
+
+  // When toilets, sinks, showers or bathtubs are listed, the plumbing they
+  // need is always extra, so the headline total must not read as the full
+  // cost of the job.
+  function totalLabel(fixtureCount) {
+    return fixtureCount > 0 ? "Estimated Labor Total, before plumbing" : "Estimated Labor Total";
+  }
+
+  function plumbingTotalNote(fixtureCount) {
+    return "This is not the full cost of your job: plumbing work for the " + BathroomPricing.formatQty(fixtureCount) +
+      " toilet/sink/shower/bathtub item(s) you listed will be added on top of this total.";
   }
 
   var ESTIMATE_DISCLAIMER =
@@ -229,10 +243,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Generates a downloadable PDF of the estimate using jsPDF (loaded on
   // demand from cdnjs). Mirrors the on-screen card's content and totals.
-  function exportEstimateAsPdf(result, assumptions) {
+  function exportEstimateAsPdf(result, assumptions, fixtureCount) {
     if (!window.jspdf) {
       loadJsPdf(function () {
-        if (window.jspdf) exportEstimateAsPdf(result, assumptions);
+        if (window.jspdf) exportEstimateAsPdf(result, assumptions, fixtureCount);
       });
       return;
     }
@@ -284,7 +298,7 @@ document.addEventListener("DOMContentLoaded", function () {
     doc.setFont("times", "bold");
     doc.setFontSize(16);
     doc.setTextColor(20);
-    doc.text("Estimated Labor Total", margin, y);
+    doc.text(totalLabel(fixtureCount), margin, y);
     doc.text(BathroomPricing.money(result.subtotal), pageWidth - margin, y, { align: "right" });
     y += 18;
 
@@ -292,7 +306,8 @@ document.addEventListener("DOMContentLoaded", function () {
     doc.setFontSize(9);
     doc.setTextColor(130);
     var excludesLines = doc.splitTextToSize(
-      "Excludes plumbing and electrical work, materials, permits, and any applicable taxes, which add to the cost. Non-binding.",
+      (fixtureCount > 0 ? plumbingTotalNote(fixtureCount) + " " : "") +
+        "Excludes plumbing and electrical work, materials, permits, and any applicable taxes, which add to the cost. Non-binding.",
       pageWidth - margin * 2
     );
     doc.text(excludesLines, margin, y);
@@ -393,9 +408,16 @@ document.addEventListener("DOMContentLoaded", function () {
     var totalWrap = document.createElement("div");
     totalWrap.className = "ai-chat-estimate-total";
     totalWrap.innerHTML =
-      '<span class="ai-chat-estimate-total-label">Estimated Labor Total</span>' +
+      '<span class="ai-chat-estimate-total-label">' + totalLabel(fixtureCount) + "</span>" +
       '<span class="ai-chat-estimate-total-value">' + BathroomPricing.money(result.subtotal) + "</span>";
     card.appendChild(totalWrap);
+
+    if (fixtureCount > 0) {
+      var totalNote = document.createElement("p");
+      totalNote.className = "ai-chat-estimate-total-note";
+      totalNote.textContent = plumbingTotalNote(fixtureCount);
+      card.appendChild(totalNote);
+    }
 
     var assumptionsWrap = document.createElement("div");
     assumptionsWrap.className = "ai-chat-estimate-assumptions";
@@ -420,7 +442,7 @@ document.addEventListener("DOMContentLoaded", function () {
     exportBtn.className = "ai-chat-estimate-export";
     exportBtn.textContent = "Export as PDF ↓";
     exportBtn.addEventListener("click", function () {
-      exportEstimateAsPdf(result, assumptions);
+      exportEstimateAsPdf(result, assumptions, fixtureCount);
     });
     actions.appendChild(exportBtn);
 
