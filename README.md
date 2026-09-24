@@ -355,25 +355,40 @@ Phone **(385) 356-8733** and email **eduardo.moroni77@gmail.com** are defined on
 
 ## Owner inputs still needed
 
-These are decisions or facts only the owner can supply. Until then, the site leaves the related text out rather than showing a placeholder.
+These are decisions, facts or accounts only the owner (or the repository admin) can supply. Until then, the site leaves the related text out rather than showing a placeholder, and no price has been changed.
 
-- **Legal name** of the owner → `owner.legalName` in `site-config.json`.
-- **Contact address** → `owner.contactAddress`.
-- **Privacy-request response period** (e.g. "30 days") → `privacy.responsePeriod`.
-- **Customer-record retention period** → then un-comment the wording in `privacy.html`.
-- **Governing state** for the Terms → then un-comment the clause in `terms.html`.
-- **A durable, shared store for admin quotes**: quotes are kept only in the browser that created them (see "Backups and moving to another device"). For quotes to survive on their own and be shared between devices, the owner needs to choose and create an account with a hosted database or back-end service (for example Supabase, Firebase or a Vercel storage product), which also brings real server-side log-in. That account, its cost and where customer data is stored are the owner's decisions; once chosen, the admin tool's storage functions (`js/admin/core.js`, `drafts.js`, `backup.js`) can be moved onto it, and the Privacy Notice updated to name it. Until then, export a backup at the end of every working day.
-- **Form service**: whether to use one (e.g. Formspree) and its endpoint → `leadForm.*`, then the go-live checklist in "Contact / lead form" (a real test request must arrive in the business inbox). Until then, the form uses the visitor's email app, and the site can't tell whether a request was sent.
-- **Tile floor rate**: the owner said "$5 per square foot for flooring". The site charges $5/sq ft for **other flooring** but prices a **tile floor** at the tile rate, **$4/sq ft** (`prices.tilePerSqFt` in `site-config.json`), in the chat estimate, chat answers, admin quotes and PDFs. Confirm in writing which is right. If tile floors should be $5/sq ft, that is a change to the calculation, not just a price: the floor-tile line in `computeEstimate()` (`js/bathroom-pricing.js`) must use the flooring rate (changing `tilePerSqFt` would also change wall tile), the chat's flooring/tile answers and the "Surfaces" note in the admin must say so, and the pricing unit tests must be updated to pin the confirmed rate. No price has been changed until then.
-- **Visitor counts**: whether to switch on anonymous counts, and with which provider (Vercel Web Analytics or Plausible) → `analytics.*` (see "Visitor counts").
-- **Spanish / French**: whether customers need these languages. If yes, full translations of the pages, chat, estimate card and PDF (with a language switcher) are a separate piece of work; if English only, record that decision here.
-- **Plumbing and licence position**: how plumbing/electrical work is handled (in-house with a licence, a named licensed subcontractor, or not at all), on legal advice — then update the wording (see "Licence line").
-- **Photos** of completed projects, with each client's written permission (or properly licensed images captioned as illustrative), for the home and About pages; see "Photos".
-- **Free quotes**: confirm whether quotes are always free before any page says "free".
-- **Tax**: a tax adviser's confirmation before any tax is added to quotes.
-- **Prices other than $60/cabinet and $5/sq ft of flooring**: confirm the remaining published rates (demolition, tile, paint, fixtures) are current. Any change is made in `site-config.json` → `prices` (see "Site settings").
-- **Estimator on or off**: confirm the owner is happy publishing live prices through the chat (`priceEstimator.enabled`).
+**Getting this version live**
+
+- **Production deploy**: the live site (https://premium-restoration.vercel.app) still serves an older build. Merge this branch into the production branch (pull request, CI passes, merge); then `npm run check:deploy -- https://premium-restoration.vercel.app` must pass and `/gallery.html` must show the styled 404 (see "Deploying").
+- **Try the two switches on production** once it is live: turn each off and on again, and record the date and the minutes it took to take effect under "The two switches". Someone besides the developer should do it, so they know how.
 - **GitHub branch protection** requiring the CI check before merging (repository admin; steps under "Tests and checks").
+
+**Accounts and services**
+
+- **Form service**: whether to use one (e.g. Formspree) and its endpoint → `leadForm.*`, then the go-live checklist in "Contact / lead form" (a real test request must arrive in the business inbox). Until then the form opens the visitor's email app, and the site can't tell whether a request was sent.
+- **A durable, shared store for admin quotes**: quotes are kept only in the browser that created them (see "Backups and moving to another device"). For them to survive on their own and be shared between devices, the owner must choose and open an account with a hosted database or back-end (e.g. Supabase, Firebase or a Vercel storage product), which also brings real server-side log-in. The account, its cost and where customer data is stored are the owner's decisions; the admin tool's storage functions (`js/admin/core.js`, `drafts.js`, `backup.js`) can then move onto it and the Privacy Notice name it. Until then, export a backup at the end of every working day.
+- **Changing published prices without Git**: needs that same back-end (a static site can't save anything itself). Until then a published price is changed in `site-config.json` → `prices` (GitHub's web editor is enough; see "Changing a published price"), and the admin's Business Prices screen changes only that browser's quotes (the dashboard warns when the two differ).
+- **Business email**: the contact email is a personal Gmail address. Once there is a business-domain address, change `EMAIL` in `js/business-info.js` and run `npm run pages` (see "Contact info").
+- **Visitor counts**: whether to switch on anonymous counts, and with which provider (Vercel Web Analytics or Plausible) → `analytics.*` (see "Visitor counts").
+- **Error reports** (so someone finds out when the site breaks for a visitor): needs visitor counts on first; then set `errorReports.enabled` to `true`, run `npm run pages` and commit (see "Error reports"). Check the provider's dashboard after the next deploy.
+
+**Prices, tax and estimates**
+
+- **Tile floor rate**: the owner said "$5 per square foot for flooring". The site charges $5/sq ft for **other flooring** but prices a **tile floor** at the tile rate, **$4/sq ft** (`prices.tilePerSqFt`), in the chat estimate, chat answers, admin quotes and PDFs. Confirm in writing which is right. If tile floors should be $5/sq ft, that is a change to the calculation, not just a price: the floor-tile line in `computeEstimate()` (`js/bathroom-pricing.js`) must use the flooring rate (changing `tilePerSqFt` would also change wall tile), the chat's flooring/tile answers and the admin's "Surfaces" note must say so, and the pricing unit tests must pin the confirmed rate.
+- **Default tax rate on admin quotes**: the original calculator added **7.45%**; the current default is **0%** (`Labor_Tax_Rate_Percent` in `js/bathroom-pricing.js`, and each browser's Business Prices), and no owner decision is recorded for either. Decide, on a tax adviser's confirmation, which default is right; record the decision and its date here, set the default to match, and add a unit test that pins it. The public estimate never includes tax.
+- **How long estimate prices are held**: a number of days → `estimates.validForDays` (e.g. `30`). Until it is set, the PDFs show no "prices held until" date.
+- **Prices other than $60/cabinet and $5/sq ft of flooring**: confirm the remaining published rates (demolition, tile, paint, fixtures) are current → `site-config.json` → `prices`.
+- **Estimator on or off**: confirm the owner is happy publishing live prices through the chat (`priceEstimator.enabled`).
+- **Free quotes**: confirm whether quotes are always free before any page says "free".
+
+**Who the business is**
+
+- **Legal name** of the owner → `owner.legalName`; **contact address** → `owner.contactAddress`.
+- **Privacy-request response period** (e.g. "30 days") → `privacy.responsePeriod`; **customer-record retention period** → then un-comment the wording in `privacy.html`.
+- **Governing state** for the Terms → then un-comment the clause in `terms.html`.
+- **Plumbing and licence position**: how plumbing/electrical work is handled (in-house with a licence, a named licensed subcontractor, or not at all), on legal advice — then update the wording (see "Licence line").
+- **Photos, service area and who does the work**: photos of completed projects with each client's written permission (or licensed images captioned as illustrative; see "Photos"), the towns or area served, and who does the work. Then they can go on the home and About pages, and the chat can answer "what areas do you serve" (until then it says to call).
+- **Spanish / French**: whether customers need these languages. If yes, full translations of the pages, chat, estimate card and PDF (with a language switcher that remembers the choice) are a separate piece of work; if English only, record that decision here.
 
 ## Legal pages
 
