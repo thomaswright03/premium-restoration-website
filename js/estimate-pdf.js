@@ -89,7 +89,7 @@
     doc.setFont("times", "bold");
     doc.setFontSize(20);
     doc.setTextColor(20);
-    doc.text("Premium Restoration", left, y);
+    doc.text(window.BusinessInfo.NAME, left, y);
     y += 22;
     paragraph(spec.title, 13, 80, "normal", 2);
     if (spec.preparedFor) paragraph("Prepared for: " + spec.preparedFor, 11, 60, "normal", 2);
@@ -182,7 +182,7 @@
       doc.setTextColor(90);
       doc.text("Generated " + f.date + "  •  " + f.phone + "  •  " + f.email, left, pageHeight - 38);
       doc.text("Page " + i + " of " + total, right, pageHeight - 38, { align: "right" });
-      doc.text(doc.splitTextToSize(f.business || "Premium Restoration", width)[0], left, pageHeight - 26);
+      doc.text(doc.splitTextToSize(f.business || window.BusinessInfo.NAME, width)[0], left, pageHeight - 26);
     }
     return doc;
   }

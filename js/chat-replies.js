@@ -583,13 +583,7 @@
     return fallback;
   }
 
-  var api = {
-    reply: reply,
-    normalize: normalize,
-    CALL_FOR_PRICE: CALL_FOR_PRICE,
-    PHONE: PHONE,
-    EMAIL: EMAIL,
-  };
+  var api = { reply: reply };
 
   if (node) module.exports = api;
   else root.ChatReplies = api;

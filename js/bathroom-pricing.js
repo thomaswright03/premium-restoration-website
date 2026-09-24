@@ -647,12 +647,12 @@
     return !!bathroomData && !(Number(bathroomData.calcVersion) >= CALC_VERSION);
   }
 
+  // Only what other scripts and the tests use.
   var api = {
     CALC_VERSION: CALC_VERSION,
     RATES_KEY: RATES_KEY,
     DEFAULT_PRICES: DEFAULT_PRICES,
     PUBLISHED_PRICES: PUBLISHED_PRICES,
-    MAX_PUBLISHED_PRICE: MAX_PUBLISHED_PRICE,
     validatePublishedPrices: validatePublishedPrices,
     setPublishedPrices: setPublishedPrices,
     hasPublishedPrices: hasPublishedPrices,
@@ -661,8 +661,6 @@
     FIXTURES: FIXTURES,
     SCOPE_QUESTIONS: SCOPE_QUESTIONS,
     DIMENSIONS: DIMENSIONS,
-    MAX_FIXTURE_COUNT: MAX_FIXTURE_COUNT,
-    MAX_ELECTRICAL_POINTS: MAX_ELECTRICAL_POINTS,
     bathtubPrice: bathtubPrice,
     money: money,
     shortMoney: shortMoney,
@@ -672,13 +670,11 @@
     roundCents: roundCents,
     getPrices: getPrices,
     fixtureRate: fixtureRate,
-    plumbingFixtureCount: plumbingFixtureCount,
     areas: areas,
     scopeNeeds: scopeNeeds,
     validateJob: validateJob,
     computeEstimate: computeEstimate,
     computePublicEstimate: computePublicEstimate,
-    describeScope: describeScope,
     estimateAssumptions: estimateAssumptions,
     buildEstimateSummary: buildEstimateSummary,
     isLegacyQuoteData: isLegacyQuoteData,

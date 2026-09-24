@@ -115,7 +115,6 @@
   if (isNode) {
     module.exports = {
       DEFAULTS: DEFAULTS,
-      ANALYTICS_PROVIDERS: ANALYTICS_PROVIDERS,
       GENERIC_FORM_SERVICE: GENERIC_FORM_SERVICE,
       normalize: normalize,
       formServiceName: formServiceName,
