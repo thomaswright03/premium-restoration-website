@@ -14,10 +14,13 @@ module.exports = [
     languageOptions: {
       ecmaVersion: 2020,
       sourceType: "script",
-      globals: { ...globals.browser, module: "readonly", require: "readonly" },
+      globals: { ...globals.browser, module: "readonly", require: "readonly", __dirname: "readonly" },
     },
     rules: {
       "no-unused-vars": ["error", { args: "after-used", caughtErrors: "none" }],
+      // Keep functions small enough to read. A file's own wrapper
+      // "(function () { ... })();" doesn't count.
+      "max-lines-per-function": ["error", { max: 150, skipBlankLines: true, skipComments: true, IIFEs: false }],
     },
   },
   {

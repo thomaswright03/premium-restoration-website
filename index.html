@@ -11,15 +11,26 @@
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="favicon.ico" sizes="32x32" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="pr-settings-fallback" content='{"analytics":{"enabled":false},"errorReports":{"enabled":false}}' />
     <script>
       (function () {
         try {
           var t = localStorage.getItem("pr_theme");
           if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
         } catch (e) {}
+        // Script errors before js/analytics.js has loaded are kept for it; it
+        // reports them only if error reports are switched on (README "Error reports").
+        var q = (window.__prErrors = []);
+        function keep(e) {
+          if (q.length < 20) q.push(e);
+        }
+        addEventListener("error", keep, true);
+        addEventListener("unhandledrejection", keep);
       })();
     </script>
     <link rel="stylesheet" href="css/style.css" />
+    <script src="js/business-info.js"></script>
+    <script src="js/analytics.js" defer></script>
     <!-- /chrome:head -->
   </head>
   <body>
@@ -54,7 +65,7 @@
             finishing work.
           </p>
           <div class="hero-actions">
-            <a href="contact.html" class="btn btn-primary">Request a Quote</a>
+            <a href="contact.html" class="btn btn-primary">Get a Quote</a>
             <a href="#pricing" class="btn btn-outline">How We Price</a>
           </div>
         </div>
@@ -73,6 +84,7 @@
         </div>
         <div class="ai-chat-window">
           <div class="ai-chat-toolbar" id="ai-chat-toolbar" hidden>
+            <p class="ai-chat-toolbar-title" id="ai-chat-fs-title" hidden>Automated Assistant</p>
             <div class="ai-chat-progress" id="ai-chat-progress" hidden>
               <div
                 class="ai-chat-progress-track"
@@ -99,15 +111,20 @@
                 <div class="ai-chat-avatar" aria-hidden="true">PR</div>
                 <div class="ai-chat-text">
                   Hi! I'm Premium Restoration's automated assistant (scripted replies — not a person). We work on
-                  bathroom restorations only. Ask me about bathroom work, prices, or how to get a quote.
+                  bathroom restorations only. Ask me about bathroom work<span
+                    data-show-if="priceEstimator.enabled"
+                    hidden
+                    >, prices,</span
+                  >
+                  or how to get a quote.
                 </div>
               </div>
             </div>
-            <div class="ai-chat-row bot" id="ai-chat-quote-starter-row" hidden>
+            <div class="ai-chat-row bot ai-chat-offer-row" id="ai-chat-quote-starter-row" hidden>
               <div class="ai-chat-row-inner">
                 <div class="ai-chat-avatar" aria-hidden="true">PR</div>
                 <button type="button" id="ai-chat-quote-starter" class="ai-chat-suggestion">
-                  Get a bathroom price estimate →
+                  Get a bathroom price estimate&nbsp;→
                 </button>
               </div>
             </div>
@@ -192,13 +209,34 @@
         <div class="grid">
           <div class="card">
             <span class="card-number">01</span>
-            <h3><span data-price="Cabinet_Price">$60</span> per Cabinet</h3>
-            <p>Labor to install each bathroom cabinet.</p>
+            <!-- With online prices off (priceEstimator.enabled false, or the settings can't be read), the
+                 figures are hidden and visitors are asked to call, as the chat does. -->
+            <h3>
+              <span data-show-if="priceEstimator.enabled"><span data-price="Cabinet_Price">$60</span> per Cabinet</span>
+              <span data-show-unless="priceEstimator.enabled" hidden>Priced per Cabinet</span>
+            </h3>
+            <p>
+              Labor to install each bathroom cabinet.<span data-show-unless="priceEstimator.enabled" hidden>
+                Call <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a> for the current price.</span
+              >
+            </p>
           </div>
           <div class="card">
             <span class="card-number">02</span>
-            <h3><span data-price="Floor_Price_Per_SqFt">$5</span> per Sq Ft of Flooring</h3>
-            <p>Labor for bathroom flooring, measured by the floor area of the room.</p>
+            <h3>
+              <span data-show-if="priceEstimator.enabled"
+                ><span data-price="Floor_Price_Per_SqFt">$5</span> per Sq Ft of Flooring</span
+              >
+              <span data-show-unless="priceEstimator.enabled" hidden>Flooring Priced per Sq Ft</span>
+            </h3>
+            <p>
+              Labor for bathroom flooring, measured by the floor area of the room.<span
+                data-show-unless="priceEstimator.enabled"
+                hidden
+              >
+                Call <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a> for the current price.</span
+              >
+            </p>
           </div>
           <div class="card">
             <span class="card-number">03</span>
@@ -214,10 +252,14 @@
       <section class="cta-band">
         <p class="eyebrow center">Get Started</p>
         <h2 class="section-title">Ready to Restore Your Bathroom?</h2>
-        <p class="section-subtitle">
+        <p class="section-subtitle" data-show-unless="leadForm.paused">
           Tell us about your bathroom project, and we'll reply once we receive your request.
         </p>
-        <a href="contact.html" class="btn btn-primary">Get Started</a>
+        <p class="section-subtitle" data-show-if="leadForm.paused" hidden>
+          We're not taking requests through the website right now. Call
+          <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a> about your bathroom project.
+        </p>
+        <a href="contact.html" class="btn btn-primary">Get a Quote</a>
       </section>
     </main>
 
@@ -247,8 +289,8 @@
         </div>
         <div class="footer-col">
           <h2 class="footer-heading">Contact</h2>
-          <a href="tel:+13853568733">(385) 356-8733</a>
-          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+          <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a>
+          <a href="mailto:eduardo.moroni77@gmail.com" data-contact="email">eduardo.moroni77@gmail.com</a>
         </div>
         <div class="footer-col">
           <h2 class="footer-heading">Legal</h2>
@@ -279,5 +321,12 @@
     <script src="js/theme.js"></script>
     <script src="js/estimate-pdf.js"></script>
     <script src="js/script.js"></script>
+    <script src="js/chat/core.js"></script>
+    <script src="js/chat/fullscreen.js"></script>
+    <script src="js/chat/persistence.js"></script>
+    <script src="js/chat/step-form.js"></script>
+    <script src="js/chat/estimate-flow.js"></script>
+    <script src="js/chat/estimate-card.js"></script>
+    <script src="js/chat/main.js"></script>
   </body>
 </html>

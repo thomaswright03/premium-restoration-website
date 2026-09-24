@@ -14,15 +14,26 @@
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="favicon.ico" sizes="32x32" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="pr-settings-fallback" content='{"analytics":{"enabled":false},"errorReports":{"enabled":false}}' />
     <script>
       (function () {
         try {
           var t = localStorage.getItem("pr_theme");
           if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
         } catch (e) {}
+        // Script errors before js/analytics.js has loaded are kept for it; it
+        // reports them only if error reports are switched on (README "Error reports").
+        var q = (window.__prErrors = []);
+        function keep(e) {
+          if (q.length < 20) q.push(e);
+        }
+        addEventListener("error", keep, true);
+        addEventListener("unhandledrejection", keep);
       })();
     </script>
     <link rel="stylesheet" href="css/style.css" />
+    <script src="js/business-info.js"></script>
+    <script src="js/analytics.js" defer></script>
     <!-- /chrome:head -->
   </head>
   <body>
@@ -87,9 +98,14 @@
         <h2>Prices and online estimates</h2>
         <ul>
           <li>
-            Our published labor prices include <span data-price="Cabinet_Price">$60</span> per cabinet and
-            <span data-price="Floor_Price_Per_SqFt">$5</span> per sq ft of bathroom flooring. Prices may change; the
-            price that applies to your job is the one in your written agreement with us.
+            <span data-show-if="priceEstimator.enabled"
+              >Our published labor prices include <span data-price="Cabinet_Price">$60</span> per cabinet and
+              <span data-price="Floor_Price_Per_SqFt">$5</span> per sq ft of bathroom flooring.</span
+            >
+            <span data-show-unless="priceEstimator.enabled" hidden
+              >Our labor is priced per item; ask us for current prices.</span
+            >
+            Prices may change; the price that applies to your job is the one in your written agreement with us.
           </li>
           <li>
             Estimates from the chat assistant on our home page, including any PDF you export, are automated, rough, and
@@ -135,9 +151,9 @@
         <h2>Accessibility</h2>
         <p>
           We want everyone to be able to use this website. If anything on it is hard to use or read, please call
-          <a href="tel:+13853568733">(385) 356-8733</a> or email
-          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>, and we'll help you get the
-          information you need another way.
+          <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a> or email
+          <a href="mailto:eduardo.moroni77@gmail.com" data-contact="email">eduardo.moroni77@gmail.com</a>, and we'll
+          help you get the information you need another way.
         </p>
 
         <h2>Limits on our responsibility</h2>
@@ -186,8 +202,8 @@
         </div>
         <div class="footer-col">
           <h2 class="footer-heading">Contact</h2>
-          <a href="tel:+13853568733">(385) 356-8733</a>
-          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+          <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a>
+          <a href="mailto:eduardo.moroni77@gmail.com" data-contact="email">eduardo.moroni77@gmail.com</a>
         </div>
         <div class="footer-col">
           <h2 class="footer-heading">Legal</h2>
@@ -212,6 +228,7 @@
     </footer>
     <!-- /chrome:footer -->
 
+    <script src="js/bathroom-pricing.js"></script>
     <script src="js/site-config.js"></script>
     <script src="js/theme.js"></script>
     <script src="js/script.js"></script>

@@ -14,15 +14,26 @@
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="favicon.ico" sizes="32x32" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="pr-settings-fallback" content='{"analytics":{"enabled":false},"errorReports":{"enabled":false}}' />
     <script>
       (function () {
         try {
           var t = localStorage.getItem("pr_theme");
           if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
         } catch (e) {}
+        // Script errors before js/analytics.js has loaded are kept for it; it
+        // reports them only if error reports are switched on (README "Error reports").
+        var q = (window.__prErrors = []);
+        function keep(e) {
+          if (q.length < 20) q.push(e);
+        }
+        addEventListener("error", keep, true);
+        addEventListener("unhandledrejection", keep);
       })();
     </script>
     <link rel="stylesheet" href="css/style.css" />
+    <script src="js/business-info.js"></script>
+    <script src="js/analytics.js" defer></script>
     <!-- /chrome:head -->
   </head>
   <body>
@@ -81,8 +92,8 @@
         </p>
         <p>
           Questions about this notice or your information: email
-          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a> or call
-          <a href="tel:+13853568733">(385) 356-8733</a>.
+          <a href="mailto:eduardo.moroni77@gmail.com" data-contact="email">eduardo.moroni77@gmail.com</a> or call
+          <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a>.
         </p>
 
         <h2>What we collect</h2>
@@ -103,24 +114,32 @@
             >
           </li>
           <li>
-            <strong>When we prepare a quote.</strong> If we prepare a quote for you, we record the property address and
-            details of the job (such as room measurements and fixtures) in our internal quoting tool.
+            <strong>When we prepare a quote.</strong> If we prepare a quote for you, we record the property address,
+            your name and contact details if you have given them to us, and details of the job (such as room
+            measurements and fixtures) in our internal quoting tool.
           </li>
           <li>
             <strong>The chat assistant.</strong> The chat on our home page is an automated tool with scripted replies.
             It runs entirely in your browser. What you type into it, and any estimate or PDF it produces, is not sent to
-            us and is not saved by us. If you choose &ldquo;Contact Us About This&rdquo; after an estimate, your browser
-            carries a summary of the estimate to our Get a Quote form for that visit; it reaches us only if you send the
-            form.
+            us and is not saved by us. So that reloading the page doesn't lose an estimate, your browser keeps your
+            answers and the finished estimate for that browser tab only, until you close it. If you choose &ldquo;Get a
+            Quote&rdquo; on a finished estimate, your browser carries a summary of the estimate to our Get a Quote form
+            for that visit; it reaches us only if you send the form.
           </li>
         </ul>
 
         <h2>Cookies, analytics and third-party services</h2>
         <p>
-          We do not use cookies, analytics, advertising pixels, or other tracking tools on this website. Your browser
-          remembers your light/dark colour theme choice on your own device; it is never sent to us. Some third-party
-          services still receive basic technical information (such as your IP address, browser type, and the page
-          requested) when you visit:
+          <span data-show-unless="analytics.enabled"
+            >We do not use cookies, analytics, advertising pixels, or other tracking tools on this website.</span
+          >
+          <span data-show-if="analytics.enabled" hidden
+            >We do not use cookies, advertising pixels, or tools that follow you across websites. We do count visits and
+            a few actions on this website, anonymously, as described below.</span
+          >
+          Your browser remembers your light/dark colour theme choice on your own device; it is never sent to us. Some
+          third-party services still receive basic technical information (such as your IP address, browser type, and the
+          page requested) when you visit:
         </p>
         <ul>
           <li>
@@ -139,21 +158,53 @@
               >Its privacy policy</a
             >
           </li>
+          <li data-show-if="analytics.enabled" hidden>
+            <strong><span data-fill="analytics.serviceName"></span></strong> counts visits to this website and a few
+            actions on it: an estimate being started or finished (or its PDF failing), the Get a Quote page being opened
+            from an estimate, and a quote request being sent, not sent, or opened in your email app. It receives basic
+            technical information about each visit (such as the page, your browser and device type, and your approximate
+            location from your IP address) and shows us only totals. It does not use cookies, and nothing you type into
+            the chat or the form is included.
+            <span data-show-if="errorReports.enabled" hidden
+              >It is also told when something on this website goes wrong for you, so we can fix it: a script error or a
+              file that fails to load (which file and line, the kind of error and the page), or the website's settings
+              not loading. The error's own message is never sent, so nothing you typed can be included.</span
+            >
+            If your browser sends a Do Not Track or Global Privacy Control signal, nothing is counted<span
+              data-show-if="errorReports.enabled"
+              hidden
+            >
+              or reported</span
+            >.
+            <a
+              data-show-if="analytics.servicePrivacyUrl"
+              data-fill-href="analytics.servicePrivacyUrl"
+              rel="noopener"
+              target="_blank"
+              hidden
+              >Its privacy policy</a
+            >
+          </li>
           <li>
             <strong>Google (Gmail)</strong> provides our email service, so emails you send us are stored by Google.
           </li>
           <li>
-            <strong>Our phone service provider</strong> carries calls and texts to (385) 356-8733, so it handles your
-            phone number and any voicemail or text message you leave.
+            <strong>Our phone service provider</strong> carries calls and texts to
+            <span data-contact="phone">(385) 356-8733</span>, so it handles your phone number and any voicemail or text
+            message you leave.
           </li>
         </ul>
         <p>
           The fonts and the PDF tool on this website are served from the same place as the website itself (Vercel), so
           loading a page or exporting an estimate as a PDF does not send your information to a separate provider.
         </p>
-        <p>
+        <p data-show-unless="analytics.enabled">
           Your browser's &ldquo;Do Not Track&rdquo; setting does not change how this website works, because we do not
           track visitors across websites.
+        </p>
+        <p data-show-if="analytics.enabled" hidden>
+          If your browser sends a &ldquo;Do Not Track&rdquo; or Global Privacy Control signal, this website does not
+          count your visit or anything you do on it.
         </p>
 
         <h2>How we use your information</h2>
@@ -197,12 +248,13 @@
         <p>
           You can ask us to tell you what personal information we hold about you, give you a copy, correct it, or delete
           it. This includes homeowners whose property address is in a quote we prepared. To make a request, email
-          <a href="mailto:eduardo.moroni77@gmail.com?subject=Privacy%20request">eduardo.moroni77@gmail.com</a> with the
-          subject &ldquo;Privacy request&rdquo;, or call <a href="tel:+13853568733">(385) 356-8733</a>. We may ask you
-          to confirm your identity before acting on a request (for example, by contacting us from the email address or
-          phone number you used before, or by confirming details of your enquiry)<span
-            data-show-if="privacy.responsePeriod"
-            hidden
+          <a href="mailto:eduardo.moroni77@gmail.com?subject=Privacy%20request" data-contact="email"
+            >eduardo.moroni77@gmail.com</a
+          >
+          with the subject &ldquo;Privacy request&rdquo;, or call
+          <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a>. We may ask you to confirm your identity
+          before acting on a request (for example, by contacting us from the email address or phone number you used
+          before, or by confirming details of your enquiry)<span data-show-if="privacy.responsePeriod" hidden
             >, and we will respond within <span data-fill="privacy.responsePeriod"></span></span
           >. If we have to keep some information by law, we'll tell you what and why.
         </p>
@@ -246,8 +298,8 @@
         </div>
         <div class="footer-col">
           <h2 class="footer-heading">Contact</h2>
-          <a href="tel:+13853568733">(385) 356-8733</a>
-          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+          <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a>
+          <a href="mailto:eduardo.moroni77@gmail.com" data-contact="email">eduardo.moroni77@gmail.com</a>
         </div>
         <div class="footer-col">
           <h2 class="footer-heading">Legal</h2>

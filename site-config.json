@@ -1,9 +1,27 @@
 {
-  "_help": "Site settings. Edit, commit and push; Vercel redeploys in about a minute and visitors get the change on their next page load. See README.md 'Site settings'.",
+  "_help": "Site settings. Edit on GitHub and commit; Vercel redeploys in about a minute and visitors get the change on their next page load. See README.md 'Site settings' for what each setting does and how to switch things off quickly.",
   "priceEstimator": {
     "enabled": true
   },
+  "prices": {
+    "_help": "Published labor prices in US dollars: numbers only, no quotes or $ sign (e.g. 60 or 1.79). The bathtub price is always 30% less than showerEach. Every page, the chat, the estimate and admin quotes use these.",
+    "demolitionPerSqFt": 37.5,
+    "toiletEach": 200,
+    "sinkEach": 200,
+    "showerEach": 500,
+    "showerDoorEach": 300,
+    "entryDoorEach": 200,
+    "vanityEach": 150,
+    "cabinetEach": 60,
+    "mirrorEach": 100,
+    "hugeMirrorEach": 300,
+    "showerShelfEach": 125,
+    "tilePerSqFt": 4,
+    "flooringPerSqFt": 5,
+    "paintingPerSqFt": 1.79
+  },
   "leadForm": {
+    "enabled": true,
     "endpoint": "",
     "serviceName": "",
     "servicePrivacyUrl": ""
@@ -14,5 +32,20 @@
   },
   "privacy": {
     "responsePeriod": ""
+  },
+  "analytics": {
+    "enabled": false,
+    "provider": "",
+    "domain": "",
+    "scriptUrl": "",
+    "servicePrivacyUrl": ""
+  },
+  "errorReports": {
+    "_help": "true = when something breaks for a visitor (a script error, a file not loading, this settings file not loading), the analytics service above is sent a short report without anything the visitor typed. Needs analytics switched on. After changing this or analytics, a developer runs `npm run pages`. See README 'Error reports'.",
+    "enabled": false
+  },
+  "estimates": {
+    "_help": "How many days the prices on an estimate or quote PDF are held, as a whole number (e.g. 30), or null. While it is null the PDFs print no 'prices held until' date. The owner decides this; see README 'Site settings'.",
+    "validForDays": null
   }
 }

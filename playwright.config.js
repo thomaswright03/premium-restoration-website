@@ -21,6 +21,8 @@ module.exports = defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command: `node scripts/serve.mjs ${PORT}`,
+    // Tests use fixed prices, whatever the owner sets in site-config.json.
+    env: { SITE_CONFIG_PRICES: "tests/fixtures/test-prices.json" },
     url: `http://localhost:${PORT}/index.html`,
     reuseExistingServer: false,
   },

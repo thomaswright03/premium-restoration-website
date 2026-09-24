@@ -41,6 +41,60 @@ test.describe("contact form without a form endpoint (email app)", () => {
   });
 });
 
+test.describe("quote form switch (site-config.json leadForm.enabled)", () => {
+  test("off: the Get a Quote page asks visitors to call instead of showing the form", async ({ page }) => {
+    await useConfig(page, { leadForm: { enabled: false } });
+    await page.goto("/contact.html");
+    await expect(page.locator("html")).toHaveAttribute("data-config", "loaded");
+    const paused = page.locator("#form-paused");
+    await expect(paused).toBeVisible();
+    await expect(paused).toContainText("We're not taking requests through this form right now");
+    await expect(paused.getByRole("link", { name: "(385) 356-8733" })).toHaveAttribute("href", "tel:+13853568733");
+    await expect(page.locator("#lead-form")).toBeHidden();
+  });
+
+  test("on (the default): the form is shown and the call-us note is not", async ({ page }) => {
+    await page.goto("/contact.html");
+    await expect(page.locator("html")).toHaveAttribute("data-config", "loaded");
+    await expect(page.locator("#lead-form")).toBeVisible();
+    await expect(page.locator("#form-paused")).toBeHidden();
+  });
+
+  test("if the settings can't be loaded, the form stays available", async ({ page }) => {
+    await page.route("**/site-config.json", (route) => route.fulfill({ status: 500, body: "" }));
+    await page.goto("/contact.html");
+    await expect(page.locator("html")).toHaveAttribute("data-config", "defaults");
+    await expect(page.locator("#lead-form")).toBeVisible();
+    await expect(page.locator("#form-paused")).toBeHidden();
+  });
+});
+
+test.describe("contact form field limits", () => {
+  test("short fields have sensible maximum lengths and the message has a visible counter and limit", async ({
+    page,
+  }) => {
+    await page.goto("/contact.html");
+    await expect(page.locator("#name")).toHaveAttribute("maxlength", "100");
+    await expect(page.locator("#phone")).toHaveAttribute("maxlength", "25");
+    await expect(page.locator("#email")).toHaveAttribute("maxlength", "254");
+    await expect(page.locator("#message")).toHaveAttribute("maxlength", "2000");
+    const counter = page.locator("#message-count");
+    await expect(counter).toHaveText("0 / 2,000 characters");
+    await page.fill("#message", "Small bathroom.");
+    await expect(counter).toHaveText("15 / 2,000 characters");
+    await page.fill("#message", "x".repeat(1850));
+    await expect(counter).toHaveText("1,850 / 2,000 characters — 150 left");
+    await expect(counter).toHaveClass(/is-near-limit/);
+    await expect(page.locator("#message-count-live")).toHaveText("150 characters left in project details.");
+    // Typing past the limit stops at it.
+    await page.locator("#message").press("End");
+    await page.keyboard.type("y".repeat(200));
+    await expect(page.locator("#message")).toHaveValue(/^x{1850}y{150}$/);
+    await expect(counter).toHaveText("2,000 / 2,000 characters — 0 left");
+    await expect(page.locator("#message-count-live")).toHaveText("Project details are at the 2,000-character limit.");
+  });
+});
+
 test.describe("contact form with a form endpoint (site-config.json leadForm.endpoint)", () => {
   const ENDPOINT = "https://forms.example.test/f/abc123";
 
@@ -87,6 +141,60 @@ test.describe("contact form with a form endpoint (site-config.json leadForm.endp
     await expect(status).not.toContainText("Request sent.");
     await expect(page.locator("#name")).toHaveValue("Test Person");
     await expect(page.locator("#lead-submit")).toBeEnabled();
+    // The visitor's own email app is offered as the fallback, filled in.
+    const fallback = page.locator("#mailto-fallback");
+    await expect(fallback).toHaveText("send it with your email app instead");
+    const href = await fallback.getAttribute("href");
+    expect(href).toMatch(/^mailto:eduardo\.moroni77@gmail\.com\?subject=/);
+    const body = decodeURIComponent(href.split("&body=")[1]);
+    expect(body).toContain("Name: Test Person");
+    expect(body).toContain("Project details:\nSmall bathroom, new floor.");
+  });
+
+  test("a network failure or timeout is also reported, never as sent", async ({ page }) => {
+    await useConfig(page, { leadForm: { endpoint: ENDPOINT, serviceName: "Formspree" } });
+    await page.route(ENDPOINT, (route) => route.abort("failed"));
+    await page.goto("/contact.html");
+    await fillValid(page);
+    await page.click("#lead-submit");
+    await expect(page.locator("#form-status")).toContainText("Sorry, your request wasn't sent.");
+    await expect(page.locator("#mailto-fallback")).toBeVisible();
+  });
+
+  test("the estimate summary from the chat is sent with the request", async ({ page }) => {
+    await useConfig(page, { leadForm: { endpoint: ENDPOINT, serviceName: "Formspree" } });
+    let body = "";
+    await page.route(ENDPOINT, async (route) => {
+      body = route.request().postData() || "";
+      await route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' });
+    });
+    await page.goto("/index.html");
+    await page.evaluate(() =>
+      sessionStorage.setItem("pr_estimate_summary", "My bathroom estimate from your website:\n- Cabinets 3"),
+    );
+    await page.goto("/contact.html?from=estimate");
+    await expect(page.locator("#message")).toHaveValue(/Cabinets 3/);
+    await page.fill("#name", "Test Person");
+    await page.fill("#phone", "(385) 555-0100");
+    await page.fill("#email", "test@example.com");
+    await page.click("#lead-submit");
+    await expect(page.locator("#form-status")).toContainText("Request sent.");
+    expect(body).toContain("My bathroom estimate from your website:");
+    expect(body).toContain("Cabinets 3");
+  });
+
+  test("a well-known form service is named even if serviceName is left blank", async ({ page }) => {
+    const FORMSPREE = "https://formspree.io/f/testform";
+    await useConfig(page, {
+      leadForm: { endpoint: FORMSPREE, serviceName: "", servicePrivacyUrl: "https://example.test/privacy" },
+    });
+    await page.goto("/contact.html");
+    await expect(page.locator(".form-consent:visible")).toContainText("sent to us through Formspree");
+    await expect(
+      page.locator(".form-consent:visible").getByRole("link", { name: "its privacy policy" }),
+    ).toHaveAttribute("href", "https://example.test/privacy");
+    await page.goto("/privacy.html");
+    await expect(page.locator("main")).toContainText("Formspree receives and stores what you send");
   });
 
   test("the Privacy Notice names the form service once one is configured", async ({ page }) => {

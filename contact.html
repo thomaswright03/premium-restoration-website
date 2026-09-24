@@ -14,15 +14,26 @@
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="favicon.ico" sizes="32x32" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="pr-settings-fallback" content='{"analytics":{"enabled":false},"errorReports":{"enabled":false}}' />
     <script>
       (function () {
         try {
           var t = localStorage.getItem("pr_theme");
           if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
         } catch (e) {}
+        // Script errors before js/analytics.js has loaded are kept for it; it
+        // reports them only if error reports are switched on (README "Error reports").
+        var q = (window.__prErrors = []);
+        function keep(e) {
+          if (q.length < 20) q.push(e);
+        }
+        addEventListener("error", keep, true);
+        addEventListener("unhandledrejection", keep);
       })();
     </script>
     <link rel="stylesheet" href="css/style.css" />
+    <script src="js/business-info.js"></script>
+    <script src="js/analytics.js" defer></script>
     <!-- /chrome:head -->
   </head>
   <body>
@@ -59,16 +70,35 @@
       <section class="section">
         <div class="contact-wrap">
           <div class="contact-form-col">
+            <!-- Shown instead of the form when leadForm.enabled is false in site-config.json. -->
+            <div id="form-paused" class="form-status form-paused" data-show-if="leadForm.paused" hidden>
+              <h2 class="form-paused-title">Please call us</h2>
+              <p>
+                We're not taking requests through this form right now. Please call us at
+                <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a> or email
+                <a href="mailto:eduardo.moroni77@gmail.com" data-contact="email">eduardo.moroni77@gmail.com</a> about
+                your bathroom project.
+              </p>
+            </div>
+
             <div id="form-status" class="form-status" role="status" aria-live="polite" tabindex="-1" hidden></div>
 
-            <form id="lead-form" novalidate>
+            <form id="lead-form" novalidate data-show-unless="leadForm.paused">
               <p id="estimate-prefill-note" class="form-prefill-note" hidden>
                 We've added your estimate to the project details below. Edit it as you like before sending.
               </p>
 
               <div class="form-group">
                 <label for="name">Full Name</label>
-                <input type="text" id="name" name="name" autocomplete="name" required aria-describedby="name-error" />
+                <input
+                  type="text"
+                  id="name"
+                  name="name"
+                  autocomplete="name"
+                  maxlength="100"
+                  required
+                  aria-describedby="name-error"
+                />
                 <p class="field-error" id="name-error" hidden></p>
               </div>
 
@@ -80,6 +110,7 @@
                   name="phone"
                   autocomplete="tel"
                   inputmode="tel"
+                  maxlength="25"
                   required
                   aria-describedby="phone-error"
                 />
@@ -93,6 +124,7 @@
                   id="email"
                   name="email"
                   autocomplete="email"
+                  maxlength="254"
                   required
                   aria-describedby="email-error"
                 />
@@ -113,8 +145,12 @@
                 <textarea
                   id="message"
                   name="message"
+                  maxlength="2000"
+                  aria-describedby="message-count"
                   placeholder="Property type, rough timeline, and anything else we should know..."
                 ></textarea>
+                <p class="char-count" id="message-count">Up to 2,000 characters.</p>
+                <p class="visually-hidden" id="message-count-live" aria-live="polite"></p>
               </div>
 
               <div class="form-honeypot" aria-hidden="true">
@@ -133,10 +169,14 @@
               <p class="form-consent" data-show-if="leadForm.endpoint" hidden>
                 <strong>How this form works:</strong> when you press Send Request, what you entered above is sent to us
                 through <span data-fill="leadForm.serviceName"></span>, the form service we use, which stores it and
-                emails it to us. We use your details to respond to your enquiry and prepare your quote, and, if you hire
-                us, to carry out and manage the work and keep the business records we are required to keep. We don't
-                sell them. See our <a href="privacy.html">Privacy Notice</a> for how long we keep them and how to ask us
-                to access or delete them.
+                emails it to us<span data-show-if="leadForm.servicePrivacyUrl" hidden>
+                  (<a data-fill-href="leadForm.servicePrivacyUrl" rel="noopener" target="_blank">its privacy policy</a
+                  >)</span
+                >. If sending fails, you'll be offered your own email app instead. We use your details to respond to
+                your enquiry and prepare your quote, and, if you hire us, to carry out and manage the work and keep the
+                business records we are required to keep. We don't sell them. See our
+                <a href="privacy.html">Privacy Notice</a> for how long we keep them and how to ask us to access or
+                delete them.
               </p>
 
               <button type="submit" class="btn btn-primary btn-block" id="lead-submit">
@@ -146,7 +186,7 @@
               <p class="form-note">
                 <span data-show-unless="leadForm.endpoint">Prefer not to use email?</span>
                 <span data-show-if="leadForm.endpoint" hidden>Prefer to talk?</span>
-                Call us at <a href="tel:+13853568733">(385) 356-8733</a>.
+                Call us at <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a>.
               </p>
             </form>
           </div>
@@ -155,11 +195,11 @@
             <h2 class="contact-info-title">Contact Us Directly</h2>
             <div class="contact-info-row">
               <span class="icon" aria-hidden="true">&#128222;</span>
-              <a href="tel:+13853568733">(385) 356-8733</a>
+              <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a>
             </div>
             <div class="contact-info-row">
               <span class="icon" aria-hidden="true">&#9993;</span>
-              <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+              <a href="mailto:eduardo.moroni77@gmail.com" data-contact="email">eduardo.moroni77@gmail.com</a>
             </div>
             <p class="note">
               Prefer to talk it through first? Give us a call or send an email and we'll get back to you as soon as
@@ -196,8 +236,8 @@
         </div>
         <div class="footer-col">
           <h2 class="footer-heading">Contact</h2>
-          <a href="tel:+13853568733">(385) 356-8733</a>
-          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+          <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a>
+          <a href="mailto:eduardo.moroni77@gmail.com" data-contact="email">eduardo.moroni77@gmail.com</a>
         </div>
         <div class="footer-col">
           <h2 class="footer-heading">Legal</h2>
@@ -225,5 +265,6 @@
     <script src="js/site-config.js"></script>
     <script src="js/theme.js"></script>
     <script src="js/script.js"></script>
+    <script src="js/lead-form.js"></script>
   </body>
 </html>

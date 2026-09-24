@@ -3,12 +3,23 @@
 <link rel="icon" href="{{base}}favicon.svg" type="image/svg+xml" />
 <link rel="icon" href="{{base}}favicon.ico" sizes="32x32" />
 <link rel="apple-touch-icon" href="{{base}}apple-touch-icon.png" />
+<meta name="pr-settings-fallback" content="{{settingsFallback}}" />
 <script>
   (function () {
     try {
       var t = localStorage.getItem("pr_theme");
       if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
     } catch (e) {}
+    // Script errors before js/analytics.js has loaded are kept for it; it
+    // reports them only if error reports are switched on (README "Error reports").
+    var q = (window.__prErrors = []);
+    function keep(e) {
+      if (q.length < 20) q.push(e);
+    }
+    addEventListener("error", keep, true);
+    addEventListener("unhandledrejection", keep);
   })();
 </script>
 <link rel="stylesheet" href="{{base}}css/style.css" />
+<script src="{{base}}js/business-info.js"></script>
+<script src="{{base}}js/analytics.js" defer></script>

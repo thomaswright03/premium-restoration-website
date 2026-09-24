@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const P = require("../../js/bathroom-pricing.js");
+const { Pricing: P } = require("./test-prices.js");
 
 const NOTHING = { demolition: false, floorFinish: "none", walls: "none", paintCeiling: false };
 const ROOM_5x8x8 = { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 };
@@ -11,9 +11,46 @@ function line(result, key) {
   return result.lines.find((l) => l.key === key);
 }
 
-test("owner-stated published prices: $60 per cabinet, $5 per sq ft of flooring", () => {
+test("the test prices are the owner-stated prices: $60 per cabinet, $5 per sq ft of flooring", () => {
   assert.equal(P.DEFAULT_PRICES.Cabinet_Price, 60);
   assert.equal(P.DEFAULT_PRICES.Floor_Price_Per_SqFt, 5);
+});
+
+test("published prices are checked: numbers only, more than 0, cents at most, no unknown names", () => {
+  const good = require("../fixtures/test-prices.json");
+  assert.equal(P.validatePublishedPrices(good).valid, true);
+  const bad = (change) => P.validatePublishedPrices(Object.assign({}, good, change)).errors.join(" ");
+  assert.match(bad({ cabinetEach: "60" }), /cabinetEach must be a number without quotes or a \$ sign/);
+  assert.match(bad({ cabinetEach: "$60" }), /cabinetEach must be a number/);
+  assert.match(bad({ cabinetEach: 0 }), /cabinetEach must be more than 0/);
+  assert.match(bad({ cabinetEach: -5 }), /cabinetEach must be more than 0/);
+  assert.match(bad({ cabinetEach: 60000 }), /no more than 10000/);
+  assert.match(bad({ paintingPerSqFt: 1.795 }), /at most 2 decimal places/);
+  assert.match(bad({ cabinetEsch: 60 }), /cabinetEsch isn't a price the site knows/);
+  const missing = Object.assign({}, good);
+  delete missing.tilePerSqFt;
+  assert.match(P.validatePublishedPrices(missing).errors.join(" "), /tilePerSqFt is missing/);
+  assert.equal(P.validatePublishedPrices(undefined).valid, false);
+  assert.equal(P.validatePublishedPrices(Object.assign({}, good, { _note: "comments are fine" })).valid, true);
+});
+
+test("a price changed in the settings reaches the public estimate, admin quotes and the bathtub rule together", () => {
+  const good = require("../fixtures/test-prices.json");
+  const values = Object.assign({ Cabinet_Quantity: 3, Bathtub_Quantity: 1 }, ROOM_5x8x8);
+  const scope = Object.assign({}, NOTHING, { floorFinish: "flooring" });
+  try {
+    P.setPublishedPrices(
+      P.validatePublishedPrices(Object.assign({}, good, { cabinetEach: 75, showerEach: 600 })).prices,
+    );
+    const pub = P.computePublicEstimate(values, scope);
+    assert.equal(line(pub, "Cabinet_Quantity").cost, 225);
+    assert.equal(line(pub, "Bathtub_Quantity").cost, 420);
+    const admin = P.computeEstimate(values, scope, { includeTrade: true, prices: P.getPrices() });
+    assert.equal(admin.subtotal - line(admin, "plumbing").cost, pub.subtotal);
+  } finally {
+    P.setPublishedPrices(P.validatePublishedPrices(good).prices);
+  }
+  assert.equal(P.DEFAULT_PRICES.Cabinet_Price, 60);
 });
 
 test("bathtub price is always 70% of the shower price", () => {
@@ -189,9 +226,9 @@ test("validation: area work needs a realistic width and length; wall work needs 
   assert.equal(v.errors.Bathroom_Height_Ft, undefined);
 
   v = P.validateJob({ Bathroom_Width_Ft: "1e200", Bathroom_Length_Ft: "8" }, scope);
-  assert.ok(v.errors.Bathroom_Width_Ft);
+  assert.match(v.errors.Bathroom_Width_Ft, /^Enter the width as a number of feet/);
   v = P.validateJob({ Bathroom_Width_Ft: "51", Bathroom_Length_Ft: "8" }, scope);
-  assert.ok(v.errors.Bathroom_Width_Ft);
+  assert.equal(v.errors.Bathroom_Width_Ft, "Width must be more than 0 and no more than 50 ft.");
   v = P.validateJob({ Bathroom_Width_Ft: "-3", Bathroom_Length_Ft: "8" }, scope);
   assert.ok(v.errors.Bathroom_Width_Ft);
   v = P.validateJob({ Bathroom_Width_Ft: "5", Bathroom_Length_Ft: "8" }, scope);
@@ -204,8 +241,74 @@ test("validation: area work needs a realistic width and length; wall work needs 
   assert.equal(v.valid, true);
 });
 
+test("room sizes accept feet and inches, and a format mistake is not reported as out of range", () => {
+  const cases = {
+    5: 5,
+    5.5: 5.5,
+    "5,5": 5.5,
+    "5ft": 5,
+    "5 ft": 5,
+    "5'": 5,
+    "5'6\"": 5.5,
+    "5' 6\"": 5.5,
+    "5’6”": 5.5,
+    "5'6": 5.5,
+    "5 ft 6 in": 5.5,
+    "5 feet 6 inches": 5.5,
+    '66"': 5.5,
+    "66 in": 5.5,
+    "": null,
+  };
+  for (const [text, feet] of Object.entries(cases)) assert.equal(P.parseFeet(text), feet, text);
+  for (const bad of ["abc", "1e200", "5'13\"", "five", "5 by 8"]) assert.ok(Number.isNaN(P.parseFeet(bad)), bad);
+
+  const scope = { demolition: false, floorFinish: "flooring", walls: "none", paintCeiling: false };
+  let v = P.validateJob({ Bathroom_Width_Ft: "5'6\"", Bathroom_Length_Ft: "8 ft" }, scope);
+  assert.equal(v.valid, true);
+  const r = P.computePublicEstimate({ Bathroom_Width_Ft: "5'6\"", Bathroom_Length_Ft: "8 ft" }, scope);
+  assert.equal(r.floorSqFt, 44);
+  assert.equal(r.subtotal, 220);
+  v = P.validateJob({ Bathroom_Width_Ft: "5 by 8", Bathroom_Length_Ft: "60" }, scope);
+  assert.equal(
+    v.errors.Bathroom_Width_Ft,
+    "Enter the width as a number of feet, e.g. 5.5, or feet and inches, e.g. 5' 6\".",
+  );
+  assert.equal(v.errors.Bathroom_Length_Ft, "Length must be more than 0 and no more than 50 ft.");
+  const summary = P.buildEstimateSummary({ Bathroom_Width_Ft: "5'6\"", Bathroom_Length_Ft: "8" }, scope, r);
+  assert.match(summary, /5\.5 ft wide × 8 ft long/);
+});
+
 test("validation: dimensions are not required when no area work is chosen", () => {
   assert.equal(P.validateJob({ Cabinet_Quantity: 2 }, NOTHING).valid, true);
+});
+
+test("validation: an estimate or quote with no work chosen is refused, never priced at $0.00", () => {
+  const none = { demolition: false, floorFinish: "none", walls: "none", paintCeiling: false };
+  const zero = { Toilet_Quantity: "0", Cabinet_Quantity: "" };
+  // Step by step the chat doesn't ask for it until the fixtures are in.
+  assert.equal(P.validateJob(zero, none).valid, true);
+  const pub = P.validateJob(zero, none, { requireWork: true });
+  assert.equal(pub.valid, false);
+  assert.match(pub.errors.work, /nothing to price yet.*at least one item.*Back and choose some work/i);
+  assert.equal(P.validateJob({ Cabinet_Quantity: "1" }, none, { requireWork: true }).valid, true);
+  assert.equal(
+    P.validateJob({}, Object.assign({}, none, { paintCeiling: true }), { requireWork: true }).errors.work,
+    undefined,
+  );
+  // Admin quotes: surcharges and electrical points count as work.
+  const admin = P.validateJob(zero, none, { requireWork: true, includeTrade: true });
+  assert.match(admin.errors.work, /Nothing to price yet: choose some work.*electrical point/);
+  assert.equal(P.validateJob({ Electrical_Points: "2" }, none, { requireWork: true, includeTrade: true }).valid, true);
+  assert.equal(
+    P.validateJob({ No_Stack_Surcharge_Included: true }, none, { requireWork: true, includeTrade: true }).valid,
+    true,
+  );
+  // Only the public check ignores the trade-only items.
+  assert.equal(P.validateJob({ Electrical_Points: "2" }, none, { requireWork: true }).valid, false);
+  // Field problems come first; the "nothing to price" message waits until they are fixed.
+  const bad = P.validateJob({ Cabinet_Quantity: "x" }, none, { requireWork: true });
+  assert.equal(bad.errors.work, undefined);
+  assert.ok(bad.errors.Cabinet_Quantity);
 });
 
 test("validation: every work question must be answered", () => {

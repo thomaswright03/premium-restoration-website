@@ -58,33 +58,58 @@
   text-align: left;
 }
 
-/* Messages */
+/* Messages: at the top of the screen in their own space, so they never
+   cover a button; dismissible. */
 .admin-messages {
-  position: fixed;
-  left: 50%;
-  bottom: var(--space-5);
-  transform: translateX(-50%);
-  z-index: 50;
-  width: min(560px, calc(100% - 2 * var(--gutter)));
+  max-width: calc(900px + 2 * var(--gutter));
+  margin: 0 auto;
+  padding: 0 var(--gutter);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  pointer-events: none;
 }
 
 .admin-toast,
 .admin-alert {
-  margin: 0;
+  margin: var(--space-5) 0 0;
   padding: var(--space-3) var(--space-5);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-  pointer-events: auto;
+  box-shadow: var(--shadow-soft);
+  overflow-wrap: anywhere;
 }
 
 .admin-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-right: var(--space-2);
   background: var(--color-selected-bg);
   color: var(--color-selected-ink);
   font-weight: 500;
+}
+
+.admin-toast p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-message-close {
+  flex-shrink: 0;
+  width: var(--tap);
+  height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.admin-message-close:hover {
+  background: color-mix(in srgb, currentColor 14%, transparent);
 }
 
 .admin-alert {
@@ -92,6 +117,50 @@
   color: var(--color-ink);
   border: 1px solid var(--color-danger);
   border-left-width: 4px;
+}
+
+/* Confirmation dialog */
+.admin-dialog {
+  width: min(480px, calc(100% - 2 * var(--gutter)));
+  padding: var(--space-6);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: var(--shadow);
+}
+
+.admin-dialog::backdrop {
+  background: rgba(20, 18, 15, 0.6);
+}
+
+.admin-dialog-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-lg);
+}
+
+.admin-dialog-message {
+  margin: 0 0 var(--space-5);
+  color: var(--color-ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.admin-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.btn-danger {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-surface);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
 }
 
 /* Header shared by the post-login screens */
@@ -184,10 +253,30 @@
   font-size: var(--fs-sm);
 }
 
+/* The only message when there are no quotes, in the same column as the list. */
+.admin-empty {
+  max-width: 900px;
+  margin: var(--space-4) auto 0;
+}
+
+.admin-empty p {
+  margin: 0 0 var(--space-3);
+}
+
 .admin-footnote {
   max-width: 900px;
   margin: var(--space-6) auto 0;
   font-size: var(--fs-sm);
+}
+
+.admin-footnote summary {
+  padding: var(--space-3) 0;
+  cursor: pointer;
+  color: var(--color-ink-soft);
+}
+
+.admin-footnote p {
+  margin: var(--space-2) 0 0;
 }
 
 .admin-inline-actions {
@@ -214,6 +303,199 @@
 .admin-panel-note p {
   margin: 0;
   color: var(--color-ink);
+}
+
+/* Unsaved drafts: one row per quote, each with Resume / Discard. */
+.draft-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 100%;
+}
+
+.draft-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.draft-item-label {
+  color: var(--color-ink-soft);
+}
+
+/* Status lines (Backups, Clean-up): one short line each, so the quote list
+   stays near the top. Details open on demand; a line is marked only while
+   something is due (.is-due). */
+.admin-status {
+  max-width: 900px;
+  margin: 0 auto var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.admin-status.is-due {
+  border-color: var(--color-danger);
+  border-left-width: 6px;
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+
+.admin-status-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+/* The backup line has Export as well, so it may wrap under the text. */
+#backup-panel .admin-status-summary {
+  flex-wrap: wrap;
+}
+
+.admin-status-actions {
+  flex: none;
+}
+
+.admin-status-text {
+  flex: 1 1 260px;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-ink-soft);
+}
+
+.admin-status-title {
+  margin-right: var(--space-2);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.admin-status.is-due .admin-status-text > span:not(.admin-status-title):not(.admin-status-chip) {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.admin-status-chip {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-danger);
+  border-radius: 999px;
+  color: var(--color-danger);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admin-status-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.admin-status-toggle {
+  min-height: var(--tap);
+  padding: 0 var(--space-2);
+  background: none;
+  border: none;
+  color: var(--color-accent-text);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* A chevron drawn with borders (no text, so screen readers don't read it). */
+.admin-status-toggle::after {
+  content: "";
+  display: inline-block;
+  width: 0.45em;
+  height: 0.45em;
+  margin-left: 0.5em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-0.2em) rotate(45deg);
+}
+
+.admin-status-toggle[aria-expanded="true"]::after {
+  transform: translateY(0.1em) rotate(-135deg);
+}
+
+.admin-status-details {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.admin-status-details[hidden] {
+  display: none;
+}
+
+.admin-status-details p {
+  margin: 0;
+  color: var(--color-ink-soft);
+}
+
+.admin-status-details p.retention-log {
+  font-size: var(--fs-sm);
+  color: var(--color-muted);
+}
+
+.backup-status.is-warning {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+/* On a phone the dashboard is tighter, so the first quote and Create New
+   Quote are on screen without scrolling. */
+@media (max-width: 640px) {
+  #screen-dashboard {
+    padding-top: var(--space-5);
+  }
+
+  #screen-dashboard .admin-header {
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+
+  .admin-count {
+    margin-bottom: var(--space-2);
+  }
+
+  .admin-toolbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+
+  .admin-toolbar .btn {
+    padding: var(--space-2) var(--space-3);
+    letter-spacing: 0.06em;
+    text-align: center;
+  }
+
+  #backup-panel .admin-status-text {
+    flex-basis: 100%;
+  }
+
+  .admin-status {
+    margin-bottom: var(--space-2);
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
+  }
 }
 
 /* Quote list */
@@ -248,6 +530,12 @@
   overflow-wrap: anywhere;
 }
 
+.quote-card-customer {
+  margin: 0 0 var(--space-1);
+  color: var(--color-ink-soft);
+  overflow-wrap: anywhere;
+}
+
 .quote-card-meta {
   color: var(--color-muted);
   font-size: var(--fs-sm);
@@ -274,6 +562,12 @@
   background: var(--color-selected-bg);
   border-color: var(--color-selected-bg);
   color: var(--color-selected-ink);
+  font-weight: 600;
+}
+
+.quote-won-chip {
+  border-color: var(--color-success);
+  color: var(--color-success);
   font-weight: 600;
 }
 
@@ -306,9 +600,23 @@
   color: var(--color-accent-text);
 }
 
-.quote-card-actions button.danger:hover {
+@media (max-width: 640px) {
+  .quote-card {
+    padding: var(--space-3) var(--space-4);
+    gap: var(--space-3);
+  }
+}
+
+/* Delete always looks destructive, not only on hover. */
+.quote-card-actions button.danger {
   border-color: var(--color-danger);
   color: var(--color-danger);
+}
+
+.quote-card-actions button.danger:hover:not(:disabled) {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-surface);
 }
 
 .quote-card-actions button:disabled {
@@ -316,32 +624,7 @@
   cursor: not-allowed;
 }
 
-/* Retention and warnings */
-.retention-bar {
-  max-width: 900px;
-  margin: 0 auto var(--space-5);
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.retention-bar p {
-  margin: 0;
-  color: var(--color-ink-soft);
-}
-
-.retention-bar p.retention-log {
-  margin-top: var(--space-1);
-  font-size: var(--fs-sm);
-  color: var(--color-muted);
-}
-
+/* Warnings */
 .admin-notice-slot {
   max-width: 900px;
   margin: 0 auto var(--space-5);
@@ -390,8 +673,7 @@
   padding: var(--space-6);
 }
 
-.admin-panel label,
-.admin-field-label {
+.admin-panel label {
   display: block;
   font-weight: 600;
   margin: 0 0 var(--space-2);
@@ -401,10 +683,31 @@
   color: var(--color-ink-soft);
 }
 
-.admin-scope-fixed {
-  margin: 0;
-  font-size: var(--fs-md);
-  color: var(--color-ink);
+/* Property and customer, at the top of the quote screen */
+.calc-section.quote-customer {
+  border-top: none;
+  padding-top: 0;
+}
+
+.quote-customer .form-group {
+  margin-bottom: var(--space-4);
+}
+
+.quote-customer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: 0 var(--space-5);
+}
+
+.admin-optional {
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-muted);
+}
+
+.form-group.has-error input {
+  border-bottom-color: var(--color-danger);
 }
 
 .admin-form-actions {
@@ -421,11 +724,6 @@
   margin-bottom: var(--space-6);
   padding-top: var(--space-5);
   border-top: 1px solid var(--color-line);
-}
-
-.bathroom-calculator > .calc-section:first-of-type {
-  border-top: none;
-  padding-top: 0;
 }
 
 .calc-section-title {

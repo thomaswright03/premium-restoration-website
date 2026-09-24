@@ -1,7 +1,7 @@
 // Premium Restoration — shared bathroom pricing model.
 //
 // The single source of truth for bathroom labor prices AND for the
-// calculation itself. Both the admin quoting tool (js/admin.js) and the
+// calculation itself. Both the admin quoting tool (js/admin/) and the
 // public chat estimate (js/script.js) call computeEstimate() below, so the
 // two always agree for the same inputs. The admin tool may add plumbing,
 // electrical and surcharge lines (includeTrade: true); the public estimate
@@ -13,18 +13,19 @@
 //
 // Labor only. Materials, permits, and profit margin are never included.
 //
+// The PUBLISHED prices (the ones the website shows) are not in this file:
+// the owner sets them in site-config.json ("prices"), and js/site-config.js
+// passes them to setPublishedPrices() when a page loads. Until then (or if
+// they are missing or invalid) hasPublishedPrices() is false, and the site
+// switches the estimator off rather than show a wrong price. Plumbing,
+// electrical, the surcharges and tax are never published; their defaults
+// are below and the admin tool can change them under Business Prices.
+//
 // Loads as a plain browser script (window.BathroomPricing) and as a Node
-// module (for the unit tests).
+// module (for the unit tests and scripts/sync-pages.mjs), which reads
+// site-config.json itself.
 
-(function (root, factory) {
-  "use strict";
-  var api = factory();
-  if (typeof module === "object" && module.exports) {
-    module.exports = api;
-  } else {
-    root.BathroomPricing = api;
-  }
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+(function (root) {
   "use strict";
 
   var RATES_KEY = "pr_business_rates";
@@ -35,25 +36,52 @@
   // review instead of being silently re-priced.
   var CALC_VERSION = 2;
 
+  // The prices the website publishes, as named in site-config.json
+  // ("setting") and in the code ("key"). The bathtub price isn't set: it is
+  // always 30% less than the shower price.
+  var PUBLISHED_PRICES = [
+    { setting: "demolitionPerSqFt", key: "Demo_Price_Per_SqFt" },
+    { setting: "toiletEach", key: "Toilet_Price" },
+    { setting: "sinkEach", key: "Sink_Price" },
+    { setting: "showerEach", key: "Shower_Price" },
+    { setting: "showerDoorEach", key: "Shower_Door_Price" },
+    { setting: "entryDoorEach", key: "Door_Price" },
+    { setting: "vanityEach", key: "Vanity_Price" },
+    { setting: "cabinetEach", key: "Cabinet_Price" },
+    { setting: "mirrorEach", key: "Mirror_Price" },
+    { setting: "hugeMirrorEach", key: "Mirror_Huge_Price" },
+    { setting: "showerShelfEach", key: "Shower_Shelf_Price" },
+    { setting: "tilePerSqFt", key: "Tile_Price_Per_SqFt" },
+    { setting: "flooringPerSqFt", key: "Floor_Price_Per_SqFt" },
+    { setting: "paintingPerSqFt", key: "Painting_Price_Per_SqFt" },
+  ];
+
+  // Highest price accepted from the settings file: a guard against a typo
+  // such as 60000 for 60.00.
+  var MAX_PUBLISHED_PRICE = 10000;
+
+  // Every price the calculation uses. The published ones are null until
+  // setPublishedPrices() fills them in from site-config.json.
+  /** @type {Prices} */
   var DEFAULT_PRICES = {
-    Demo_Price_Per_SqFt: 37.5,
+    Demo_Price_Per_SqFt: null,
 
-    Toilet_Price: 200,
-    Sink_Price: 200,
-    Shower_Price: 500,
-    Shower_Door_Price: 300,
-    Door_Price: 200,
-    Vanity_Price: 150,
-    Cabinet_Price: 60,
-    Mirror_Price: 100,
-    Mirror_Huge_Price: 300,
-    Shower_Shelf_Price: 125,
+    Toilet_Price: null,
+    Sink_Price: null,
+    Shower_Price: null,
+    Shower_Door_Price: null,
+    Door_Price: null,
+    Vanity_Price: null,
+    Cabinet_Price: null,
+    Mirror_Price: null,
+    Mirror_Huge_Price: null,
+    Shower_Shelf_Price: null,
 
-    Tile_Price_Per_SqFt: 4,
-    // Owner-confirmed: $5 per sq ft of bathroom floor.
-    Floor_Price_Per_SqFt: 5,
-    Painting_Price_Per_SqFt: 1.79,
+    Tile_Price_Per_SqFt: null,
+    Floor_Price_Per_SqFt: null,
+    Painting_Price_Per_SqFt: null,
 
+    // Never published (admin quotes only).
     Plumbing_Price_Per_Point: 300,
     No_Stack_Surcharge_Price: 1000,
     Bad_Valve_Surcharge_Price: 400,
@@ -66,6 +94,64 @@
     Labor_Tax_Rate_Percent: 0,
   };
 
+  var publishedLoaded = false;
+
+  // Checks the "prices" section of site-config.json. Returns
+  // { valid, prices: { <code key>: number } | null, errors: [plain-English problems] }.
+  /**
+   * @param {unknown} raw the "prices" section as read from the file
+   * @returns {{ valid: boolean, prices: Record<string, number> | null, errors: string[] }}
+   */
+  function validatePublishedPrices(raw) {
+    /** @type {string[]} */
+    var errors = [];
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return { valid: false, prices: null, errors: ['site-config.json has no "prices" section.'] };
+    }
+    var settings = /** @type {Record<string, unknown>} */ (raw);
+    /** @type {Record<string, boolean>} */
+    var known = {};
+    /** @type {Record<string, number>} */
+    var prices = {};
+    PUBLISHED_PRICES.forEach(function (p) {
+      known[p.setting] = true;
+      var v = settings[p.setting];
+      if (v === undefined) {
+        errors.push("prices." + p.setting + " is missing.");
+      } else if (typeof v !== "number" || !isFinite(v)) {
+        errors.push("prices." + p.setting + " must be a number without quotes or a $ sign (e.g. 60 or 1.79).");
+      } else if (v <= 0 || v > MAX_PUBLISHED_PRICE) {
+        errors.push("prices." + p.setting + " must be more than 0 and no more than " + MAX_PUBLISHED_PRICE + ".");
+      } else if (Math.abs(v * 100 - Math.round(v * 100)) > 1e-6) {
+        errors.push("prices." + p.setting + " can have at most 2 decimal places (cents).");
+      } else {
+        prices[p.key] = v;
+      }
+    });
+    Object.keys(settings).forEach(function (name) {
+      if (!known[name] && name.charAt(0) !== "_") {
+        errors.push("prices." + name + " isn't a price the site knows — check the spelling.");
+      }
+    });
+    return { valid: errors.length === 0, prices: errors.length ? null : prices, errors: errors };
+  }
+
+  // Fills in the published prices (keyed by code key, as returned by
+  // validatePublishedPrices). DEFAULT_PRICES is changed in place, so every
+  // script holding it sees the new prices.
+  /** @param {Record<string, number>} prices */
+  function setPublishedPrices(prices) {
+    PUBLISHED_PRICES.forEach(function (p) {
+      DEFAULT_PRICES[p.key] = Number(prices[p.key]);
+    });
+    publishedLoaded = true;
+  }
+
+  function hasPublishedPrices() {
+    return publishedLoaded;
+  }
+
+  /** @type {Record<string, string>} */
   var PRICE_LABELS = {
     Demo_Price_Per_SqFt: "Demolition (per sq ft of bathroom floor)",
 
@@ -105,6 +191,7 @@
 
   // Bathtub price isn't set directly — it's always 30% less than the
   // current shower price, per the business owner.
+  /** @param {Prices} prices */
   function bathtubPrice(prices) {
     return roundCents((Number(prices.Shower_Price) || 0) * 0.7);
   }
@@ -112,6 +199,7 @@
   // Fixture counts, in the order they are asked for and listed.
   // needsPlumbing: installing it also needs plumbing work (priced per point
   // in the admin tool, never priced publicly).
+  /** @type {Fixture[]} */
   var FIXTURES = [
     { key: "Toilet_Quantity", label: "Toilet", plural: "Toilets", priceKey: "Toilet_Price", needsPlumbing: true },
     { key: "Sink_Quantity", label: "Sink", plural: "Sinks", priceKey: "Sink_Price", needsPlumbing: true },
@@ -172,27 +260,33 @@
   var MAX_FIXTURE_COUNT = 20;
   var MAX_ELECTRICAL_POINTS = 50;
 
+  /** @param {number} n */
   function roundCents(n) {
     return Math.round((Number(n) || 0) * 100) / 100;
   }
 
+  // "$1,234.50". Anything that isn't a number counts as 0.
+  /** @param {number | string | null | undefined} value */
   function money(value) {
     var n = Number(value) || 0;
     return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   // Whole dollars when there are no cents ($60), otherwise cents ($1.79).
+  /** @param {number | string | null | undefined} value */
   function shortMoney(value) {
     var n = Number(value) || 0;
     return n % 1 === 0 ? "$" + n.toLocaleString("en-US") : money(n);
   }
 
+  /** @param {number | null} n */
   function formatQty(n) {
     return (Number(n) || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
   }
 
   // Parses a form value. Returns null for blank, NaN for anything that
   // isn't a plain finite number.
+  /** @param {string | number | boolean | null | undefined} value */
   function parseNumber(value) {
     if (value === undefined || value === null) return null;
     if (typeof value === "number") return isFinite(value) ? value : NaN;
@@ -202,12 +296,54 @@
     return Number(s);
   }
 
+  // Parses a room measurement in feet. Accepts a plain number (5, 5.5, and
+  // 5,5 with a decimal comma), feet with a unit (5ft, 5 ft, 5', 5 feet),
+  // feet and inches (5'6", 5' 6", 5 ft 6 in, 5 feet 6 inches) or inches
+  // alone (66", 66 in). Returns feet, null for blank, or NaN when the entry
+  // can't be read (see FEET_FORMAT_HINT).
+  var NUM = "(\\d+(?:[.,]\\d+)?|\\.\\d+)";
+  var FEET_UNIT = "\\s*(?:'|ft\\.?|foot|feet)";
+  var INCH_UNIT = '\\s*(?:"|in\\.?|inch|inches)';
+  var FEET_AND_INCHES = new RegExp(
+    "^" + NUM + FEET_UNIT + "(?:\\s*,?\\s*(?:and\\s*)?" + NUM + "(?:" + INCH_UNIT + ")?)?$",
+  );
+  var INCHES_ONLY = new RegExp("^" + NUM + INCH_UNIT + "$");
+  var FEET_FORMAT_HINT = "as a number of feet, e.g. 5.5, or feet and inches, e.g. 5' 6\"";
+
+  /** @param {string | number | boolean | null | undefined} value */
+  function parseFeet(value) {
+    if (value === undefined || value === null) return null;
+    if (typeof value === "number") return isFinite(value) ? value : NaN;
+    var s = String(value)
+      .trim()
+      .toLowerCase()
+      .replace(/[’‘′`´]/g, "'")
+      .replace(/[”“″]|''/g, '"');
+    if (s === "") return null;
+    var plain = parseNumber(s.replace(/^(\d+),(\d{1,2})$/, "$1.$2"));
+    if (plain !== null && !isNaN(plain)) return plain;
+    /** @param {string} text */
+    function num(text) {
+      return Number(String(text).replace(",", "."));
+    }
+    var m = FEET_AND_INCHES.exec(s);
+    if (m) {
+      var inches = m[2] === undefined ? 0 : num(m[2]);
+      if (inches >= 12) return NaN;
+      return num(m[1]) + inches / 12;
+    }
+    m = INCHES_ONLY.exec(s);
+    if (m) return num(m[1]) / 12;
+    return NaN;
+  }
+
   // Merges any prices saved from the admin "Business Prices" screen over the
-  // defaults (admin only — the public estimate always uses DEFAULT_PRICES).
+  // defaults (admin only — the public estimate always uses DEFAULT_PRICES,
+  // i.e. the published prices from site-config.json).
   function getPrices() {
     var prices = Object.assign({}, DEFAULT_PRICES);
     try {
-      var saved = JSON.parse(globalThis.localStorage.getItem(RATES_KEY));
+      var saved = JSON.parse(globalThis.localStorage.getItem(RATES_KEY) || "null");
       if (saved && saved.prices) {
         Object.keys(saved.prices).forEach(function (key) {
           if (Object.prototype.hasOwnProperty.call(DEFAULT_PRICES, key) && isFinite(Number(saved.prices[key]))) {
@@ -221,24 +357,32 @@
     return prices;
   }
 
+  /**
+   * @param {Fixture} fixture
+   * @param {Prices} prices
+   */
   function fixtureRate(fixture, prices) {
-    return fixture.derivedPrice ? fixture.derivedPrice(prices) : Number(prices[fixture.priceKey]) || 0;
+    if (fixture.derivedPrice) return fixture.derivedPrice(prices);
+    return fixture.priceKey ? Number(prices[fixture.priceKey]) || 0 : 0;
   }
 
+  /** @param {JobValues} values */
   function plumbingFixtureCount(values) {
     return FIXTURES.reduce(function (sum, f) {
       return f.needsPlumbing ? sum + (parseNumber(values[f.key]) || 0) : sum;
     }, 0);
   }
 
+  /** @param {JobValues} values */
   function areas(values) {
-    var w = parseNumber(values.Bathroom_Width_Ft) || 0;
-    var l = parseNumber(values.Bathroom_Length_Ft) || 0;
-    var h = parseNumber(values.Bathroom_Height_Ft) || 0;
+    var w = parseFeet(values.Bathroom_Width_Ft) || 0;
+    var l = parseFeet(values.Bathroom_Length_Ft) || 0;
+    var h = parseFeet(values.Bathroom_Height_Ft) || 0;
     return { floorSqFt: roundCents(w * l), wallSqFt: roundCents(2 * h * (w + l)) };
   }
 
   // What the chosen work needs measured.
+  /** @param {JobScope} scope */
   function scopeNeeds(scope) {
     scope = scope || {};
     var walls = scope.walls === "tile" || scope.walls === "paint";
@@ -251,22 +395,54 @@
     return { floorArea: floorArea, height: walls };
   }
 
-  function isScopeComplete(scope) {
+  // Whether anything priced has been chosen: some work, a fixture, or (with
+  // includeTrade, admin only) a plumbing surcharge or electrical point. It
+  // looks at what was chosen, not at prices, so a price of 0 doesn't matter.
+  /**
+   * @param {JobValues} values
+   * @param {JobScope} scope
+   * @param {boolean} [includeTrade] also count plumbing, surcharges and electrical (admin quotes)
+   */
+  function hasChosenWork(values, scope, includeTrade) {
+    values = values || {};
     scope = scope || {};
-    return SCOPE_QUESTIONS.every(function (q) {
-      return q.options.some(function (o) {
-        return o.value === scope[q.key];
-      });
+    var needs = scopeNeeds(scope);
+    if (needs.floorArea) return true;
+    var fixture = FIXTURES.some(function (f) {
+      return (parseNumber(values[f.key]) || 0) > 0;
     });
+    if (fixture || !includeTrade) return fixture;
+    return (
+      (parseNumber(values.Electrical_Points) || 0) > 0 ||
+      values.No_Stack_Surcharge_Included === true ||
+      values.Bad_Valve_Surcharge_Included === true
+    );
   }
+
+  var NO_WORK_MESSAGE = {
+    public:
+      "There's nothing to price yet: enter how many of at least one item above, or go ← Back and choose some work.",
+    admin:
+      "Nothing to price yet: choose some work, or enter at least one fixture, plumbing surcharge or electrical point, before saving.",
+  };
 
   // Field-level validation shared by the public chat and the admin quote.
   // Returns { valid, errors: { fieldKey: message } }.
   // options.includeTrade also checks the admin-only electrical points.
+  // options.requireWork (once every answer is in): at least one priced item
+  // must be chosen, so an estimate or quote can never come to $0.00; the
+  // problem is reported as errors.work.
+  /**
+   * @param {JobValues} values
+   * @param {JobScope} scope
+   * @param {{ includeTrade?: boolean, requireWork?: boolean }} [options]
+   * @returns {JobCheck}
+   */
   function validateJob(values, scope, options) {
     values = values || {};
     scope = scope || {};
     options = options || {};
+    /** @type {Record<string, string>} */
     var errors = {};
 
     SCOPE_QUESTIONS.forEach(function (q) {
@@ -279,7 +455,7 @@
     var needs = scopeNeeds(scope);
     DIMENSIONS.forEach(function (d) {
       var required = d.key === "Bathroom_Height_Ft" ? needs.height : needs.floorArea;
-      var n = parseNumber(values[d.key]);
+      var n = parseFeet(values[d.key]);
       var range = "more than 0 and no more than " + d.max + " ft";
       if (n === null) {
         if (required) {
@@ -288,7 +464,10 @@
         }
         return;
       }
-      if (isNaN(n) || n <= 0 || n > d.max) {
+      if (isNaN(n)) {
+        // The format is the problem, not the size.
+        errors[d.key] = "Enter the " + d.label.toLowerCase() + " " + FEET_FORMAT_HINT + ".";
+      } else if (n <= 0 || n > d.max) {
         errors[d.key] = d.label + " must be " + range + ".";
       }
     });
@@ -311,6 +490,10 @@
       }
     }
 
+    if (options.requireWork && !Object.keys(errors).length && !hasChosenWork(values, scope, options.includeTrade)) {
+      errors.work = options.includeTrade ? NO_WORK_MESSAGE.admin : NO_WORK_MESSAGE.public;
+    }
+
     return { valid: Object.keys(errors).length === 0, errors: errors };
   }
 
@@ -325,14 +508,29 @@
   // options: { prices (default DEFAULT_PRICES), includeTrade (default false) }
   //
   // Every line carries its quantity x rate. Lines costing $0 are left out.
+  /**
+   * @param {JobValues} values
+   * @param {JobScope} scope
+   * @param {{ prices?: Prices, includeTrade?: boolean }} [options]
+   * @returns {EstimateResult}
+   */
   function computeEstimate(values, scope, options) {
     values = values || {};
     scope = scope || {};
     options = options || {};
     var prices = Object.assign({}, DEFAULT_PRICES, options.prices || {});
     var a = areas(values);
+    /** @type {PricingLine[]} */
     var lines = [];
 
+    /**
+     * @param {string} key
+     * @param {string} section
+     * @param {string} label
+     * @param {number} qty
+     * @param {string} unit
+     * @param {number | null} rate (null: not set, so nothing is charged)
+     */
     function addLine(key, section, label, qty, unit, rate) {
       qty = Number(qty) || 0;
       rate = Number(rate) || 0;
@@ -350,6 +548,12 @@
       });
     }
 
+    /**
+     * @param {string} key
+     * @param {string} section
+     * @param {string} label
+     * @param {number | null} rate
+     */
     function addFlat(key, section, label, rate) {
       rate = Number(rate) || 0;
       if (rate <= 0) return;
@@ -436,10 +640,18 @@
   }
 
   // Public estimate: published prices only, no plumbing or electrical, no tax.
+  /**
+   * @param {JobValues} values
+   * @param {JobScope} scope
+   */
   function computePublicEstimate(values, scope) {
     return computeEstimate(values, scope, { prices: DEFAULT_PRICES, includeTrade: false });
   }
 
+  /**
+   * @param {string} questionKey
+   * @param {string | boolean | undefined} value
+   */
   function optionLabel(questionKey, value) {
     var q = SCOPE_QUESTIONS.filter(function (x) {
       return x.key === questionKey;
@@ -454,6 +666,7 @@
 
   // One line describing the chosen work, e.g. "Demolition: No; new floor:
   // Other flooring; walls: Neither; paint ceiling: No".
+  /** @param {JobScope} scope */
   function describeScope(scope) {
     scope = scope || {};
     return (
@@ -469,11 +682,16 @@
   }
 
   // Plain-text list of what an estimate assumed (estimate card and PDFs).
+  /**
+   * @param {JobValues} values
+   * @param {JobScope} scope
+   * @param {EstimateResult} result
+   */
   function estimateAssumptions(values, scope, result) {
     var needs = scopeNeeds(scope);
-    var w = formatQty(parseNumber(values.Bathroom_Width_Ft) || 0);
-    var l = formatQty(parseNumber(values.Bathroom_Length_Ft) || 0);
-    var h = formatQty(parseNumber(values.Bathroom_Height_Ft) || 0);
+    var w = formatQty(parseFeet(values.Bathroom_Width_Ft) || 0);
+    var l = formatQty(parseFeet(values.Bathroom_Length_Ft) || 0);
+    var h = formatQty(parseFeet(values.Bathroom_Height_Ft) || 0);
     var list = [describeScope(scope) + ". Only this work is priced."];
     if (needs.floorArea) {
       list.push(
@@ -505,16 +723,21 @@
 
   // Readable, editable summary of a public estimate, used to pre-fill the
   // Contact form's project details.
+  /**
+   * @param {JobValues} values
+   * @param {JobScope} scope
+   * @param {EstimateResult} result
+   */
   function buildEstimateSummary(values, scope, result) {
     var out = ["My bathroom estimate from your website:"];
     var needs = scopeNeeds(scope);
     if (needs.floorArea) {
       var dims =
-        formatQty(parseNumber(values.Bathroom_Width_Ft)) +
+        formatQty(parseFeet(values.Bathroom_Width_Ft)) +
         " ft wide × " +
-        formatQty(parseNumber(values.Bathroom_Length_Ft)) +
+        formatQty(parseFeet(values.Bathroom_Length_Ft)) +
         " ft long";
-      if (needs.height) dims += " × " + formatQty(parseNumber(values.Bathroom_Height_Ft)) + " ft high";
+      if (needs.height) dims += " × " + formatQty(parseFeet(values.Bathroom_Height_Ft)) + " ft high";
       out.push("- Room: " + dims);
     }
     out.push("- Work: " + describeScope(scope));
@@ -533,39 +756,59 @@
     return out.join("\n");
   }
 
+  /** @param {BathroomData | null | undefined} bathroomData */
   function isLegacyQuoteData(bathroomData) {
     return !!bathroomData && !(Number(bathroomData.calcVersion) >= CALC_VERSION);
   }
 
-  return {
+  // Only what other scripts and the tests use.
+  var api = {
     CALC_VERSION: CALC_VERSION,
     RATES_KEY: RATES_KEY,
     DEFAULT_PRICES: DEFAULT_PRICES,
+    PUBLISHED_PRICES: PUBLISHED_PRICES,
+    validatePublishedPrices: validatePublishedPrices,
+    setPublishedPrices: setPublishedPrices,
+    hasPublishedPrices: hasPublishedPrices,
     PRICE_LABELS: PRICE_LABELS,
     UNPUBLISHED_PRICE_KEYS: UNPUBLISHED_PRICE_KEYS,
     FIXTURES: FIXTURES,
     SCOPE_QUESTIONS: SCOPE_QUESTIONS,
     DIMENSIONS: DIMENSIONS,
-    MAX_FIXTURE_COUNT: MAX_FIXTURE_COUNT,
-    MAX_ELECTRICAL_POINTS: MAX_ELECTRICAL_POINTS,
     bathtubPrice: bathtubPrice,
     money: money,
     shortMoney: shortMoney,
     formatQty: formatQty,
     parseNumber: parseNumber,
+    parseFeet: parseFeet,
     roundCents: roundCents,
     getPrices: getPrices,
     fixtureRate: fixtureRate,
-    plumbingFixtureCount: plumbingFixtureCount,
     areas: areas,
     scopeNeeds: scopeNeeds,
-    isScopeComplete: isScopeComplete,
+    hasChosenWork: hasChosenWork,
     validateJob: validateJob,
     computeEstimate: computeEstimate,
     computePublicEstimate: computePublicEstimate,
-    describeScope: describeScope,
     estimateAssumptions: estimateAssumptions,
     buildEstimateSummary: buildEstimateSummary,
     isLegacyQuoteData: isLegacyQuoteData,
   };
-});
+
+  var node = typeof module === "object" && module.exports && typeof require === "function";
+  if (node) {
+    try {
+      // (Through a variable, so the browser-side type check doesn't look for Node's modules.)
+      var nodeRequire = require;
+      var path = nodeRequire("path");
+      var raw = JSON.parse(nodeRequire("fs").readFileSync(path.join(__dirname, "..", "site-config.json"), "utf8"));
+      var check = api.validatePublishedPrices(raw.prices);
+      if (check.valid && check.prices) api.setPublishedPrices(check.prices);
+    } catch (e) {
+      /* unreadable settings: hasPublishedPrices() stays false; the unit tests say why */
+    }
+    module.exports = api;
+  } else {
+    /** @type {any} */ (root).BathroomPricing = api;
+  }
+})(typeof globalThis !== "undefined" ? globalThis : this);

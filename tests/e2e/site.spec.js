@@ -2,19 +2,10 @@
 
 const { test, expect } = require("@playwright/test");
 const AxeBuilder = require("@axe-core/playwright").default;
-const Pricing = require("../../js/bathroom-pricing.js");
 const { useConfig } = require("./helpers");
+const Pricing = require("../../js/bathroom-pricing.js");
 
-const PUBLIC_PAGES = [
-  "index.html",
-  "about.html",
-  "faq.html",
-  "contact.html",
-  "privacy.html",
-  "terms.html",
-  "gallery.html",
-  "404.html",
-];
+const PUBLIC_PAGES = ["index.html", "about.html", "faq.html", "contact.html", "privacy.html", "terms.html", "404.html"];
 const PLACEHOLDER = /\[[A-Z][A-Z0-9 #/-]*[A-Z#]\]/;
 
 test.describe("every public page", () => {
@@ -78,11 +69,40 @@ test.describe("every public page", () => {
     );
   });
 
-  test("no link leads to the empty Our Work page", async ({ page }) => {
-    for (const file of PUBLIC_PAGES.filter((f) => f !== "gallery.html")) {
+  test("there is no empty Our Work page: it isn't deployed and nothing links to it", async ({ page, request }) => {
+    expect((await request.get("/gallery.html")).status()).toBe(404);
+    for (const file of PUBLIC_PAGES) {
       await page.goto("/" + file);
-      await expect(page.locator('a[href*="gallery.html"]')).toHaveCount(0);
+      await expect(page.locator('a[href*="gallery"]')).toHaveCount(0);
     }
+  });
+
+  test("no page shows a box standing in for a photo, and any image has alt text", async ({ page }) => {
+    for (const file of PUBLIC_PAGES) {
+      await page.goto("/" + file);
+      await expect(
+        page.locator(".about-photo, [class*='placeholder-photo'], [class*='photo-placeholder']"),
+      ).toHaveCount(0);
+      const missingAlt = await page.locator("img").evaluateAll((imgs) => imgs.filter((i) => !i.alt).length);
+      expect(missingAlt, file).toBe(0);
+    }
+    // The About copy uses the space instead: one readable column, no empty half.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/about.html");
+    const copy = await page.locator(".about-copy").boundingBox();
+    expect(copy.width).toBeGreaterThan(500);
+  });
+
+  test("every link to the Get a Quote page is labelled Get a Quote", async ({ page }) => {
+    const labels = new Set();
+    for (const file of PUBLIC_PAGES) {
+      await page.goto("/" + file);
+      for (const text of await page.locator('a[href*="contact.html"]').allTextContents()) {
+        labels.add(text.replace(/\s+/g, " ").replace(/ ?→$/, "").trim());
+      }
+    }
+    // (The estimate card's "Get a Quote →" is checked in chat.spec.js.)
+    expect([...labels]).toEqual(["Get a Quote"]);
   });
 
   test("unknown URLs get the styled 404 page with Home and Get a Quote", async ({ page }) => {
@@ -164,9 +184,9 @@ test.describe("accessibility", () => {
       await page.fill("#login-password", "templein26)");
       await page.click('button:has-text("Log In")');
       await page.click("#create-quote-btn");
-      await page.fill("#quote-address", "1 Contrast St");
-      await page.click('button:has-text("Get Started")');
+      await page.fill("#quote-customer-email", "not-an-email");
       await page.click("#save-quote-btn"); // show validation messages
+      await expect(page.locator("#quote-address-error")).toBeVisible();
       results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
       expect(results.violations.flatMap((v) => v.nodes.map((n) => n.target + " " + n.failureSummary))).toEqual([]);
     });

@@ -1,0 +1,17 @@
+{
+  "_help": "Prices the tests use, whatever the owner sets in site-config.json. They are the owner-stated prices of September 2026. Served in place of site-config.json's prices during the browser tests (scripts/serve.mjs, SITE_CONFIG_PRICES).",
+  "demolitionPerSqFt": 37.5,
+  "toiletEach": 200,
+  "sinkEach": 200,
+  "showerEach": 500,
+  "showerDoorEach": 300,
+  "entryDoorEach": 200,
+  "vanityEach": 150,
+  "cabinetEach": 60,
+  "mirrorEach": 100,
+  "hugeMirrorEach": 300,
+  "showerShelfEach": 125,
+  "tilePerSqFt": 4,
+  "flooringPerSqFt": 5,
+  "paintingPerSqFt": 1.79
+}

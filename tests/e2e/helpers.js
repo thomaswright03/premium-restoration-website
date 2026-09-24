@@ -1,10 +1,19 @@
 "use strict";
 
+const { expect } = require("@playwright/test");
 const fs = require("node:fs");
 const path = require("node:path");
 
 const ROOT = path.join(__dirname, "..", "..");
-const BASE_CONFIG = JSON.parse(fs.readFileSync(path.join(ROOT, "site-config.json"), "utf8"));
+// The server gives the pages tests/fixtures/test-prices.json as their prices
+// (see playwright.config.js), and so does this copy.
+const TEST_PRICES = JSON.parse(fs.readFileSync(path.join(ROOT, "tests/fixtures/test-prices.json"), "utf8"));
+const BASE_CONFIG = Object.assign(JSON.parse(fs.readFileSync(path.join(ROOT, "site-config.json"), "utf8")), {
+  prices: TEST_PRICES,
+});
+// Expectations computed in the tests use the same prices.
+const Pricing = require("../../js/bathroom-pricing.js");
+Pricing.setPublishedPrices(Pricing.validatePublishedPrices(TEST_PRICES).prices);
 
 // Serve a modified site-config.json for this page only.
 async function useConfig(page, overrides) {
@@ -66,10 +75,12 @@ async function chooseAdmin(page, question, label) {
   await page.locator(".calc-row", { hasText: question }).locator("label.calc-choice", { hasText: label }).click();
 }
 
-async function fillAdminQuote(page, { address, dims, scope, counts }) {
+// Everything is on one screen: property, customer and the calculator.
+async function fillAdminQuote(page, { address, customer, dims, scope, counts }) {
   await page.click("#create-quote-btn");
+  await page.locator("#screen-quote").waitFor();
   await page.fill("#quote-address", address);
-  await page.click('button:has-text("Get Started")');
+  for (const [k, v] of Object.entries(customer || {})) await page.fill(`#quote-customer-${k}`, v);
   for (const [k, v] of Object.entries(dims || {})) await page.fill(`input[name="${k}"]`, String(v));
   for (const [k, v] of Object.entries(counts || {})) await page.fill(`input[name="${k}"]`, String(v));
   for (const [k, v] of Object.entries(scope || {})) await chooseAdmin(page, ADMIN_SCOPE_ROWS[k], v);
@@ -82,9 +93,19 @@ const ADMIN_SCOPE_ROWS = {
   paintCeiling: "Paint the ceiling?",
 };
 
+// The site's own confirmation dialog (not the browser's): press one of its buttons.
+async function answerDialog(page, buttonName) {
+  const dialog = page.locator("#admin-dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: buttonName, exact: true }).click();
+  await expect(dialog).toBeHidden();
+}
+
 module.exports = {
+  answerDialog,
   ROOT,
   BASE_CONFIG,
+  TEST_PRICES,
   useConfig,
   sendChat,
   startEstimate,

@@ -3,10 +3,29 @@
 //   <!-- chrome:head -->   … <!-- /chrome:head -->     from scripts/partials/head.html
 //   <!-- chrome:header --> … <!-- /chrome:header -->   from scripts/partials/header.html
 //   <!-- chrome:footer --> … <!-- /chrome:footer -->   from scripts/partials/footer.html
-//   <span data-price="Cabinet_Price">$60</span>        from DEFAULT_PRICES in js/bathroom-pricing.js
+//   <span data-price="Cabinet_Price">$60</span>        from "prices" in site-config.json (via js/bathroom-pricing.js)
+//   <a data-contact="phone" href="tel:…">…</a>         from js/business-info.js (phone or email;
+//   <span data-contact="email">…</span>                 a mailto link keeps its ?subject=…)
+//   <meta name="pr-settings-fallback" content="…">     a copy of the visitor-count and error-report
+//                                                      settings from site-config.json, used if that
+//                                                      file can't be read (js/site-config.js)
+//
+// The check also fails if a page still has the phone number, the email
+// address, or a tel:/mailto: link that is NOT marked with data-contact, so
+// every copy changes together.
 //
 // The pages are committed already filled in, so the site needs no build step:
 // this only has to be run after editing a partial or a price.
+//
+// Prices are special: the owner changes them in site-config.json, and every
+// page also fills its price text from that file when it loads (js/site-config.js),
+// so visitors see a new price straight away even before this script is run.
+// So in --check mode, pages whose only difference is price text are reported
+// as a notice ("run npm run pages to refresh the text in the files", which
+// matters only for visitors without JavaScript), not as a failure. The same
+// goes for the settings copy, except when the copy in the pages would count
+// visitors or send error reports that site-config.json has switched off:
+// that fails, so a page never does more than the owner has chosen.
 //
 //   node scripts/sync-pages.mjs          rewrite the pages
 //   node scripts/sync-pages.mjs --check  exit 1 if any page is out of date (CI)
@@ -20,6 +39,7 @@ import * as prettier from "prettier";
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL("..", import.meta.url));
 const Pricing = require(join(root, "js/bathroom-pricing.js"));
+const Business = require(join(root, "js/business-info.js"));
 
 // base: prefix for links/assets. 404.html is served for any missing URL
 // (at any depth), so it uses root-absolute links.
@@ -30,12 +50,72 @@ export const PAGES = [
   { file: "contact.html", base: "" },
   { file: "privacy.html", base: "" },
   { file: "terms.html", base: "" },
-  { file: "gallery.html", base: "" },
   { file: "404.html", base: "/" },
   { file: "admin/index.html", base: "../" },
 ];
 
 const BLOCKS = ["head", "header", "footer"];
+
+const RAW_CONFIG = JSON.parse(await readFile(join(root, "site-config.json"), "utf8"));
+
+if (!Pricing.hasPublishedPrices()) {
+  const problems = Pricing.validatePublishedPrices(RAW_CONFIG.prices).errors;
+  throw new Error("site-config.json prices can't be used:\n  " + problems.join("\n  "));
+}
+
+// The page with every price text and the settings copy blanked and
+// whitespace collapsed, to tell such a difference from any other.
+export function withoutPriceText(html) {
+  return html
+    .replace(/(<span[^>]*\bdata-price="\w+"[^>]*>)[^<]*(<\/span>)/g, "$1$2")
+    .replace(/<meta name="pr-settings-fallback" content=("[^"]*"|'[^']*')/g, '<meta name="pr-settings-fallback"')
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// The copy of the visitor-count and error-report settings written into each
+// page: only what js/site-config.js needs if site-config.json can't be read.
+export function settingsFallback(raw) {
+  const a = (raw && raw.analytics) || {};
+  const on = a.enabled === true;
+  return {
+    analytics: on
+      ? {
+          enabled: true,
+          provider: a.provider || "",
+          domain: a.domain || "",
+          scriptUrl: a.scriptUrl || "",
+          servicePrivacyUrl: a.servicePrivacyUrl || "",
+        }
+      : { enabled: false },
+    errorReports: { enabled: on && !!(raw.errorReports && raw.errorReports.enabled === true) },
+  };
+}
+
+function readFallback(html) {
+  // Prettier may write the attribute in either kind of quotes.
+  const m = /<meta name="pr-settings-fallback" content=(?:"([^"]*)"|'([^']*)')/.exec(html);
+  try {
+    return JSON.parse(
+      (m ? m[1] || m[2] : "{}")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&amp;/g, "&"),
+    );
+  } catch {
+    return {};
+  }
+}
+
+// True if a page's settings copy switches on something site-config.json has off.
+export function fallbackDoesMore(pageHtml, raw) {
+  const inPage = readFallback(pageHtml);
+  const wanted = settingsFallback(raw);
+  const on = (s, key) => !!(s && s[key] && s[key].enabled === true);
+  return ["analytics", "errorReports"].some((key) => on(inPage, key) && !on(wanted, key));
+}
+
+const escapeAttr = (text) => text.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
 async function partial(name) {
   return readFile(join(root, "scripts/partials", name + ".html"), "utf8");
@@ -60,6 +140,7 @@ export async function renderPage(source, page) {
     const re = new RegExp(`(<!-- chrome:${block} -->)[\\s\\S]*?(<!-- /chrome:${block} -->)`);
     if (!re.test(html)) continue;
     let body = (await partial(block)).trim().replaceAll("{{base}}", page.base);
+    body = body.replaceAll("{{settingsFallback}}", escapeAttr(JSON.stringify(settingsFallback(RAW_CONFIG))));
     if (block === "header") body = renderHeader(body, page);
     html = html.replace(re, (m, open, close) => `${open}\n${body}\n${close}`);
   }
@@ -67,28 +148,80 @@ export async function renderPage(source, page) {
     if (!(key in Pricing.DEFAULT_PRICES)) throw new Error(`${page.file}: unknown data-price key ${key}`);
     return open + Pricing.shortMoney(Pricing.DEFAULT_PRICES[key]) + close;
   });
+  html = html.replace(
+    /<(a|span)\b([^>]*?)\bdata-contact="(\w+)"([^>]*)>[^<]*<\/\1\s*>/g,
+    (m, tag, before, kind, after) => {
+      if (kind !== "phone" && kind !== "email") throw new Error(`${page.file}: unknown data-contact "${kind}"`);
+      let attrs = before + `data-contact="${kind}"` + after;
+      if (tag === "a") {
+        attrs = attrs.replace(/href="([^"]*)"/, (h, href) => {
+          if (kind === "phone") return `href="${Business.PHONE_HREF}"`;
+          const query = href.indexOf("?") === -1 ? "" : href.slice(href.indexOf("?"));
+          return `href="${Business.EMAIL_HREF}${query}"`;
+        });
+      }
+      return `<${tag}${attrs}>${kind === "phone" ? Business.PHONE : Business.EMAIL}</${tag}>`;
+    },
+  );
   const options = (await prettier.resolveConfig(join(root, page.file))) || {};
   return prettier.format(html, { ...options, parser: "html" });
+}
+
+// Contact details or links left outside a data-contact element (they would
+// not change with js/business-info.js).
+export function strayContacts(html) {
+  const outside = html
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<(a|span)\b[^>]*\bdata-contact="\w+"[^>]*>[^<]*<\/\1\s*>/g, "");
+  return [Business.PHONE, Business.EMAIL, 'href="tel:', 'href="mailto:'].filter((s) => outside.includes(s));
 }
 
 async function main() {
   const check = process.argv.includes("--check");
   const stale = [];
+  const priceOnly = [];
   for (const page of PAGES) {
     const path = join(root, page.file);
     const source = await readFile(path, "utf8");
     const output = await renderPage(source, page);
+    const stray = strayContacts(output);
+    if (stray.length) {
+      console.error(`${page.file}: contact details not marked with data-contact: ${stray.join(", ")}`);
+      process.exitCode = 1;
+    }
     if (output !== source) {
-      stale.push(page.file);
+      if (check && fallbackDoesMore(source, RAW_CONFIG)) {
+        console.error(
+          `${page.file}: its copy of the settings still counts visitors or sends error reports, which site-config.json has switched off.`,
+        );
+        stale.push(page.file);
+      } else if (check && withoutPriceText(output) === withoutPriceText(source)) priceOnly.push(page.file);
+      else stale.push(page.file);
       if (!check) await writeFile(path, output);
     }
   }
+  if (check && priceOnly.length) {
+    console.warn(
+      "Notice: the price text, or the copy of the visitor-count settings, written in these files is older than site-config.json:\n  " +
+        priceOnly.join("\n  ") +
+        "\nVisitors already see the new prices and settings (pages read them when they load). " +
+        "Run `npm run pages` and commit to refresh the files (for visitors without JavaScript, and for when site-config.json can't be read).",
+    );
+  }
   if (check && stale.length) {
-    console.error("These pages are out of date with scripts/partials or DEFAULT_PRICES:\n  " + stale.join("\n  "));
+    console.error("These pages are out of date with scripts/partials or js/business-info.js:\n  " + stale.join("\n  "));
     console.error("Run: npm run pages");
     process.exit(1);
   }
-  console.log(check ? "Pages are up to date." : stale.length ? "Updated: " + stale.join(", ") : "No changes.");
+  console.log(
+    check
+      ? priceOnly.length
+        ? "Pages are up to date apart from the price text above."
+        : "Pages are up to date."
+      : stale.length
+        ? "Updated: " + stale.join(", ")
+        : "No changes.",
+  );
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

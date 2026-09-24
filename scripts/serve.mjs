@@ -3,6 +3,10 @@
 // missing path with 404.html and a 404 status.
 //
 //   node scripts/serve.mjs [port]      (default 8000)
+//
+// For the browser tests, SITE_CONFIG_PRICES=<file> serves site-config.json
+// with its "prices" replaced by that file's (tests/fixtures/test-prices.json),
+// so the tests don't depend on the prices the owner has set.
 
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
@@ -21,6 +25,7 @@ const TYPES = {
   ".ico": "image/x-icon",
   ".png": "image/png",
   ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
   ".txt": "text/plain; charset=utf-8",
   ".webmanifest": "application/manifest+json",
 };
@@ -51,7 +56,12 @@ const server = createServer(async (req, res) => {
     res.end(body);
     return;
   }
-  const body = await readFile(file);
+  let body = await readFile(file);
+  if (process.env.SITE_CONFIG_PRICES && file === join(root, "site-config.json")) {
+    const config = JSON.parse(body.toString("utf8"));
+    config.prices = JSON.parse(await readFile(resolve(root, process.env.SITE_CONFIG_PRICES), "utf8"));
+    body = Buffer.from(JSON.stringify(config, null, 2));
+  }
   res.writeHead(200, {
     "Content-Type": TYPES[extname(file)] || "application/octet-stream",
     "Cache-Control": "no-cache",
