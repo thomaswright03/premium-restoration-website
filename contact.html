@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Get a Quote | Premium Restoration</title>
-<meta name="description" content="Request a free quote from Premium Restoration for your home restoration project." />
+<meta name="description" content="Request a free quote from Premium Restoration for your bathroom restoration project." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap" rel="stylesheet" />
@@ -30,7 +30,7 @@
   <div class="hero-inner">
     <span class="eyebrow center">Let's Talk</span>
     <h1>Get a Free <em>Quote</em></h1>
-    <p>Tell us a bit about your project and we'll be in touch to schedule a consultation.</p>
+    <p>Tell us a bit about your bathroom project, then send it to us by email, or call us directly.</p>
   </div>
 </section>
 
@@ -38,8 +38,9 @@
   <div class="contact-wrap">
 
     <div>
-      <div id="form-success" class="form-success">
-        Thanks! Your request has been received. We'll be in touch shortly.
+      <div id="form-success" class="form-success" role="status">
+        Your email app should now open with your request filled in. <strong>Please press Send in your email app</strong> &mdash; we don't receive anything until you do. If nothing opened, email us at
+        <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a> or call <a href="tel:+13853568733">(385) 356-8733</a>.
       </div>
 
       <form id="lead-form">
@@ -59,13 +60,11 @@
         </div>
 
         <div class="form-group">
-          <label for="service">Service Interested In</label>
+          <label for="service">Bathroom Work Needed</label>
           <select id="service" name="service">
-            <option value="full-home">Full Home Restoration</option>
-            <option value="kitchen-bath">Kitchen &amp; Bath Restoration</option>
-            <option value="damage-repair">Water / Fire / Storm Damage</option>
-            <option value="design">Design &amp; Material Consultation</option>
-            <option value="other">Other</option>
+            <option value="full-bathroom">Full bathroom restoration</option>
+            <option value="partial-bathroom">Part of a bathroom (e.g. fixtures, tile, or flooring)</option>
+            <option value="other-bathroom">Other bathroom work / not sure yet</option>
           </select>
         </div>
 
@@ -74,10 +73,16 @@
           <textarea id="message" name="message" placeholder="Property type, rough timeline, and anything else we should know..."></textarea>
         </div>
 
-        <button type="submit" class="btn btn-primary" style="width:100%;">Request Free Quote</button>
+        <p class="form-consent">
+          <strong>How this form works:</strong> this website doesn't store or send your details. When you press the button,
+          your own email app opens a message to us containing what you entered above, and we only receive it if you press Send.
+          We use your details only to respond to your enquiry and prepare your quote, and we don't sell them.
+          See our <a href="privacy.html">Privacy Notice</a> for how long we keep them and how to ask us to access or delete them.
+        </p>
+
+        <button type="submit" class="btn btn-primary" style="width:100%;">Open Email to Send Request</button>
         <p class="form-note">
-          This is a front-end demo form — submissions aren't sent anywhere yet.
-          Connect it to a form service (e.g. Formspree, Netlify Forms) or your own backend before launch.
+          Prefer not to use email? Call us at <a href="tel:+13853568733">(385) 356-8733</a>.
         </p>
       </form>
     </div>
@@ -104,7 +109,12 @@
   <div class="footer-grid">
     <div class="footer-col">
       <p class="footer-brand">Premium Restoration</p>
-      <p style="max-width:260px; font-size: 0.9rem;">Quality home restoration services.</p>
+      <p style="max-width:260px; font-size: 0.9rem;">Bathroom restoration services.</p>
+      <p class="footer-identity">
+        [COMPANY LEGAL NAME]<br />
+        [BUSINESS ADDRESS]<br />
+        Contractor License # [CONTRACTOR LICENSE #]
+      </p>
     </div>
     <div class="footer-col">
       <h4>Explore</h4>
@@ -119,9 +129,15 @@
       <a href="tel:+13853568733">(385) 356-8733</a>
       <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
     </div>
+    <div class="footer-col">
+      <h4>Legal</h4>
+      <a href="privacy.html">Privacy Notice</a>
+      <a href="terms.html">Terms of Use</a>
+      <a href="privacy.html#your-rights">Access or Delete My Data</a>
+    </div>
   </div>
   <div class="footer-bottom">
-    &copy; <span id="year"></span> Premium Restoration. All rights reserved.
+    &copy; <span id="year"></span> Premium Restoration ([COMPANY LEGAL NAME]). All rights reserved.
   </div>
 </footer>
 
