@@ -259,6 +259,10 @@
     )
     .concat(["No_Stack_Surcharge_Included", "Bad_Valve_Surcharge_Included"]);
 
+  var DIMENSION_KEYS = Pricing.DIMENSIONS.map(function (d) {
+    return d.key;
+  });
+
   function draftFromQuote(quote) {
     var bathroom = (quote.data && quote.data.bathroom) || {};
     var jobValues = bathroom.jobValues || {};
@@ -938,7 +942,7 @@
       el(
         "p",
         "calc-help",
-        "Only needed for work priced by area (demolition, floor, walls, ceiling). Floor area = width × length; wall area = 2 × height × (width + length).",
+        "Only needed for work priced by area (demolition, floor, walls, ceiling). Feet (5.5) or feet and inches (5' 6\") both work. Floor area = width × length; wall area = 2 × height × (width + length).",
       ),
     );
     var dimGrid = el("div", "calc-dims");
@@ -947,8 +951,9 @@
       var id = "calc-" + ++uid;
       var label = el("label", "calc-label-text", d.label + " (ft)");
       label.htmlFor = id;
-      var input = numberInput(d.key, "decimal").node;
+      var input = numberInput(d.key, "text").node;
       input.id = id;
+      input.placeholder = "e.g. 5' 6\"";
       var error = el("p", "calc-error");
       error.hidden = true;
       error.id = id + "-error";
@@ -1130,14 +1135,17 @@
     saveBtn.textContent = "Saving…";
 
     var prices = Pricing.getPrices();
-    var result = Pricing.computeEstimate(draft.values, draft.scope, { prices: prices, includeTrade: true });
     var now = new Date().toISOString();
+    // Measurements are stored in feet (5' 6" is saved as 5.5), and the total
+    // is worked out from exactly what is stored, so the PDF always matches.
     var jobValues = {};
     VALUE_KEYS.forEach(function (key) {
       var v = draft.values[key];
       if (typeof v === "boolean") jobValues[key] = v;
+      else if (DIMENSION_KEYS.indexOf(key) !== -1) jobValues[key] = Math.round((Pricing.parseFeet(v) || 0) * 1e4) / 1e4;
       else jobValues[key] = Pricing.parseNumber(v) || 0;
     });
+    var result = Pricing.computeEstimate(jobValues, draft.scope, { prices: prices, includeTrade: true });
     var bathroom = {
       calcVersion: Pricing.CALC_VERSION,
       jobValues: jobValues,

@@ -189,9 +189,9 @@ test("validation: area work needs a realistic width and length; wall work needs 
   assert.equal(v.errors.Bathroom_Height_Ft, undefined);
 
   v = P.validateJob({ Bathroom_Width_Ft: "1e200", Bathroom_Length_Ft: "8" }, scope);
-  assert.ok(v.errors.Bathroom_Width_Ft);
+  assert.match(v.errors.Bathroom_Width_Ft, /^Enter the width as a number of feet/);
   v = P.validateJob({ Bathroom_Width_Ft: "51", Bathroom_Length_Ft: "8" }, scope);
-  assert.ok(v.errors.Bathroom_Width_Ft);
+  assert.equal(v.errors.Bathroom_Width_Ft, "Width must be more than 0 and no more than 50 ft.");
   v = P.validateJob({ Bathroom_Width_Ft: "-3", Bathroom_Length_Ft: "8" }, scope);
   assert.ok(v.errors.Bathroom_Width_Ft);
   v = P.validateJob({ Bathroom_Width_Ft: "5", Bathroom_Length_Ft: "8" }, scope);
@@ -202,6 +202,43 @@ test("validation: area work needs a realistic width and length; wall work needs 
   assert.ok(v.errors.Bathroom_Height_Ft);
   v = P.validateJob({ Bathroom_Width_Ft: "5", Bathroom_Length_Ft: "8", Bathroom_Height_Ft: "8" }, walls);
   assert.equal(v.valid, true);
+});
+
+test("room sizes accept feet and inches, and a format mistake is not reported as out of range", () => {
+  const cases = {
+    5: 5,
+    5.5: 5.5,
+    "5,5": 5.5,
+    "5ft": 5,
+    "5 ft": 5,
+    "5'": 5,
+    "5'6\"": 5.5,
+    "5' 6\"": 5.5,
+    "5’6”": 5.5,
+    "5'6": 5.5,
+    "5 ft 6 in": 5.5,
+    "5 feet 6 inches": 5.5,
+    '66"': 5.5,
+    "66 in": 5.5,
+    "": null,
+  };
+  for (const [text, feet] of Object.entries(cases)) assert.equal(P.parseFeet(text), feet, text);
+  for (const bad of ["abc", "1e200", "5'13\"", "five", "5 by 8"]) assert.ok(Number.isNaN(P.parseFeet(bad)), bad);
+
+  const scope = { demolition: false, floorFinish: "flooring", walls: "none", paintCeiling: false };
+  let v = P.validateJob({ Bathroom_Width_Ft: "5'6\"", Bathroom_Length_Ft: "8 ft" }, scope);
+  assert.equal(v.valid, true);
+  const r = P.computePublicEstimate({ Bathroom_Width_Ft: "5'6\"", Bathroom_Length_Ft: "8 ft" }, scope);
+  assert.equal(r.floorSqFt, 44);
+  assert.equal(r.subtotal, 220);
+  v = P.validateJob({ Bathroom_Width_Ft: "5 by 8", Bathroom_Length_Ft: "60" }, scope);
+  assert.equal(
+    v.errors.Bathroom_Width_Ft,
+    "Enter the width as a number of feet, e.g. 5.5, or feet and inches, e.g. 5' 6\".",
+  );
+  assert.equal(v.errors.Bathroom_Length_Ft, "Length must be more than 0 and no more than 50 ft.");
+  const summary = P.buildEstimateSummary({ Bathroom_Width_Ft: "5'6\"", Bathroom_Length_Ft: "8" }, scope, r);
+  assert.match(summary, /5\.5 ft wide × 8 ft long/);
 });
 
 test("validation: dimensions are not required when no area work is chosen", () => {

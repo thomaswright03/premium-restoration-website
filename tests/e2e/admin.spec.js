@@ -43,6 +43,26 @@ test.describe("admin bathroom quote", () => {
     await expect(page.locator('[data-role="price"]')).toHaveText("$340.00");
   });
 
+  test("room sizes in feet and inches are converted, and unreadable ones get a format message", async ({ page }) => {
+    await loginAdmin(page);
+    await fillAdminQuote(page, {
+      address: "1 Inches Ave",
+      dims: { Bathroom_Width_Ft: "5'6\"", Bathroom_Length_Ft: "8 ft" },
+      scope: FLOORING_ONLY,
+    });
+    await expect(page.locator(".calc-row", { hasText: "New floor?" }).locator(".calc-cost")).toContainText("$220.00");
+    await page.fill('input[name="Bathroom_Length_Ft"]', "eight");
+    await page.click("#save-quote-btn");
+    await expect(page.locator(".calc-dim", { hasText: "Length" }).locator(".calc-error")).toHaveText(
+      "Enter the length as a number of feet, e.g. 5.5, or feet and inches, e.g. 5' 6\".",
+    );
+    await page.fill('input[name="Bathroom_Length_Ft"]', "8");
+    await page.click("#save-quote-btn");
+    await expect(page.locator(".quote-card", { hasText: "1 Inches Ave" })).toContainText("Total $220.00");
+    const saved = (await quotesInStorage(page))[0].data.bathroom.jobValues;
+    expect(saved.Bathroom_Width_Ft).toBe(5.5);
+  });
+
   test("create, save (double-click = one quote), edit, download PDF, delete", async ({ page }) => {
     await loginAdmin(page);
     await fillAdminQuote(page, {

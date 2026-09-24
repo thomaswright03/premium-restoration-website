@@ -202,6 +202,45 @@
     return Number(s);
   }
 
+  // Parses a room measurement in feet. Accepts a plain number (5, 5.5, and
+  // 5,5 with a decimal comma), feet with a unit (5ft, 5 ft, 5', 5 feet),
+  // feet and inches (5'6", 5' 6", 5 ft 6 in, 5 feet 6 inches) or inches
+  // alone (66", 66 in). Returns feet, null for blank, or NaN when the entry
+  // can't be read (see FEET_FORMAT_HINT).
+  var NUM = "(\\d+(?:[.,]\\d+)?|\\.\\d+)";
+  var FEET_UNIT = "\\s*(?:'|ft\\.?|foot|feet)";
+  var INCH_UNIT = '\\s*(?:"|in\\.?|inch|inches)';
+  var FEET_AND_INCHES = new RegExp(
+    "^" + NUM + FEET_UNIT + "(?:\\s*,?\\s*(?:and\\s*)?" + NUM + "(?:" + INCH_UNIT + ")?)?$",
+  );
+  var INCHES_ONLY = new RegExp("^" + NUM + INCH_UNIT + "$");
+  var FEET_FORMAT_HINT = "as a number of feet, e.g. 5.5, or feet and inches, e.g. 5' 6\"";
+
+  function parseFeet(value) {
+    if (value === undefined || value === null) return null;
+    if (typeof value === "number") return isFinite(value) ? value : NaN;
+    var s = String(value)
+      .trim()
+      .toLowerCase()
+      .replace(/[’‘′`´]/g, "'")
+      .replace(/[”“″]|''/g, '"');
+    if (s === "") return null;
+    var plain = parseNumber(s.replace(/^(\d+),(\d{1,2})$/, "$1.$2"));
+    if (plain !== null && !isNaN(plain)) return plain;
+    function num(text) {
+      return Number(String(text).replace(",", "."));
+    }
+    var m = FEET_AND_INCHES.exec(s);
+    if (m) {
+      var inches = m[2] === undefined ? 0 : num(m[2]);
+      if (inches >= 12) return NaN;
+      return num(m[1]) + inches / 12;
+    }
+    m = INCHES_ONLY.exec(s);
+    if (m) return num(m[1]) / 12;
+    return NaN;
+  }
+
   // Merges any prices saved from the admin "Business Prices" screen over the
   // defaults (admin only — the public estimate always uses DEFAULT_PRICES).
   function getPrices() {
@@ -232,9 +271,9 @@
   }
 
   function areas(values) {
-    var w = parseNumber(values.Bathroom_Width_Ft) || 0;
-    var l = parseNumber(values.Bathroom_Length_Ft) || 0;
-    var h = parseNumber(values.Bathroom_Height_Ft) || 0;
+    var w = parseFeet(values.Bathroom_Width_Ft) || 0;
+    var l = parseFeet(values.Bathroom_Length_Ft) || 0;
+    var h = parseFeet(values.Bathroom_Height_Ft) || 0;
     return { floorSqFt: roundCents(w * l), wallSqFt: roundCents(2 * h * (w + l)) };
   }
 
@@ -249,15 +288,6 @@
       scope.paintCeiling === true ||
       walls;
     return { floorArea: floorArea, height: walls };
-  }
-
-  function isScopeComplete(scope) {
-    scope = scope || {};
-    return SCOPE_QUESTIONS.every(function (q) {
-      return q.options.some(function (o) {
-        return o.value === scope[q.key];
-      });
-    });
   }
 
   // Field-level validation shared by the public chat and the admin quote.
@@ -279,7 +309,7 @@
     var needs = scopeNeeds(scope);
     DIMENSIONS.forEach(function (d) {
       var required = d.key === "Bathroom_Height_Ft" ? needs.height : needs.floorArea;
-      var n = parseNumber(values[d.key]);
+      var n = parseFeet(values[d.key]);
       var range = "more than 0 and no more than " + d.max + " ft";
       if (n === null) {
         if (required) {
@@ -288,7 +318,10 @@
         }
         return;
       }
-      if (isNaN(n) || n <= 0 || n > d.max) {
+      if (isNaN(n)) {
+        // The format is the problem, not the size.
+        errors[d.key] = "Enter the " + d.label.toLowerCase() + " " + FEET_FORMAT_HINT + ".";
+      } else if (n <= 0 || n > d.max) {
         errors[d.key] = d.label + " must be " + range + ".";
       }
     });
@@ -471,9 +504,9 @@
   // Plain-text list of what an estimate assumed (estimate card and PDFs).
   function estimateAssumptions(values, scope, result) {
     var needs = scopeNeeds(scope);
-    var w = formatQty(parseNumber(values.Bathroom_Width_Ft) || 0);
-    var l = formatQty(parseNumber(values.Bathroom_Length_Ft) || 0);
-    var h = formatQty(parseNumber(values.Bathroom_Height_Ft) || 0);
+    var w = formatQty(parseFeet(values.Bathroom_Width_Ft) || 0);
+    var l = formatQty(parseFeet(values.Bathroom_Length_Ft) || 0);
+    var h = formatQty(parseFeet(values.Bathroom_Height_Ft) || 0);
     var list = [describeScope(scope) + ". Only this work is priced."];
     if (needs.floorArea) {
       list.push(
@@ -510,11 +543,11 @@
     var needs = scopeNeeds(scope);
     if (needs.floorArea) {
       var dims =
-        formatQty(parseNumber(values.Bathroom_Width_Ft)) +
+        formatQty(parseFeet(values.Bathroom_Width_Ft)) +
         " ft wide × " +
-        formatQty(parseNumber(values.Bathroom_Length_Ft)) +
+        formatQty(parseFeet(values.Bathroom_Length_Ft)) +
         " ft long";
-      if (needs.height) dims += " × " + formatQty(parseNumber(values.Bathroom_Height_Ft)) + " ft high";
+      if (needs.height) dims += " × " + formatQty(parseFeet(values.Bathroom_Height_Ft)) + " ft high";
       out.push("- Room: " + dims);
     }
     out.push("- Work: " + describeScope(scope));
@@ -553,13 +586,13 @@
     shortMoney: shortMoney,
     formatQty: formatQty,
     parseNumber: parseNumber,
+    parseFeet: parseFeet,
     roundCents: roundCents,
     getPrices: getPrices,
     fixtureRate: fixtureRate,
     plumbingFixtureCount: plumbingFixtureCount,
     areas: areas,
     scopeNeeds: scopeNeeds,
-    isScopeComplete: isScopeComplete,
     validateJob: validateJob,
     computeEstimate: computeEstimate,
     computePublicEstimate: computePublicEstimate,

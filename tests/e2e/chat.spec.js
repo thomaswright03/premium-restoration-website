@@ -134,14 +134,21 @@ test.describe("chat estimate", () => {
     await expect(dims.locator(".ai-chat-field-error").first()).toContainText("Enter the width in feet");
     await expect(page.getByTestId("estimate-card")).toHaveCount(0);
 
+    // A value it can't read gets a format message, not a range message.
     await dims.locator('input[name="Bathroom_Width_Ft"]').fill("1e200");
     await dims.locator('input[name="Bathroom_Length_Ft"]').fill("8");
     await dims.locator(".ai-chat-group-continue").click();
-    await expect(dims.locator(".ai-chat-field-error").first()).toContainText(
-      "Width must be more than 0 and no more than 50 ft",
+    const widthError = dims.locator(".ai-chat-field-error").first();
+    await expect(widthError).toHaveText(
+      "Enter the width as a number of feet, e.g. 5.5, or feet and inches, e.g. 5' 6\".",
     );
 
-    await dims.locator('input[name="Bathroom_Width_Ft"]').fill("5");
+    await dims.locator('input[name="Bathroom_Width_Ft"]').fill("60");
+    await dims.locator(".ai-chat-group-continue").click();
+    await expect(widthError).toHaveText("Width must be more than 0 and no more than 50 ft.");
+
+    // Feet and inches are accepted: 5' 6" is 5.5 ft.
+    await dims.locator('input[name="Bathroom_Width_Ft"]').fill("5'6\"");
     await dims.locator(".ai-chat-group-continue").click();
     const fixtures = page.locator('form[data-group="fixtures"]');
     await fixtures.locator('input[name="Toilet_Quantity"]').fill("2.5");
@@ -153,7 +160,9 @@ test.describe("chat estimate", () => {
     await fixtures.locator(".ai-chat-group-continue").click();
     const card = page.getByTestId("estimate-card");
     await expect(card).toContainText("Demolition");
-    await expect(card.locator(".ai-chat-estimate-total-value")).toHaveText("$1,700.00");
+    await expect(card).toContainText("44 sq ft of floor × $37.50");
+    await expect(card).toContainText("Floor area: 5.5 × 8 ft = 44 sq ft");
+    await expect(card.locator(".ai-chat-estimate-total-value")).toHaveText("$1,850.00");
   });
 
   test("every work question must be answered", async ({ page }) => {

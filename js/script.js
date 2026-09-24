@@ -243,13 +243,21 @@ document.addEventListener("DOMContentLoaded", function () {
       if (scope && needs.floorArea) {
         groups.push({
           id: "dimensions",
-          intro: needs.height
-            ? "Now the room's size, in feet. The wall work you chose needs the ceiling height too."
-            : "Now the room's floor size, in feet.",
+          intro:
+            (needs.height
+              ? "Now the room's size. The wall work you chose needs the ceiling height too."
+              : "Now the room's floor size.") + " Feet (5.5) or feet and inches (5' 6\") both work.",
           fields: Pricing.DIMENSIONS.filter(function (d) {
             return d.key !== "Bathroom_Height_Ft" || needs.height;
           }).map(function (d) {
-            return { key: d.key, label: d.label + " (ft)", type: "number", inputmode: "decimal", target: "values" };
+            return {
+              key: d.key,
+              label: d.label + " (ft)",
+              type: "number",
+              inputmode: "text",
+              placeholder: "e.g. 5' 6\"",
+              target: "values",
+            };
           }),
         });
       }
@@ -374,7 +382,7 @@ document.addEventListener("DOMContentLoaded", function () {
           input.type = "text";
           input.inputMode = field.inputmode;
           input.autocomplete = "off";
-          input.placeholder = "0";
+          input.placeholder = field.placeholder || "0";
           input.id = fieldId;
           input.name = field.key;
           input.setAttribute("aria-describedby", errorEl.id);
