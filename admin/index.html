@@ -86,20 +86,32 @@
         </div>
       </header>
 
+      <!-- Backups: quotes live only in this browser, so this panel always says when the last backup was
+           made and whether the browser has agreed to keep the data (js/admin.js renderBackupPanel). -->
+      <section id="backup-panel" class="backup-panel" aria-labelledby="backup-panel-title">
+        <div class="backup-panel-text">
+          <h2 id="backup-panel-title" class="backup-panel-title">Backups</h2>
+          <p id="backup-status" class="backup-status"></p>
+          <p id="storage-status" class="backup-status" hidden></p>
+        </div>
+        <div class="admin-inline-actions">
+          <button id="export-quotes-btn" class="btn btn-outline-dark" type="button">Export Backup</button>
+          <label class="btn btn-outline-dark admin-file-btn" for="import-quotes-input">Restore from Backup</label>
+          <input id="import-quotes-input" class="visually-hidden" type="file" accept="application/json,.json" />
+          <button id="persist-retry-btn" class="btn btn-outline-dark" type="button" hidden>
+            Ask Browser to Keep Data
+          </button>
+        </div>
+      </section>
+
       <div id="draft-banner" class="admin-panel-note" hidden>
         <p id="draft-banner-text"></p>
-        <div class="admin-inline-actions">
-          <button type="button" class="btn btn-primary" id="draft-resume-btn">Resume</button>
-          <button type="button" class="btn btn-outline-dark" id="draft-discard-btn">Discard</button>
-        </div>
+        <ul id="draft-list" class="draft-list"></ul>
       </div>
 
       <div class="admin-toolbar">
         <button id="create-quote-btn" class="btn btn-primary" type="button">Create New Quote</button>
         <button id="open-rates-btn" class="btn btn-outline-dark" type="button">Business Prices</button>
-        <button id="export-quotes-btn" class="btn btn-outline-dark" type="button">Export Quotes</button>
-        <label class="btn btn-outline-dark admin-file-btn" for="import-quotes-input">Import Quotes</label>
-        <input id="import-quotes-input" class="visually-hidden" type="file" accept="application/json,.json" />
       </div>
 
       <div id="price-drift-notice" class="admin-notice-slot" hidden></div>
@@ -111,15 +123,19 @@
       </div>
       <p id="quote-count" class="admin-muted admin-count" aria-live="polite"></p>
       <div id="quote-list" class="quote-list"></div>
-      <p id="quote-list-empty" class="admin-muted" hidden>No quotes yet. Choose "Create New Quote" to get started.</p>
+      <p id="quote-list-empty" class="admin-muted" hidden>
+        No quotes in this browser. Choose "Create New Quote" to get started, or "Restore from Backup" to bring back
+        quotes from a backup file.
+      </p>
       <p class="admin-muted admin-footnote">
         Data handling: quotes contain homeowners' property addresses and, if entered, customers' names and contact
-        details. They are saved only in this browser (use Export Quotes to keep a copy). Delete quotes that didn't lead
-        to work after about a month (30 days; the public Privacy Notice says enquiries are kept for about a month), mark
-        quotes that did lead to work so they are kept, and delete a quote promptly if the homeowner asks. The clean-up
-        record above is kept only in this browser, so also note each clean-up in the business's own records. Tax on
-        labor: the tax rate defaults to 0% &mdash; only change it under Business Prices once a tax adviser confirms tax
-        applies.
+        details. They are saved only in this browser, so export a backup regularly and keep the file somewhere other
+        than this browser; backup files hold the same personal details, so delete old ones in the monthly clean-up.
+        Delete quotes that didn't become jobs after about a month (30 days; the public Privacy Notice says enquiries are
+        kept for about a month), mark quotes that became jobs as booked so they are kept, and delete a quote promptly if
+        the homeowner asks. The clean-up record above is kept only in this browser, so also note each clean-up in the
+        business's own records. Tax on labor: the tax rate defaults to 0% &mdash; only change it under Business Prices
+        once a tax adviser confirms tax applies.
       </p>
     </main>
 

@@ -285,6 +285,78 @@
   color: var(--color-ink);
 }
 
+/* Unsaved drafts: one row per quote, each with Resume / Discard. */
+.draft-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 100%;
+}
+
+.draft-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.draft-item-label {
+  color: var(--color-ink-soft);
+}
+
+/* Backups: always on the dashboard; a strong warning while a backup is due. */
+.backup-panel {
+  max-width: 900px;
+  margin: 0 auto var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.backup-panel.is-due {
+  border-color: var(--color-danger);
+  border-left-width: 6px;
+}
+
+.backup-panel-text {
+  flex: 1 1 380px;
+  min-width: 0;
+}
+
+.backup-panel-title {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-body);
+  font-size: var(--fs-base);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.backup-status {
+  margin: 0;
+  color: var(--color-ink-soft);
+}
+
+.backup-status + .backup-status {
+  margin-top: var(--space-2);
+  font-size: var(--fs-sm);
+}
+
+.backup-panel.is-due #backup-status,
+.backup-status.is-warning {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
 /* Quote list */
 .quote-list {
   max-width: 900px;

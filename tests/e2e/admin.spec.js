@@ -217,6 +217,33 @@ test.describe("admin bathroom quote", () => {
     await expect(page.locator("#draft-banner")).toBeHidden();
   });
 
+  test("the 'Fix the highlighted answers' message counts down and goes once all are fixed", async ({ page }) => {
+    await loginAdmin(page);
+    await page.click("#create-quote-btn");
+    await page.click("#save-quote-btn");
+    const summary = page.locator("#quote-error");
+    await expect(summary).toHaveText("Fix the 5 highlighted answers before saving.");
+    await page.fill("#quote-address", "14 Fixed Ln");
+    await expect(summary).toHaveText("Fix the 4 highlighted answers before saving.");
+    for (const [k, v] of Object.entries(FLOORING_ONLY)) {
+      await chooseAdmin(
+        page,
+        { demolition: "(demolition)", floorFinish: "New floor?", walls: "Walls?", paintCeiling: "Paint the ceiling?" }[
+          k
+        ],
+        v,
+      );
+    }
+    // Every answer is fixed: the message has gone before Save is pressed again.
+    await expect(summary).toBeHidden();
+    await page.click("#save-quote-btn");
+    // Choosing flooring needs the room size: a new, accurate count.
+    await expect(summary).toHaveText("Fix the 2 highlighted answers before saving.");
+    await page.fill('input[name="Bathroom_Width_Ft"]', "5");
+    await page.fill('input[name="Bathroom_Length_Ft"]', "8");
+    await expect(summary).toBeHidden();
+  });
+
   test("saving needs every work question answered and valid numbers", async ({ page }) => {
     await loginAdmin(page);
     await fillAdminQuote(page, { address: "6 Check Way", counts: { Toilet_Quantity: "2.5" } });
@@ -306,29 +333,6 @@ test.describe("admin bathroom quote", () => {
     await expect(page.locator("#save-quote-btn")).toBeEnabled();
   });
 
-  test("quotes can be exported to JSON and imported again", async ({ page }) => {
-    await loginAdmin(page);
-    await fillAdminQuote(page, { address: "9 Export St", dims: ROOM, scope: FLOORING_ONLY });
-    await page.click("#save-quote-btn");
-    const [download] = await Promise.all([page.waitForEvent("download"), page.click("#export-quotes-btn")]);
-    const file = await download.path();
-    const exported = JSON.parse(fs.readFileSync(file, "utf8"));
-    expect(exported.quotes).toHaveLength(1);
-
-    await page.evaluate(() => localStorage.setItem("pr_quotes", "[]"));
-    await page.reload();
-    await expect(page.locator(".quote-card")).toHaveCount(0);
-    await page.setInputFiles("#import-quotes-input", file);
-    await expect(page.locator("#admin-dialog")).toContainText("Import 1 new quote(s)");
-    await answerDialog(page, "Import quotes");
-    await expect(page.locator(".quote-card", { hasText: "9 Export St" })).toBeVisible();
-
-    // Importing the same file again changes nothing, so it doesn't ask.
-    await page.setInputFiles("#import-quotes-input", file);
-    await expect(page.locator("#admin-toast")).toContainText("Nothing new to import");
-    await expect(page.locator("#admin-dialog")).toBeHidden();
-  });
-
   test("Quote Details fits a 375px phone with no sideways scroll", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 800 });
     await loginAdmin(page);
@@ -362,14 +366,14 @@ test.describe("admin bathroom quote", () => {
 });
 
 test.describe("admin: nothing unsaved is lost", () => {
-  test("opening another quote with unsaved changes asks: resume, discard or cancel", async ({ page, context }) => {
+  test("two tabs editing different quotes never discard each other's changes", async ({ page, context }) => {
     await loginAdmin(page);
     for (const address of ["1 First St", "2 Second St"]) {
       await fillAdminQuote(page, { address, dims: ROOM, scope: FLOORING_ONLY });
       await page.click("#save-quote-btn");
       await expect(page.locator(".quote-card", { hasText: address })).toBeVisible();
     }
-    // Change a value on quote A, then go to the dashboard in a new tab.
+    // Tab 1 edits quote A, tab 2 edits quote B; neither is saved.
     await page.locator(".quote-card", { hasText: "1 First St" }).getByRole("button", { name: "View / Edit" }).click();
     await page.fill('input[name="Cabinet_Quantity"]', "2");
     const other = await context.newPage();
@@ -377,45 +381,87 @@ test.describe("admin: nothing unsaved is lost", () => {
     await expect(other.locator("#draft-banner-text")).toHaveText(
       "You have unsaved changes to the quote for 1 First St.",
     );
-
-    const openB = other.locator(".quote-card", { hasText: "2 Second St" }).getByRole("button", { name: "View / Edit" });
-    await openB.click();
-    const dialog = other.locator("#admin-dialog");
-    await expect(dialog).toContainText("Your changes to the quote for 1 First St haven't been saved");
-    await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
-    await answerDialog(other, "Cancel");
-    await expect(other.locator("#screen-dashboard")).toBeVisible();
-    await expect(other.locator("#draft-banner-text")).toContainText("1 First St");
-    const stored = await other.evaluate(() => JSON.parse(localStorage.getItem("pr_quote_draft")));
-    expect(stored.address).toBe("1 First St");
-    expect(stored.values.Cabinet_Quantity).toBe("2");
-
-    // Resume goes back to quote A with the change.
-    await openB.click();
-    await answerDialog(other, "Resume changes");
-    await expect(other.locator("#quote-address")).toHaveValue("1 First St");
-    await expect(other.locator('input[name="Cabinet_Quantity"]')).toHaveValue("2");
-
-    // Discard opens quote B.
-    await other.goto("/about.html");
-    await other.goto("/admin/#/dashboard");
-    await openB.click();
-    await answerDialog(other, "Discard and open");
+    // Opening B doesn't ask about A, and doesn't throw A away.
+    await other.locator(".quote-card", { hasText: "2 Second St" }).getByRole("button", { name: "View / Edit" }).click();
+    await expect(other.locator("#admin-dialog")).toBeHidden();
     await expect(other.locator("#quote-address")).toHaveValue("2 Second St");
+    await other.fill('input[name="Cabinet_Quantity"]', "5");
+
+    // Reloading tab 1 keeps A's edits; reloading tab 2 keeps B's.
+    await page.reload();
+    await expect(page.locator("#quote-address")).toHaveValue("1 First St");
+    await expect(page.locator('input[name="Cabinet_Quantity"]')).toHaveValue("2");
+    await other.reload();
+    await expect(other.locator("#quote-address")).toHaveValue("2 Second St");
+    await expect(other.locator('input[name="Cabinet_Quantity"]')).toHaveValue("5");
+
+    // A third tab lists both, each with its own Resume.
+    const third = await context.newPage();
+    await loginAdmin(third);
+    await expect(third.locator("#draft-banner-text")).toHaveText("You have unsaved changes to 2 quotes.");
+    await third.getByRole("button", { name: "Resume the quote for 2 Second St" }).click();
+    await expect(third.locator('input[name="Cabinet_Quantity"]')).toHaveValue("5");
+
+    // Saving A in tab 1 leaves B's draft alone.
+    await page.click("#save-quote-btn");
+    await expect(page.locator(".quote-card", { hasText: "1 First St" })).toContainText("Total $320.00");
+    await expect(page.locator("#draft-banner-text")).toHaveText(
+      "You have unsaved changes to the quote for 2 Second St.",
+    );
   });
 
-  test("Create New Quote with unsaved changes to another quote offers the same choice", async ({ page }) => {
+  test("Create New Quote keeps unsaved changes to another quote; Discard asks first", async ({ page }) => {
     await loginAdmin(page);
     await fillAdminQuote(page, { address: "3 Draft Rd", dims: ROOM });
     await page.goto("/about.html");
     await page.goto("/admin/#/dashboard");
     await expect(page.locator("#draft-banner")).toBeVisible();
     await page.click("#create-quote-btn");
-    await answerDialog(page, "Cancel");
-    await expect(page.locator("#screen-dashboard")).toBeVisible();
-    await page.click("#create-quote-btn");
-    await answerDialog(page, "Discard and start new");
+    await expect(page.locator("#admin-dialog")).toBeHidden();
     await expect(page.locator("#quote-address")).toHaveValue("");
+    await page.locator("#screen-quote").getByRole("button", { name: "Cancel" }).first().click();
+    await expect(page.locator("#draft-banner-text")).toHaveText(
+      "You have unsaved changes to the quote for 3 Draft Rd.",
+    );
+
+    await page.getByRole("button", { name: "Discard unsaved changes to the quote for 3 Draft Rd" }).click();
+    await answerDialog(page, "Cancel");
+    await expect(page.locator("#draft-banner")).toBeVisible();
+    await page.getByRole("button", { name: "Discard unsaved changes to the quote for 3 Draft Rd" }).click();
+    await answerDialog(page, "Discard changes");
+    await expect(page.locator("#draft-banner")).toBeHidden();
+  });
+
+  test("an unsaved quote kept by the previous version of the tool is still offered", async ({ page }) => {
+    await page.goto("/admin/");
+    await page.evaluate(() => {
+      const values = { Cabinet_Quantity: "4" };
+      const baseline = JSON.stringify({
+        address: "",
+        customer: { name: "", phone: "", email: "" },
+        values: {},
+        scope: {},
+      });
+      localStorage.setItem(
+        "pr_quote_draft",
+        JSON.stringify({
+          id: "q_1_old",
+          isNew: true,
+          address: "9 Old Draft Ave",
+          customer: {},
+          values,
+          scope: {},
+          baseline,
+        }),
+      );
+    });
+    await loginAdmin(page);
+    await expect(page.locator("#draft-banner-text")).toHaveText(
+      "You have unsaved changes to the quote for 9 Old Draft Ave.",
+    );
+    await page.getByRole("button", { name: "Resume the quote for 9 Old Draft Ave" }).click();
+    await expect(page.locator('input[name="Cabinet_Quantity"]')).toHaveValue("4");
+    expect(await page.evaluate(() => localStorage.getItem("pr_quote_draft"))).toBeNull();
   });
 
   test("leaving Business Prices with a changed price asks first", async ({ page }) => {
@@ -473,7 +519,6 @@ test.describe("admin: customer details", () => {
     await page.evaluate(() => localStorage.setItem("pr_quotes", "[]"));
     await page.reload();
     await page.setInputFiles("#import-quotes-input", file);
-    await answerDialog(page, "Import quotes");
     await expect(page.locator(".quote-card-customer")).toHaveText("Jamie Example · (801) 555-0199 · jamie@example.com");
 
     await page.getByRole("button", { name: "View / Edit" }).click();
@@ -542,7 +587,7 @@ test.describe("admin: messages and retention", () => {
     await expect(toastBox).toBeHidden();
   });
 
-  test("quotes marked as led to work are kept by the retention clean-up", async ({ page }) => {
+  test("quotes marked as booked jobs are kept by the retention clean-up", async ({ page }) => {
     await page.goto("/admin/");
     await page.evaluate(() => {
       const old = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString();
@@ -561,12 +606,12 @@ test.describe("admin: messages and retention", () => {
     await loginAdmin(page);
     await expect(page.locator("#retention-bar")).toContainText("3 quotes have not been updated in over 30 days");
     const won = page.locator(".quote-card", { hasText: "42 Won Lane" });
-    await won.getByRole("button", { name: "Mark as Led to Work" }).click();
-    await expect(won).toContainText("Led to work");
+    await won.getByRole("button", { name: "Mark Job Booked" }).click();
+    await expect(won).toContainText("Job booked");
     await expect(won).not.toContainText("Past retention period");
     await expect(page.locator("#retention-bar")).toContainText("2 quotes have not been updated in over 30 days");
 
-    await page.getByRole("button", { name: "Delete Quotes Past Retention" }).click();
+    await page.getByRole("button", { name: "Delete Old Enquiries" }).click();
     await answerDialog(page, "Delete 2 quotes");
     await expect(page.locator(".quote-card")).toHaveCount(1);
     await expect(page.locator(".quote-card")).toContainText("42 Won Lane");
@@ -574,8 +619,14 @@ test.describe("admin: messages and retention", () => {
     const left = await quotesInStorage(page);
     expect(left.map((q) => [q.id, q.ledToWork])).toEqual([["q_c", true]]);
 
-    await won.getByRole("button", { name: "Unmark Led to Work" }).click();
+    await won.getByRole("button", { name: "Undo Job Booked" }).click();
     await expect(won).toContainText("Past retention period");
+
+    await page.getByRole("button", { name: "Log This Month's Clean-Up" }).click();
+    await expect(page.locator("#admin-dialog")).toContainText("old backup files");
+    await answerDialog(page, "Log clean-up");
+    await expect(page.locator("#retention-bar")).toContainText("Last monthly clean-up logged in this browser: ");
+    await expect(page.locator("#retention-bar")).not.toContainText("logged in this browser: none");
   });
 });
 

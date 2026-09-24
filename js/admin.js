@@ -22,8 +22,19 @@
   var ADMIN_PASSWORD = "templein26)";
   var AUTH_KEY = "pr_admin_authed";
   var QUOTES_KEY = "pr_quotes";
-  var DRAFT_KEY = "pr_quote_draft";
+  // One draft per quote ("pr_quote_draft:<quote id>"), so two tabs editing
+  // different quotes never overwrite each other. Each tab remembers (in its
+  // sessionStorage) which draft it is editing, so a reload reopens it.
+  var DRAFT_PREFIX = "pr_quote_draft:";
+  var OLD_DRAFT_KEY = "pr_quote_draft"; // before drafts were kept per quote
+  var TAB_DRAFT_KEY = "pr_admin_tab_draft";
   var RETENTION_LOG_KEY = "pr_retention_log";
+  // When quotes were last exported to a backup file: { at, quoteCount }.
+  var BACKUP_KEY = "pr_last_backup";
+  // After this many days without a backup the dashboard warns (and it warns
+  // straight away if quotes have never been backed up).
+  var BACKUP_REMINDER_DAYS = 3;
+  var DAY_MS = 24 * 60 * 60 * 1000;
   var Business = window.BusinessInfo;
   var configReady = window.SiteConfig ? window.SiteConfig.ready : Promise.resolve(null);
 
@@ -90,7 +101,133 @@
   }
 
   var STORAGE_ERROR =
-    "Couldn't save in this browser — its storage is full or blocked (for example in a private window). Nothing on screen has been lost. Try again, free up space by deleting old quotes, or use Export Quotes to keep a copy.";
+    "Couldn't save in this browser — its storage is full or blocked (for example in a private window). Nothing on screen has been lost. Try again, free up space by deleting old quotes, or use Export Backup to keep a copy.";
+
+  // ------------------------------------------------------------------
+  // Backups. Quotes exist only in this browser, which can clear them without
+  // warning (Safari after 7 days without a visit, "clear browsing data", a
+  // new device). So: ask the browser to keep the data, record every backup,
+  // and keep a warning on the dashboard until a recent backup exists.
+  // ------------------------------------------------------------------
+  function getLastBackup() {
+    var b = readJson(BACKUP_KEY, null);
+    return b && typeof b.at === "string" && !isNaN(new Date(b.at).getTime()) ? b : null;
+  }
+
+  function recordBackup(at, quoteCount) {
+    return writeJson(BACKUP_KEY, { at: at, quoteCount: quoteCount });
+  }
+
+  function daysSince(iso) {
+    return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / DAY_MS));
+  }
+
+  function describeAge(days) {
+    return days === 0 ? "today" : days === 1 ? "yesterday" : days + " days ago";
+  }
+
+  function plural(n, one, many) {
+    return n + " " + (n === 1 ? one : many || one + "s");
+  }
+
+  // "persisted": the browser agreed not to clear the data on its own;
+  // "not-persisted": it may; "unsupported": it can't say; null: still asking.
+  var persistence = null;
+  var persistenceAsked = false;
+
+  function checkPersistence(ask) {
+    var storage = navigator.storage;
+    if (!storage || typeof storage.persisted !== "function") {
+      persistence = "unsupported";
+      renderBackupPanel();
+      return Promise.resolve(persistence);
+    }
+    return storage
+      .persisted()
+      .then(function (already) {
+        if (already || !ask || typeof storage.persist !== "function") return already;
+        return storage.persist();
+      })
+      .then(
+        function (granted) {
+          persistence = granted ? "persisted" : "not-persisted";
+        },
+        function () {
+          persistence = "not-persisted";
+        },
+      )
+      .then(function () {
+        renderBackupPanel();
+        return persistence;
+      });
+  }
+
+  var PERSISTENCE_TEXT = {
+    persisted:
+      "Storage: protected. This browser has agreed not to clear these quotes on its own. Clearing browsing data, " +
+      "Safari's 7-day limit for sites not opened, or a lost or new device can still remove them, so keep exporting backups.",
+    "not-persisted":
+      "Storage: not protected. This browser hasn't agreed to keep these quotes and can delete them without warning — " +
+      "for example Safari after 7 days without opening this tool, or any browser when space runs low or browsing data " +
+      "is cleared. Export a backup at the end of every day you add or change quotes. (Firefox asks you when you press " +
+      "the button; Chrome and Edge decide for themselves, and are more likely to agree once this page is bookmarked.)",
+    unsupported:
+      "Storage: not guaranteed. This browser can't promise to keep saved quotes, so it may delete them without warning. " +
+      "Export a backup at the end of every day you add or change quotes.",
+  };
+
+  function renderBackupPanel() {
+    var panel = document.getElementById("backup-panel");
+    if (!panel) return;
+    var quotes = getQuotes();
+    var last = getLastBackup();
+    var status = document.getElementById("backup-status");
+    var exportBtn = document.getElementById("export-quotes-btn");
+    var text;
+    var due = false;
+    if (!quotes.length) {
+      text = last
+        ? "No quotes in this browser, but " +
+          plural(last.quoteCount || 0, "quote") +
+          " were backed up here on " +
+          formatDate(last.at) +
+          ". If you didn't delete them, the browser may have cleared its storage: choose Restore from Backup and pick your latest backup file."
+        : "No quotes in this browser. If you had quotes here before, the browser may have cleared its storage: choose Restore from Backup and pick your latest backup file.";
+    } else if (!last) {
+      due = true;
+      text =
+        "Last backup: never. " +
+        (quotes.length === 1 ? "This quote exists" : "These " + quotes.length + " quotes exist") +
+        " only in this browser — Export now and keep the file somewhere else.";
+    } else {
+      var days = daysSince(last.at);
+      var changed = quotes.filter(function (q) {
+        return lastChanged(q) > new Date(last.at).getTime();
+      }).length;
+      due = days >= BACKUP_REMINDER_DAYS;
+      text =
+        "Last backup: " +
+        describeAge(days) +
+        " (" +
+        formatDate(last.at) +
+        ")" +
+        (changed ? ". " + plural(changed, "quote") + " added or changed since" : ", with every quote as it is now") +
+        (due ? " — Export now." : changed ? ". Export again before you finish for the day." : ".");
+    }
+    status.textContent = text;
+    panel.classList.toggle("is-due", due);
+    panel.setAttribute("data-backup", !quotes.length ? "empty" : due ? "due" : "ok");
+    exportBtn.textContent = due ? "Export Now" : "Export Backup";
+    exportBtn.className = "btn " + (due ? "btn-primary" : "btn-outline-dark");
+    exportBtn.disabled = !quotes.length;
+
+    var storageEl = document.getElementById("storage-status");
+    storageEl.hidden = !persistence;
+    storageEl.textContent = persistence ? PERSISTENCE_TEXT[persistence] : "";
+    storageEl.className = "backup-status" + (persistence && persistence !== "persisted" ? " is-warning" : "");
+    storageEl.setAttribute("data-persistence", persistence || "");
+    document.getElementById("persist-retry-btn").hidden = persistence !== "not-persisted";
+  }
 
   // ------------------------------------------------------------------
   // Messages
@@ -295,6 +432,11 @@
     alertError("");
     if (toastRoute && toastRoute !== route) hideToast();
     currentRoute = route;
+    if (route === "dashboard" && !persistenceAsked) {
+      // Once per visit, ask the browser to keep this tool's data.
+      persistenceAsked = true;
+      checkPersistence(true);
+    }
     if (route === "dashboard") renderDashboard();
     if (route === "details") renderEditor();
     if (route === "prices") renderRatesForm();
@@ -339,9 +481,31 @@
 
   var draftWarned = false;
 
+  function draftKey(id) {
+    return DRAFT_PREFIX + id;
+  }
+
+  function setTabDraft(id) {
+    try {
+      if (id) sessionStorage.setItem(TAB_DRAFT_KEY, id);
+      else sessionStorage.removeItem(TAB_DRAFT_KEY);
+    } catch (e) {
+      /* this tab just won't reopen the quote after a reload */
+    }
+  }
+
+  function tabDraftId() {
+    try {
+      return sessionStorage.getItem(TAB_DRAFT_KEY);
+    } catch (e) {
+      return null;
+    }
+  }
+
   function persistDraft() {
     if (!draft) return;
-    if (!writeJson(DRAFT_KEY, draft) && !draftWarned) {
+    setTabDraft(draft.id);
+    if (!writeJson(draftKey(draft.id), draft) && !draftWarned) {
       draftWarned = true;
       alertError(
         "This browser isn't letting us keep a backup of this quote while you work, so don't reload the page until you've saved it.",
@@ -349,12 +513,10 @@
     }
   }
 
-  // The unsaved quote kept in this browser (shared by every tab), if any.
-  function readDraft() {
-    var d = readJson(DRAFT_KEY, null);
+  // A draft saved before customer details existed: compare like with like.
+  function upgradeDraft(d) {
     if (!d || !d.id) return null;
     if (!d.customer) {
-      // Saved before customer details existed: compare like with like.
       d.customer = cleanCustomer();
       try {
         var base = JSON.parse(d.baseline);
@@ -366,9 +528,46 @@
     return d;
   }
 
+  // The unsaved copy of one quote kept in this browser, if any.
+  function readDraft(id) {
+    return id ? upgradeDraft(readJson(draftKey(id), null)) : null;
+  }
+
+  // Every quote with unsaved changes in this browser (from any tab), oldest first.
+  function unsavedDrafts() {
+    var list = [];
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (key && key.indexOf(DRAFT_PREFIX) === 0) {
+          var d = readDraft(key.slice(DRAFT_PREFIX.length));
+          if (hasUnsavedDraft(d)) list.push(d);
+        }
+      }
+    } catch (e) {
+      /* storage blocked: nothing to list */
+    }
+    return list.sort(function (a, b) {
+      return String(a.id).localeCompare(String(b.id));
+    });
+  }
+
+  // The single draft key used before drafts were kept per quote.
+  function migrateOldDraft() {
+    var old = upgradeDraft(readJson(OLD_DRAFT_KEY, null));
+    if (!old) return;
+    if (!readJson(draftKey(old.id), null) && !writeJson(draftKey(old.id), old)) return;
+    removeKey(OLD_DRAFT_KEY);
+  }
+
+  function removeDraft(id) {
+    if (id) removeKey(draftKey(id));
+  }
+
   function clearDraft() {
+    if (draft) removeDraft(draft.id);
     draft = null;
-    removeKey(DRAFT_KEY);
+    setTabDraft(null);
   }
 
   function newDraft() {
@@ -439,7 +638,7 @@
   // ------------------------------------------------------------------
   // Dashboard
   // ------------------------------------------------------------------
-  // Quotes marked as having led to work are customer records: never
+  // Quotes marked as booked jobs are customer records: never
   // counted as past retention or deleted by the bulk clean-up.
   function isPastRetention(quote) {
     if (quote.ledToWork === true) return false;
@@ -481,7 +680,7 @@
         (expired.length === 1 ? " quote has" : " quotes have") +
         " not been updated in over " +
         QUOTE_RETENTION_DAYS +
-        " days and not marked as led to work. Mark any that led to work, then delete the rest."
+        " days and not marked as a booked job. Mark any that became jobs, then delete the rest."
       : "No quotes in this browser are past the " + QUOTE_RETENTION_DAYS + "-day retention period.";
     textWrap.appendChild(text);
 
@@ -499,9 +698,9 @@
     var logText = document.createElement("p");
     logText.className = "retention-log";
     logText.textContent =
-      "Last monthly clean-up recorded in this browser: " +
+      "Last monthly clean-up logged in this browser: " +
       (lastCleanUp ? formatDate(lastCleanUp.date) : "none") +
-      ". Last quote purge: " +
+      ". Old enquiries last deleted: " +
       (lastPurge ? formatDate(lastPurge.date) + " (" + lastPurge.deleted + " deleted)" : "none") +
       ".";
     textWrap.appendChild(logText);
@@ -511,15 +710,15 @@
     actions.className = "admin-inline-actions";
     if (expired.length) {
       actions.appendChild(
-        makeButton("Delete Quotes Past Retention", "btn btn-outline-dark", function () {
+        makeButton("Delete Old Enquiries", "btn btn-outline-dark", function () {
           confirmAction(
-            "Delete quotes past retention?",
+            "Delete old enquiries?",
             "Delete " +
               expired.length +
               (expired.length === 1 ? " quote" : " quotes") +
               " not updated in over " +
               QUOTE_RETENTION_DAYS +
-              " days? Quotes marked as led to work are kept. This can't be undone.",
+              " days? Quotes marked as booked jobs are kept. This can't be undone.",
             "Delete " + expired.length + (expired.length === 1 ? " quote" : " quotes"),
           ).then(function (ok) {
             if (!ok) return;
@@ -542,18 +741,18 @@
       );
     }
     actions.appendChild(
-      makeButton("Record Monthly Clean-Up", "btn btn-outline-dark", function () {
+      makeButton("Log This Month's Clean-Up", "btn btn-outline-dark", function () {
         confirmAction(
-          "Record the monthly clean-up?",
-          "Only record today's date once you have deleted, everywhere they are kept (email, voicemail and texts, the form " +
-            "service if one is used, and quotes in every browser that holds them), enquiries that didn't lead to work " +
-            "and are about a month old.",
-          "Record clean-up",
+          "Log this month's clean-up?",
+          "Only log today's date once you have deleted, everywhere they are kept (email, voicemail and texts, the form " +
+            "service if one is used, quotes in every browser that holds them, and old backup files), enquiries that " +
+            "didn't become jobs and are about a month old.",
+          "Log clean-up",
           "primary",
         ).then(function (ok) {
           if (!ok) return;
           if (!addRetentionLogEntry("monthly-clean-up", null)) return alertError(STORAGE_ERROR);
-          toast("Monthly clean-up recorded.");
+          toast("This month's clean-up is logged.");
           renderDashboard();
         });
       }),
@@ -595,16 +794,56 @@
     return box;
   }
 
+  // Every quote with unsaved changes (from this tab or another), each with
+  // its own Resume and Discard. Drafts are kept per quote, so starting or
+  // opening another quote never throws one away.
   function renderDraftBanner() {
     var banner = document.getElementById("draft-banner");
-    var stored = readDraft();
-    if (!hasUnsavedDraft(stored)) {
-      banner.hidden = true;
-      return;
-    }
+    var drafts = unsavedDrafts();
+    var list = document.getElementById("draft-list");
+    list.innerHTML = "";
+    banner.hidden = !drafts.length;
+    if (!drafts.length) return;
     document.getElementById("draft-banner-text").textContent =
-      "You have unsaved changes to " + describeDraft(stored) + ".";
-    banner.hidden = false;
+      drafts.length === 1
+        ? "You have unsaved changes to " + describeDraft(drafts[0]) + "."
+        : "You have unsaved changes to " + drafts.length + " quotes.";
+    drafts.forEach(function (d) {
+      var item = el("li", "draft-item");
+      item.setAttribute("data-draft-id", d.id);
+      if (drafts.length > 1) item.appendChild(el("span", "draft-item-label", capitalize(describeDraft(d))));
+      var actions = el("span", "admin-inline-actions");
+      var resume = makeButton("Resume", "btn btn-primary", function () {
+        resumeDraft(d.id);
+      });
+      resume.setAttribute("aria-label", "Resume " + describeDraft(d));
+      var discard = makeButton("Discard", "btn btn-outline-dark", function () {
+        confirmDiscardQuote(readDraft(d.id) || d).then(function (ok) {
+          if (!ok) return;
+          removeDraft(d.id);
+          if (draft && draft.id === d.id) clearDraft();
+          renderDashboard();
+          document.getElementById("create-quote-btn").focus();
+        });
+      });
+      discard.setAttribute("aria-label", "Discard unsaved changes to " + describeDraft(d));
+      actions.appendChild(resume);
+      actions.appendChild(discard);
+      item.appendChild(actions);
+      list.appendChild(item);
+    });
+  }
+
+  function capitalize(text) {
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
+  function resumeDraft(id) {
+    var stored = readDraft(id);
+    if (!stored) return renderDashboard();
+    draft = stored;
+    persistDraft();
+    navigate("details");
   }
 
   // Search by address, customer name, email or phone (digits match however
@@ -623,6 +862,7 @@
       .sort(function (a, b) {
         return new Date(b.updatedAt) - new Date(a.updatedAt);
       });
+    renderBackupPanel();
     renderRetentionBar(all);
     renderDraftBanner();
 
@@ -685,7 +925,7 @@
       chip("Bathroom");
       if (Number(bathroom.totalPrice) > 0 || !legacy) chip("Total " + money(bathroom.totalPrice), "quote-price-chip");
       if (legacy) chip("Needs review: old calculator", "quote-attention-chip");
-      if (quote.ledToWork === true) chip("Led to work", "quote-won-chip");
+      if (quote.ledToWork === true) chip("Job booked", "quote-won-chip");
       if (isPastRetention(quote)) chip("Past retention period", "quote-attention-chip");
       main.appendChild(chips);
 
@@ -705,7 +945,7 @@
       }
       actions.appendChild(pdfBtn);
       actions.appendChild(
-        makeButton(quote.ledToWork === true ? "Unmark Led to Work" : "Mark as Led to Work", "", function () {
+        makeButton(quote.ledToWork === true ? "Undo Job Booked" : "Mark Job Booked", "", function () {
           setLedToWork(quote.id, quote.ledToWork !== true);
         }),
       );
@@ -722,6 +962,7 @@
             }),
           );
           if (!saved) return alertError(STORAGE_ERROR);
+          removeDraft(quote.id);
           toast("Quote for " + quote.address + " deleted.");
           renderDashboard();
           document.getElementById("quote-filter").focus();
@@ -749,8 +990,8 @@
     })[0];
     toast(
       value
-        ? "Quote for " + quote.address + " marked as led to work. It is kept as a customer record."
-        : "Quote for " + quote.address + " is no longer marked as led to work.",
+        ? "Quote for " + quote.address + " marked as a booked job. It is kept as a customer record."
+        : "Quote for " + quote.address + " is no longer marked as a booked job.",
     );
     renderDashboard();
     var again = document.querySelector(
@@ -759,47 +1000,22 @@
     if (again) again.focus();
   }
 
-  // Opening a quote never silently replaces unsaved changes to another one.
+  // Opening a quote carries on with its unsaved changes if there are any;
+  // unsaved changes to other quotes are kept (each quote has its own draft).
   function openQuoteForEdit(id) {
     var quote = getQuotes().filter(function (q) {
       return q.id === id;
     })[0];
     if (!quote) return;
-    var stored = readDraft();
-    if (hasUnsavedDraft(stored) && stored.id === id) {
-      // Unsaved changes to this same quote: carry on with them.
+    var stored = readDraft(id);
+    if (hasUnsavedDraft(stored)) {
       draft = stored;
-      return navigate("details");
+      toast("Carrying on with your unsaved changes to " + describeDraft(stored) + ".", "details");
+    } else {
+      draft = draftFromQuote(quote);
     }
-    var ask = hasUnsavedDraft(stored)
-      ? askUnsavedDraft(
-          stored,
-          "Discard them and open the quote for " + quote.address + ", or resume them?",
-          "Discard and open",
-        )
-      : Promise.resolve("discard");
-    ask.then(function (choice) {
-      if (choice === "resume") {
-        draft = stored;
-        navigate("details");
-      } else if (choice === "discard") {
-        draft = draftFromQuote(quote);
-        persistDraft();
-        navigate("details");
-      }
-    });
-  }
-
-  // Resume / discard / cancel for unsaved changes to another quote.
-  function askUnsavedDraft(stored, message, discardLabel) {
-    return askDialog({
-      title: "You have unsaved changes",
-      message: "Your changes to " + describeDraft(stored) + " haven't been saved. " + message,
-      actions: [
-        { id: "resume", label: "Resume changes", style: "primary" },
-        { id: "discard", label: discardLabel, style: "danger" },
-      ],
-    });
+    persistDraft();
+    navigate("details");
   }
 
   // ------------------------------------------------------------------
@@ -818,43 +1034,61 @@
     }, 1000);
   }
 
+  // A backup file holds every quote (with customer details), the Business
+  // Prices saved in this browser and the clean-up log, so a new browser or
+  // device can be set up from it in one step.
   function exportQuotes() {
     var quotes = getQuotes();
-    if (!quotes.length) return toast("There are no quotes to export.");
+    if (!quotes.length) return toast("There are no quotes to back up.");
+    var now = new Date().toISOString();
+    var saved = readJson(Pricing.RATES_KEY, null);
     var payload = {
       app: "premium-restoration-quotes",
-      version: 1,
-      exportedAt: new Date().toISOString(),
+      version: 2,
+      exportedAt: now,
       quotes: quotes,
+      businessPrices: saved && saved.prices ? saved.prices : null,
+      retentionLog: getRetentionLog(),
     };
-    downloadBlob(
-      new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }),
-      "premium-restoration-quotes-" + new Date().toISOString().slice(0, 10) + ".json",
+    var filename = "premium-restoration-quotes-" + now.slice(0, 10) + ".json";
+    downloadBlob(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }), filename);
+    recordBackup(now, quotes.length);
+    renderBackupPanel();
+    toast(
+      "Backup of " +
+        plural(quotes.length, "quote") +
+        " downloaded as " +
+        filename +
+        ". Keep it somewhere other than this browser (for example the business's cloud drive), and delete old backup files in the monthly clean-up.",
     );
-    toast("Exported " + quotes.length + (quotes.length === 1 ? " quote." : " quotes."));
   }
 
-  // When a quote last changed: an edit, or marking it as led to work.
+  // When a quote last changed: an edit, or marking it as a booked job.
   function lastChanged(q) {
     return Math.max(new Date(q.updatedAt).getTime() || 0, new Date(q.statusChangedAt).getTime() || 0);
   }
 
+  // Restoring is one step: choosing the file restores it. It never deletes
+  // anything: quotes not in this browser are added, and a quote already here
+  // is replaced only by a newer copy.
   function importQuotes(file) {
     var reader = new FileReader();
     reader.onload = function () {
+      var parsed;
       var incoming;
       try {
-        var parsed = JSON.parse(reader.result);
+        parsed = JSON.parse(reader.result);
         incoming = Array.isArray(parsed) ? parsed : parsed && parsed.quotes;
         if (!Array.isArray(incoming)) throw new Error("no quotes");
         incoming = incoming.filter(function (q) {
           return q && typeof q.id === "string" && typeof q.address === "string" && q.data;
         });
       } catch (e) {
-        return alertError("That file isn't a quotes export from this tool, so nothing was imported.");
+        return alertError("That file isn't a backup from this tool, so nothing was restored.");
       }
-      if (!incoming.length) return alertError("That file has no quotes in it, so nothing was imported.");
+      if (!incoming.length) return alertError("That file has no quotes in it, so nothing was restored.");
       var quotes = getQuotes();
+      var wasEmpty = !quotes.length;
       var byId = {};
       quotes.forEach(function (q, i) {
         byId[q.id] = i;
@@ -870,25 +1104,67 @@
           updated++;
         }
       });
+      var extras = restoreExtras(parsed);
       if (!added && !updated) {
-        return toast("Nothing new to import: every quote in that file is already here and up to date.");
+        return toast("Nothing new to restore: every quote in that file is already here and up to date." + extras);
       }
-      confirmAction(
-        "Import quotes?",
-        "Import " + added + " new quote(s) and update " + updated + " with newer copies from this file?",
-        "Import quotes",
-        "primary",
-      ).then(function (ok) {
-        if (!ok) return;
-        if (!saveQuotes(quotes)) return alertError(STORAGE_ERROR);
-        toast("Imported " + added + " new and " + updated + " updated quote(s).");
-        renderDashboard();
-      });
+      if (!saveQuotes(quotes)) return alertError(STORAGE_ERROR);
+      var exportedAt = parsed && typeof parsed.exportedAt === "string" ? parsed.exportedAt : null;
+      // Restored into an empty browser: that file is now an up-to-date backup.
+      if (wasEmpty && exportedAt && !isNaN(new Date(exportedAt).getTime())) recordBackup(exportedAt, quotes.length);
+      toast(
+        "Restored " +
+          plural(added, "quote") +
+          (updated ? " and updated " + plural(updated, "quote") + " with newer copies" : "") +
+          (exportedAt ? " from the backup of " + formatDate(exportedAt) : "") +
+          "." +
+          extras,
+      );
+      renderDashboard();
     };
     reader.onerror = function () {
-      alertError("That file couldn't be read, so nothing was imported.");
+      alertError("That file couldn't be read, so nothing was restored.");
     };
     reader.readAsText(file);
+  }
+
+  // Business Prices (only if none are saved in this browser) and the
+  // clean-up log from a backup file. Returns a sentence for the message.
+  function restoreExtras(parsed) {
+    if (!parsed || Array.isArray(parsed)) return "";
+    var notes = "";
+    var hasPrices = readJson(Pricing.RATES_KEY, null);
+    if (parsed.businessPrices && typeof parsed.businessPrices === "object" && !(hasPrices && hasPrices.prices)) {
+      var prices = {};
+      Object.keys(parsed.businessPrices).forEach(function (key) {
+        var n = Number(parsed.businessPrices[key]);
+        if (Object.prototype.hasOwnProperty.call(Pricing.DEFAULT_PRICES, key) && isFinite(n) && n >= 0) {
+          prices[key] = n;
+        }
+      });
+      if (Object.keys(prices).length && writeJson(Pricing.RATES_KEY, { prices: prices })) {
+        notes += " Business Prices were restored too.";
+      }
+    }
+    if (Array.isArray(parsed.retentionLog) && parsed.retentionLog.length) {
+      var log = getRetentionLog();
+      var seen = {};
+      log.forEach(function (e) {
+        seen[e.type + "|" + e.date] = true;
+      });
+      var more = parsed.retentionLog.filter(function (e) {
+        return e && typeof e.date === "string" && typeof e.type === "string" && !seen[e.type + "|" + e.date];
+      });
+      if (more.length) {
+        writeJson(
+          RETENTION_LOG_KEY,
+          log.concat(more).sort(function (x, y) {
+            return new Date(x.date) - new Date(y.date);
+          }),
+        );
+      }
+    }
+    return notes;
   }
 
   // ------------------------------------------------------------------
@@ -1149,8 +1425,23 @@
 
   function onChange(key) {
     if (calc.errorEls[key]) setFieldError(key, null);
+    refreshErrorSummary();
     persistDraft();
     calc.recompute();
+  }
+
+  // "Fix the N highlighted answers" counts only what is still highlighted,
+  // and goes away once every answer has been fixed.
+  function errorSummaryText(count) {
+    return "Fix the " + (count === 1 ? "highlighted answer" : count + " highlighted answers") + " before saving.";
+  }
+
+  function refreshErrorSummary() {
+    var box = document.getElementById("quote-error");
+    if (box.hidden || box.getAttribute("data-kind") !== "validation") return;
+    var count = document.querySelectorAll("#screen-quote .has-error").length;
+    if (count) box.textContent = errorSummaryText(count);
+    else box.hidden = true;
   }
 
   function setFieldError(key, message) {
@@ -1379,10 +1670,8 @@
       setFieldError(key, validation.errors[key] || null);
     });
     if (firstHeaderProblem || !validation.valid) {
-      var count =
-        Object.keys(validation.errors).length + document.querySelectorAll("#screen-quote .form-group.has-error").length;
-      errorBox.textContent =
-        "Fix the " + (count === 1 ? "highlighted answer" : count + " highlighted answers") + " before saving.";
+      errorBox.textContent = errorSummaryText(document.querySelectorAll("#screen-quote .has-error").length);
+      errorBox.setAttribute("data-kind", "validation");
       errorBox.hidden = false;
       if (firstHeaderProblem) {
         document.getElementById(firstHeaderProblem).focus();
@@ -1453,6 +1742,7 @@
       saving = false;
       saveBtn.disabled = false;
       saveBtn.textContent = "Save Quote";
+      errorBox.setAttribute("data-kind", "storage");
       errorBox.textContent =
         "Couldn't save this quote in this browser. " +
         STORAGE_ERROR.replace(/^Couldn't save in this browser — /, "The browser's storage is ");
@@ -1599,26 +1889,16 @@
   // Wire up
   // ------------------------------------------------------------------
   function startNewQuote() {
-    var stored = readDraft();
-    var ask = hasUnsavedDraft(stored)
-      ? askUnsavedDraft(stored, "Discard them and start a new quote, or resume them?", "Discard and start new")
-      : Promise.resolve("discard");
-    ask.then(function (choice) {
-      if (choice === "resume") {
-        draft = stored;
-        navigate("details");
-      } else if (choice === "discard") {
-        draft = newDraft();
-        persistDraft();
-        navigate("details");
-      }
-    });
+    draft = newDraft();
+    persistDraft();
+    navigate("details");
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    // Restore an unsaved quote (e.g. after a reload).
-    var stored = readDraft();
-    if (stored && stored.id) draft = stored;
+    // Reopen the quote this tab was editing (e.g. after a reload).
+    migrateOldDraft();
+    var stored = readDraft(tabDraftId());
+    if (stored) draft = stored;
 
     document.getElementById("login-form").addEventListener("submit", function (e) {
       e.preventDefault();
@@ -1648,18 +1928,21 @@
       e.target.value = "";
     });
     document.getElementById("quote-filter").addEventListener("input", renderDashboard);
-    document.getElementById("draft-resume-btn").addEventListener("click", function () {
-      draft = readDraft();
-      if (draft) navigate("details");
-    });
-    document.getElementById("draft-discard-btn").addEventListener("click", function () {
-      var stored = readDraft();
-      confirmDiscardQuote(stored).then(function (discard) {
-        if (!discard) return;
-        clearDraft();
-        renderDashboard();
-        document.getElementById("create-quote-btn").focus();
+    document.getElementById("persist-retry-btn").addEventListener("click", function () {
+      checkPersistence(true).then(function (state) {
+        toast(
+          state === "persisted"
+            ? "The browser has agreed to keep this tool's data."
+            : "The browser still hasn't agreed to keep this tool's data, so keep exporting backups.",
+        );
       });
+    });
+    // Another tab saved, deleted or backed up quotes: keep this dashboard current.
+    window.addEventListener("storage", function (e) {
+      if (currentRoute !== "dashboard" || !isAuthed()) return;
+      if (!e.key || e.key === QUOTES_KEY || e.key === BACKUP_KEY || e.key.indexOf(DRAFT_PREFIX) === 0) {
+        renderDashboard();
+      }
     });
     document.getElementById("admin-toast-close").addEventListener("click", hideToast);
     document.getElementById("rates-form").addEventListener("submit", handleRatesSubmit);
@@ -1667,6 +1950,7 @@
       if (!draft) return;
       draft.address = e.target.value;
       setInputError("quote-address", null);
+      refreshErrorSummary();
       persistDraft();
     });
     Object.keys(CUSTOMER_FIELDS).forEach(function (key) {
@@ -1676,6 +1960,7 @@
         draft.customer = cleanCustomer(draft.customer);
         draft.customer[key] = input.value;
         if (key !== "name") setInputError(CUSTOMER_FIELDS[key], null);
+        refreshErrorSummary();
         persistDraft();
       });
     });
