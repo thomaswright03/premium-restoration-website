@@ -29,8 +29,9 @@
     Shower_Shelf_Price: 125,
 
     Tile_Price_Per_SqFt: 4,
-    Floor_Price_Small: 500,
-    Floor_Price_Large: 700,
+    // Owner-confirmed: $5 per sq ft of bathroom floor (replaces the old
+    // flat $500 / $700 tiers, which contradicted the owner's stated price).
+    Floor_Price_Per_SqFt: 5,
     Painting_Price_Per_SqFt: 1.79,
 
     Plumbing_Price_Per_Point: 300,
@@ -57,8 +58,7 @@
     Shower_Shelf_Price: "Built-in shower shelf price (each)",
 
     Tile_Price_Per_SqFt: "Tile install price (per sq ft — floor + walls combined, no ceiling)",
-    Floor_Price_Small: "Floor price — 50 sq ft or less (flat)",
-    Floor_Price_Large: "Floor price — over 50 sq ft (flat)",
+    Floor_Price_Per_SqFt: "Flooring price (per sq ft of bathroom floor)",
     Painting_Price_Per_SqFt: "Painting price (per sq ft — ceiling + walls combined, no floor)",
 
     Plumbing_Price_Per_Point: "Plumbing price (per point of entry — one per toilet, sink, shower, and bathtub)",
@@ -125,9 +125,9 @@
         { varName: "Wall_SqFt", label: "Wall sq ft (for tile)", unit: "sq ft" },
       ],
       priceKey: "Tile_Price_Per_SqFt" },
-    { section: "C. Surfaces", label: "Floor", pattern: "flatTier",
+    { section: "C. Surfaces", label: "Floor", pattern: "flat",
       qtyVar: "Bathroom_SqFt", qtyLabel: "Bathroom sq ft (floor)", unit: "sq ft",
-      tierThreshold: 50, tierLowKey: "Floor_Price_Small", tierHighKey: "Floor_Price_Large" },
+      priceKey: "Floor_Price_Per_SqFt" },
     { section: "C. Surfaces", label: "Painting", pattern: "flatSum",
       qtyVars: [
         { varName: "Bathroom_SqFt", label: "Bathroom sq ft (ceiling, for paint)", unit: "sq ft" },

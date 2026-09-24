@@ -5,10 +5,12 @@ A blank starting template for the Premium Restoration website. Plain HTML/CSS/JS
 ## Pages
 
 - `index.html` — Home
-- `gallery.html` — Previous restorations (photo placeholders, ready for real before/after photos)
+- `gallery.html` — Our Work (currently empty: the previous stock/watermarked images were removed; see "Gallery photos" below)
 - `about.html` — About Us
-- `faq.html` — FAQs (answers are **AI-generated placeholder copy** — review and rewrite before launch)
-- `contact.html` — Get a Quote / lead capture form
+- `faq.html` — FAQs (bathroom-only answers; no warranty or experience claims)
+- `contact.html` — Get a Quote (opens the visitor's email app; see "Contact / lead form" below)
+- `privacy.html` — Privacy Notice (linked from every footer)
+- `terms.html` — Terms of Use, incl. estimate disclaimer, third-party licences and accessibility contact (linked from every footer)
 - `admin/index.html` — Internal restoration quoting tool (password-gated, not linked from the public nav)
 
 ## Structure
@@ -20,6 +22,8 @@ premium-restoration/
 ├── about.html
 ├── faq.html
 ├── contact.html
+├── privacy.html
+├── terms.html
 ├── admin/index.html
 ├── css/style.css
 ├── css/admin.css
@@ -31,13 +35,13 @@ premium-restoration/
 
 ## Public chat quote assistant
 
-The chat widget on the home page (between the hero and "What We Do") is front-end only — no real AI, no backend, no API key. It's keyword-matched canned responses, **plus one real feature**: click "Get a bathroom price estimate" (or type something like "bathroom quote") and it walks the visitor through a scripted flow, then computes and shows a real itemized price estimate, ending in Subtotal → Tax → Total.
+The chat widget on the home page (between the hero and "What We Do") is front-end only — no AI, no backend, no API key. It's keyword-matched scripted responses and it tells visitors so (greeting, section subtitle, and an honest answer if asked "are you a person / AI?"). Don't market it as AI. **One real feature**: click "Get a bathroom price estimate" (or type something like "bathroom quote") and it walks the visitor through a scripted flow, then computes and shows an itemized, non-binding **labor-only** estimate. The public estimate shows **no tax line** (Utah generally treats labor on real property as not subject to sales tax — get tax advice before adding one back) and ends in an "Estimated Labor Total" with a not-a-quote disclaimer. Out-of-scope requests (kitchen, exterior, roofing, damage, mold, etc.) get a "bathrooms only" reply.
 
 **Fullscreen:** the moment someone starts using the chat (focuses the input, or taps the quote-estimate suggestion), it expands to fill the whole screen so the conversation is the only thing visible, with an "×" button (or Escape) to close it and go back to browsing the page.
 
 **Grouped mini-forms, not one question at a time:** the estimate flow asks for related fields together as a small fillable form embedded right in the chat bubble — one form for room dimensions (width/length/height), one for every fixture count (toilets, sinks, showers, etc. — 12 fields at once), and one for the two plumbing yes/no questions. A progress bar with a percentage (not "3/17") shows how close the visitor is to their estimate. "Cancel" on any form stops it.
 
-**The finished estimate is a styled card**, not plain text — itemized lines, a Subtotal/Tax breakdown, and a bold Estimated Total band, plus two buttons: **"Export as PDF"** (downloads a formatted PDF of the estimate, generated client-side with jsPDF — no backend involved) and **"Get This Confirmed →"** (links to the Contact page). jsPDF is loaded via CDN in `index.html`; the PDF-building logic is `exportEstimateAsPdf()` in `js/script.js`.
+**The finished estimate is a styled card**, not plain text — itemized lines, a Subtotal/Tax breakdown, and a bold Estimated Total band, plus two buttons: **"Export as PDF"** (downloads a formatted PDF of the estimate, generated client-side with jsPDF — no backend involved) and **"Contact Us About This →"** (links to the Contact page). jsPDF is fetched from cdnjs **only when the visitor clicks Export** (no third-party script on normal page views); the PDF-building logic is `exportEstimateAsPdf()` in `js/script.js`. The PDF carries the business identity placeholders in `BUSINESS_IDENTITY` and the `ESTIMATE_DISCLAIMER` text.
 
 That math comes from `js/bathroom-pricing.js`, the exact same pricing model the admin quoting tool uses (same prices, same formulas) — the two are built from one shared file so they can never drift apart. The chat estimate always uses the default prices (or whatever's saved under `pr_business_rates` in that visitor's own browser, which in practice means the defaults, since a customer's browser won't have the admin's saved settings — see the "no backend" limitations below).
 
@@ -61,7 +65,7 @@ A few line items work a little differently:
 - **Bathtub** — not set directly; it's always calculated as 30% less than the current Shower price.
 - **Tile** — one combined price per sq ft, applied to bathroom floor sq ft + wall sq ft together (no ceiling).
 - **Painting** — one combined price per sq ft, applied to bathroom (ceiling) sq ft + wall sq ft together (no floor).
-- **Floor** — a flat price that jumps to a higher flat price once the bathroom is over 50 sq ft (not priced per sq ft).
+- **Floor** — $5 per sq ft of bathroom floor, per the owner's stated price (replaced the old flat $500 / $700 tiers).
 - **Plumbing** — priced per "point of entry," counted automatically from the toilets, sinks, showers, and bathtubs you've already entered under Fixtures (no separate count to type), plus two optional flat surcharges: no existing plumbing stack, and a bad valve that needs replacing.
 - **Bathroom Dimensions** — type the room's width, length, and height once at the top of the Bathroom section, and floor/ceiling sq ft and wall sq ft are calculated automatically and reused everywhere they're needed (Demolition, Tile, Floor, Painting).
 - **Electrical** — a single flat price per "point of electrical entry" (lamps, outlets, fans, fan switches, light switches, an electric toilet — each counts as one point).
@@ -94,7 +98,7 @@ Any static host works (GitHub Pages, Netlify, Vercel, S3, etc.). For GitHub Page
 
 ## Contact / lead form — next steps
 
-The form on `contact.html` (`#lead-form`) is currently **front-end only**: on submit it just shows a success message locally and does not send data anywhere. Before launch, wire it up to actually deliver leads, e.g.:
+The form on `contact.html` (`#lead-form`) has **no backend**. On submit it opens the visitor's own email app with a pre-filled message to the business address and tells them plainly that nothing is received until they press Send. It never claims a request "has been received". If you wire it to a service instead, also update the "How this form works" notice on `contact.html` and the Privacy Notice (who receives the data, where it's stored, how long) **before** switching over. Options:
 
 - **Netlify Forms** — add `data-netlify="true"` and a hidden `form-name` input if hosting on Netlify (no backend needed).
 - **Formspree / Basin / etc.** — point the form's `action` at their endpoint (no backend needed).
@@ -102,6 +106,23 @@ The form on `contact.html` (`#lead-form`) is currently **front-end only**: on su
 
 ## Editing content
 
-- Company name, contact info, and nav are repeated at the top/bottom of each HTML page (no templating layer yet) — update all five pages if you change them.
+- Company name, contact info, and nav are repeated at the top/bottom of each HTML page (no templating layer yet) — update all seven public pages (and the placeholders listed below) if you change them.
 - Colors and spacing are controlled by CSS variables at the top of `css/style.css`.
 - Contact info currently set to: **(385) 356-8733** / **eduardo.moroni77@gmail.com**.
+
+## Gallery photos
+
+The six original gallery images were removed: several carried third-party watermarks or logos (e.g. a "dreamstime" watermark, a stock-library ID) and were presented as "projects we've completed". Only add photos that are either your own completed projects (with the client's written permission) or licensed images clearly captioned as illustrative. Record the source/licence of every image here. A commented template is in `gallery.html`.
+
+## Placeholders to fill in before launch
+
+These bracketed placeholders appear on the public site and must be replaced consistently in every file (`grep -rn "\[" --include=*.html --include=*.js .`):
+
+- `[COMPANY LEGAL NAME]` — footer of every page, `privacy.html`, `terms.html`, PDF estimate (`js/script.js` `BUSINESS_IDENTITY`)
+- `[BUSINESS ADDRESS]` — footer of every page, `privacy.html`, `terms.html`
+- `[CONTRACTOR LICENSE #]` — footer of every page, `terms.html`, PDF estimate
+- `[GOVERNING STATE]` — `terms.html`
+- `[EFFECTIVE DATE]` — `privacy.html`, `terms.html`
+- `[RETENTION PERIOD]` — `privacy.html`, `admin/index.html`
+- `[CUSTOMER RECORD RETENTION PERIOD]` — `privacy.html`
+- `[PRIVACY RESPONSE PERIOD]` — `privacy.html`
