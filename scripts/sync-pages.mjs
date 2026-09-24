@@ -4,6 +4,12 @@
 //   <!-- chrome:header --> … <!-- /chrome:header -->   from scripts/partials/header.html
 //   <!-- chrome:footer --> … <!-- /chrome:footer -->   from scripts/partials/footer.html
 //   <span data-price="Cabinet_Price">$60</span>        from DEFAULT_PRICES in js/bathroom-pricing.js
+//   <a data-contact="phone" href="tel:…">…</a>         from js/business-info.js (phone or email;
+//   <span data-contact="email">…</span>                 a mailto link keeps its ?subject=…)
+//
+// The check also fails if a page still has the phone number, the email
+// address, or a tel:/mailto: link that is NOT marked with data-contact, so
+// every copy changes together.
 //
 // The pages are committed already filled in, so the site needs no build step:
 // this only has to be run after editing a partial or a price.
@@ -20,6 +26,7 @@ import * as prettier from "prettier";
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL("..", import.meta.url));
 const Pricing = require(join(root, "js/bathroom-pricing.js"));
+const Business = require(join(root, "js/business-info.js"));
 
 // base: prefix for links/assets. 404.html is served for any missing URL
 // (at any depth), so it uses root-absolute links.
@@ -67,8 +74,32 @@ export async function renderPage(source, page) {
     if (!(key in Pricing.DEFAULT_PRICES)) throw new Error(`${page.file}: unknown data-price key ${key}`);
     return open + Pricing.shortMoney(Pricing.DEFAULT_PRICES[key]) + close;
   });
+  html = html.replace(
+    /<(a|span)\b([^>]*?)\bdata-contact="(\w+)"([^>]*)>[^<]*<\/\1\s*>/g,
+    (m, tag, before, kind, after) => {
+      if (kind !== "phone" && kind !== "email") throw new Error(`${page.file}: unknown data-contact "${kind}"`);
+      let attrs = before + `data-contact="${kind}"` + after;
+      if (tag === "a") {
+        attrs = attrs.replace(/href="([^"]*)"/, (h, href) => {
+          if (kind === "phone") return `href="${Business.PHONE_HREF}"`;
+          const query = href.indexOf("?") === -1 ? "" : href.slice(href.indexOf("?"));
+          return `href="${Business.EMAIL_HREF}${query}"`;
+        });
+      }
+      return `<${tag}${attrs}>${kind === "phone" ? Business.PHONE : Business.EMAIL}</${tag}>`;
+    },
+  );
   const options = (await prettier.resolveConfig(join(root, page.file))) || {};
   return prettier.format(html, { ...options, parser: "html" });
+}
+
+// Contact details or links left outside a data-contact element (they would
+// not change with js/business-info.js).
+export function strayContacts(html) {
+  const outside = html
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<(a|span)\b[^>]*\bdata-contact="\w+"[^>]*>[^<]*<\/\1\s*>/g, "");
+  return [Business.PHONE, Business.EMAIL, 'href="tel:', 'href="mailto:'].filter((s) => outside.includes(s));
 }
 
 async function main() {
@@ -78,6 +109,11 @@ async function main() {
     const path = join(root, page.file);
     const source = await readFile(path, "utf8");
     const output = await renderPage(source, page);
+    const stray = strayContacts(output);
+    if (stray.length) {
+      console.error(`${page.file}: contact details not marked with data-contact: ${stray.join(", ")}`);
+      process.exitCode = 1;
+    }
     if (output !== source) {
       stale.push(page.file);
       if (!check) await writeFile(path, output);

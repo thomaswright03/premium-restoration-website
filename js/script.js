@@ -7,8 +7,10 @@
 document.addEventListener("DOMContentLoaded", function () {
   "use strict";
 
-  var PHONE = "(385) 356-8733";
-  var EMAIL = "eduardo.moroni77@gmail.com";
+  var Business = window.BusinessInfo;
+  var PHONE = Business.PHONE;
+  var EMAIL = Business.EMAIL;
+  var PHONE_HREF = Business.PHONE_HREF;
   var configReady = window.SiteConfig ? window.SiteConfig.ready : Promise.resolve(null);
   var siteConfig = null;
   configReady.then(function (c) {
@@ -511,10 +513,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function businessLine() {
-      var name = siteConfig && siteConfig.owner.legalName;
-      return (
-        "Premium Restoration, operated by " + (name ? name + ", " : "") + "an individual (not a registered company)"
-      );
+      return Business.businessLine(siteConfig && siteConfig.owner.legalName);
     }
 
     function el(tag, className, text) {
@@ -762,7 +761,7 @@ document.addEventListener("DOMContentLoaded", function () {
       var digits = phone.replace(/\D/g, "");
       if (!phone) errors.phone = "Enter a phone number we can call you on.";
       else if (!/^[0-9+().\-\s]+$/.test(phone) || digits.length < 10 || digits.length > 15) {
-        errors.phone = "Enter a valid phone number, e.g. (385) 356-8733.";
+        errors.phone = "Enter a valid phone number, e.g. " + PHONE + ".";
       }
       var email = value("email");
       if (!email) errors.email = "Enter your email address.";
@@ -843,7 +842,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ", email us at ",
         link("mailto:" + EMAIL, EMAIL),
         " or call ",
-        link("tel:+13853568733", PHONE),
+        link(PHONE_HREF, PHONE),
         ".",
       ]);
       window.location.href = href;
@@ -893,7 +892,7 @@ document.addEventListener("DOMContentLoaded", function () {
           showStatus("success", [
             strong("Request sent."),
             " Thank you — we've received your request and will get back to you as soon as we can. If it's urgent, call ",
-            link("tel:+13853568733", PHONE),
+            link(PHONE_HREF, PHONE),
             ".",
           ]);
         })
@@ -901,7 +900,7 @@ document.addEventListener("DOMContentLoaded", function () {
           showStatus("error", [
             strong("Sorry, your request wasn't sent."),
             " Nothing you entered has been lost — please try again, or call us at ",
-            link("tel:+13853568733", PHONE),
+            link(PHONE_HREF, PHONE),
             " or email ",
             link("mailto:" + EMAIL, EMAIL),
             ".",

@@ -24,8 +24,8 @@
   var QUOTES_KEY = "pr_quotes";
   var DRAFT_KEY = "pr_quote_draft";
   var RETENTION_LOG_KEY = "pr_retention_log";
-  var PHONE = "(385) 356-8733";
-  var EMAIL = "eduardo.moroni77@gmail.com";
+  var Business = window.BusinessInfo;
+  var configReady = window.SiteConfig ? window.SiteConfig.ready : Promise.resolve(null);
 
   // Retention for quotes that didn't lead to work, in days. The public
   // Privacy Notice says enquiries are kept for "about a month"; keep the two
@@ -658,8 +658,9 @@
     var label = button.textContent;
     button.disabled = true;
     button.textContent = "Preparing PDF…";
-    window.EstimatePdf.load()
-      .then(function () {
+    Promise.all([window.EstimatePdf.load(), configReady])
+      .then(function (loaded) {
+        var config = loaded[1];
         var values = bathroom.jobValues || {};
         var scope = bathroom.scope || {};
         var prices = Object.assign({}, Pricing.DEFAULT_PRICES, bathroom.prices || {});
@@ -693,9 +694,9 @@
             { title: "What this estimate assumes", items: Pricing.estimateAssumptions(values, scope, result) },
           ],
           footer: {
-            business: "Premium Restoration, operated by an individual (not a registered company)",
-            phone: PHONE,
-            email: EMAIL,
+            business: Business.businessLine(config && config.owner.legalName),
+            phone: Business.PHONE,
+            email: Business.EMAIL,
             date: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
           },
         });

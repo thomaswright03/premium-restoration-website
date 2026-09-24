@@ -23,6 +23,7 @@
       })();
     </script>
     <link rel="stylesheet" href="css/style.css" />
+    <script src="js/business-info.js"></script>
     <!-- /chrome:head -->
   </head>
   <body>
@@ -81,8 +82,8 @@
         </p>
         <p>
           Questions about this notice or your information: email
-          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a> or call
-          <a href="tel:+13853568733">(385) 356-8733</a>.
+          <a href="mailto:eduardo.moroni77@gmail.com" data-contact="email">eduardo.moroni77@gmail.com</a> or call
+          <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a>.
         </p>
 
         <h2>What we collect</h2>
@@ -143,8 +144,9 @@
             <strong>Google (Gmail)</strong> provides our email service, so emails you send us are stored by Google.
           </li>
           <li>
-            <strong>Our phone service provider</strong> carries calls and texts to (385) 356-8733, so it handles your
-            phone number and any voicemail or text message you leave.
+            <strong>Our phone service provider</strong> carries calls and texts to
+            <span data-contact="phone">(385) 356-8733</span>, so it handles your phone number and any voicemail or text
+            message you leave.
           </li>
         </ul>
         <p>
@@ -197,12 +199,13 @@
         <p>
           You can ask us to tell you what personal information we hold about you, give you a copy, correct it, or delete
           it. This includes homeowners whose property address is in a quote we prepared. To make a request, email
-          <a href="mailto:eduardo.moroni77@gmail.com?subject=Privacy%20request">eduardo.moroni77@gmail.com</a> with the
-          subject &ldquo;Privacy request&rdquo;, or call <a href="tel:+13853568733">(385) 356-8733</a>. We may ask you
-          to confirm your identity before acting on a request (for example, by contacting us from the email address or
-          phone number you used before, or by confirming details of your enquiry)<span
-            data-show-if="privacy.responsePeriod"
-            hidden
+          <a href="mailto:eduardo.moroni77@gmail.com?subject=Privacy%20request" data-contact="email"
+            >eduardo.moroni77@gmail.com</a
+          >
+          with the subject &ldquo;Privacy request&rdquo;, or call
+          <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a>. We may ask you to confirm your identity
+          before acting on a request (for example, by contacting us from the email address or phone number you used
+          before, or by confirming details of your enquiry)<span data-show-if="privacy.responsePeriod" hidden
             >, and we will respond within <span data-fill="privacy.responsePeriod"></span></span
           >. If we have to keep some information by law, we'll tell you what and why.
         </p>
@@ -246,8 +249,8 @@
         </div>
         <div class="footer-col">
           <h2 class="footer-heading">Contact</h2>
-          <a href="tel:+13853568733">(385) 356-8733</a>
-          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+          <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a>
+          <a href="mailto:eduardo.moroni77@gmail.com" data-contact="email">eduardo.moroni77@gmail.com</a>
         </div>
         <div class="footer-col">
           <h2 class="footer-heading">Legal</h2>

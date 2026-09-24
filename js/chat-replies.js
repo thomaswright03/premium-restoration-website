@@ -14,17 +14,21 @@
 
 (function (root, factory) {
   "use strict";
-  var api = factory(root.BathroomPricing || (typeof require === "function" ? require("./bathroom-pricing.js") : null));
+  var node = typeof module === "object" && module.exports && typeof require === "function";
+  var api = factory(
+    node ? require("./bathroom-pricing.js") : root.BathroomPricing,
+    node ? require("./business-info.js") : root.BusinessInfo,
+  );
   if (typeof module === "object" && module.exports) {
     module.exports = api;
   } else {
     root.ChatReplies = api;
   }
-})(typeof globalThis !== "undefined" ? globalThis : this, function (Pricing) {
+})(typeof globalThis !== "undefined" ? globalThis : this, function (Pricing, Business) {
   "use strict";
 
-  var PHONE = "(385) 356-8733";
-  var EMAIL = "eduardo.moroni77@gmail.com";
+  var PHONE = Business.PHONE;
+  var EMAIL = Business.EMAIL;
   var PRICES = Pricing.DEFAULT_PRICES;
   var $ = Pricing.shortMoney;
 

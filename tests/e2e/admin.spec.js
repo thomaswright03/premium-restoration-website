@@ -2,7 +2,15 @@
 
 const { test, expect } = require("@playwright/test");
 const fs = require("node:fs");
-const { loginAdmin, chooseAdmin, fillAdminQuote } = require("./helpers");
+const {
+  useConfig,
+  startEstimate,
+  answerScope,
+  fillGroup,
+  loginAdmin,
+  chooseAdmin,
+  fillAdminQuote,
+} = require("./helpers");
 
 const ROOM = { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 };
 const FLOORING_ONLY = { demolition: "No", floorFinish: "Other flooring", walls: "Neither", paintCeiling: "No" };
@@ -291,5 +299,33 @@ test.describe("admin bathroom quote", () => {
       .locator(".calc-row .calc-cost")
       .evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().right)));
     expect(new Set(rights).size).toBe(1);
+  });
+});
+
+test.describe("PDF business line", () => {
+  test("the public estimate PDF and the admin quote PDF show the owner's name identically", async ({ page }) => {
+    const LINE = "Premium Restoration, operated by Test Owner Name, an individual (not a registered company)";
+    // PDF text strings escape their brackets.
+    const pdfText = async (download) => fs.readFileSync(await download.path(), "latin1").replace(/\\([()])/g, "$1");
+    await useConfig(page, { owner: { legalName: "Test Owner Name" } });
+
+    await startEstimate(page);
+    await answerScope(page, FLOORING_ONLY);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8 });
+    await fillGroup(page, "fixtures", { Cabinet_Quantity: 3 });
+    const [publicPdf] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByTestId("estimate-card").getByRole("button", { name: "Export as PDF" }).click(),
+    ]);
+    expect(await pdfText(publicPdf)).toContain(LINE);
+
+    await loginAdmin(page);
+    await fillAdminQuote(page, { address: "12 Owner Way", dims: ROOM, scope: FLOORING_ONLY });
+    await page.click("#save-quote-btn");
+    const [adminPdf] = await Promise.all([
+      page.waitForEvent("download"),
+      page.locator(".quote-card", { hasText: "12 Owner Way" }).getByRole("button", { name: "Download PDF" }).click(),
+    ]);
+    expect(await pdfText(adminPdf)).toContain(LINE);
   });
 });
