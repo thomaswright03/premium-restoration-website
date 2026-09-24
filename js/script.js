@@ -83,8 +83,9 @@ document.addEventListener("DOMContentLoaded", function () {
   // work the job needs, fixture counts) instead of one question at a time,
   // so the visitor fills several fields per turn. The estimate prices only
   // what the visitor explicitly chooses: no scope is assumed and no choice
-  // is pre-selected. Plumbing and electrical work is not offered or priced
-  // on the public site.
+  // is pre-selected. Plumbing and electrical work is not priced here: the
+  // estimate says so, and warns that toilets, sinks, showers and bathtubs
+  // need plumbing that will cost extra (see PLUMBING_NOTE).
   var YES_NO = [
     { label: "Yes", value: true },
     { label: "No", value: false },
@@ -92,7 +93,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   var BATHROOM_QUOTE_GROUPS = [
     {
-      intro: "Sure! Let's get you a rough, non-binding bathroom labor estimate — plumbing and electrical work, materials, permits, and any applicable taxes aren't included. Nothing you enter here is sent to us. First, the room's dimensions:",
+      intro: "Sure! Let's get you a rough, non-binding bathroom labor estimate — plumbing and electrical work (including the plumbing any toilets, sinks, showers, or bathtubs need), materials, permits, and any applicable taxes aren't included and will add to the cost. Nothing you enter here is sent to us. First, the room's dimensions:",
       fields: [
         { key: "Bathroom_Width_Ft", label: "Width (ft)" },
         { key: "Bathroom_Length_Ft", label: "Length (ft)" },
@@ -158,10 +159,26 @@ document.addEventListener("DOMContentLoaded", function () {
     email: "eduardo.moroni77@gmail.com",
   };
 
+  // Plumbing and electrical work is never priced by the public estimate, but
+  // the business's own quotes do charge for it (per toilet, sink, shower and
+  // bathtub, plus electrical points), so the estimate must say it's extra.
+  var PLUMBING_FIXTURE_KEYS = ["Toilet_Quantity", "Sink_Quantity", "Shower_Quantity", "Bathtub_Quantity"];
+  var PLUMBING_NOTE =
+    "Plumbing and electrical work is not included. Toilets, sinks, showers, and bathtubs also need plumbing work, " +
+    "so if you listed any, or your job needs other plumbing or electrical work, expect it to add to the cost. " +
+    "We'll tell you how it will be handled and priced before any work is agreed.";
+
+  function plumbingFixtureCount(answers) {
+    return PLUMBING_FIXTURE_KEYS.reduce(function (sum, key) {
+      return sum + (parseFloat(answers[key]) || 0);
+    }, 0);
+  }
+
   var ESTIMATE_DISCLAIMER =
     "This is an automated, non-binding estimate of labor only, based only on the measurements, counts, and " +
     "choices you entered and the assumptions listed with it. It is not a quote, offer, or contract. It excludes " +
-    "plumbing and electrical work, materials, permits, and any applicable taxes. " +
+    "plumbing and electrical work (including the plumbing any toilets, sinks, showers, or bathtubs need), " +
+    "materials, permits, and any applicable taxes, which will add to the cost where your job needs them. " +
     "Prices are current as of the date generated and may change. Your actual price is set only in a " +
     "written agreement after we review your project in person.";
 
@@ -188,7 +205,8 @@ document.addEventListener("DOMContentLoaded", function () {
       "Wall area: 2 × " + h + " ft × (" + w + " + " + l + " ft) = " + BathroomPricing.formatQty(result.wallSqFt) +
         " sq ft — all four walls, full height, with no deduction for doors, windows, or a tub/shower.",
       "Fixtures are priced per item at our current labor rates, which may change.",
-      "Not included: plumbing and electrical work, materials, permits, and any applicable taxes.",
+      PLUMBING_NOTE,
+      "Also not included: materials, permits, and any applicable taxes.",
     ];
   }
 
@@ -273,8 +291,12 @@ document.addEventListener("DOMContentLoaded", function () {
     doc.setFont("times", "normal");
     doc.setFontSize(9);
     doc.setTextColor(130);
-    doc.text("Excludes plumbing and electrical work, materials, permits, and any applicable taxes. Non-binding.", margin, y);
-    y += 30;
+    var excludesLines = doc.splitTextToSize(
+      "Excludes plumbing and electrical work, materials, permits, and any applicable taxes, which add to the cost. Non-binding.",
+      pageWidth - margin * 2
+    );
+    doc.text(excludesLines, margin, y);
+    y += 30 + (excludesLines.length - 1) * 11;
 
     doc.setFont("times", "bold");
     doc.setFontSize(11);
@@ -331,7 +353,7 @@ document.addEventListener("DOMContentLoaded", function () {
     header.innerHTML =
       '<span class="eyebrow">Your Estimate</span>' +
       '<h3>Bathroom Restoration</h3>' +
-      '<p>Automated, non-binding labor estimate — not a quote, offer, or contract. Based only on what you entered and the assumptions listed below. Excludes plumbing and electrical work, materials, permits, and any applicable taxes. Your actual price is set only in a written agreement after we review your project in person.</p>';
+      '<p>Automated, non-binding labor estimate — not a quote, offer, or contract. Based only on what you entered and the assumptions listed below. Excludes plumbing and electrical work (including the plumbing any toilets, sinks, showers, or bathtubs need), materials, permits, and any applicable taxes, which will add to the cost where your job needs them. Your actual price is set only in a written agreement after we review your project in person.</p>';
     card.appendChild(header);
 
     var lines = document.createElement("div");
@@ -357,8 +379,14 @@ document.addEventListener("DOMContentLoaded", function () {
     // applies to this work must be confirmed by a tax adviser first.
     var subtotalWrap = document.createElement("div");
     subtotalWrap.className = "ai-chat-estimate-subtotal";
+    var fixtureCount = plumbingFixtureCount(answers);
     subtotalWrap.innerHTML =
-      '<div class="ai-chat-estimate-line muted"><span>Plumbing &amp; electrical work</span><span>Not included</span></div>' +
+      (fixtureCount > 0
+        ? '<div class="ai-chat-estimate-line muted"><span>Plumbing for the ' + BathroomPricing.formatQty(fixtureCount) +
+          ' toilet/sink/shower/bathtub item(s) you listed</span><span>Extra &mdash; not included</span></div>'
+        : "") +
+      '<div class="ai-chat-estimate-line muted"><span>' + (fixtureCount > 0 ? "Any other plumbing" : "Plumbing") +
+        ' &amp; electrical work</span><span>Extra &mdash; not included</span></div>' +
       '<div class="ai-chat-estimate-line muted"><span>Materials, permits &amp; any applicable taxes</span><span>Not included</span></div>';
     card.appendChild(subtotalWrap);
 
@@ -624,7 +652,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   var CHAT_RESPONSES = [
     { keywords: ["plumb", "electric", "wiring", "outlet", "pipe", "valve", "drain"],
-      reply: "Plumbing and electrical work isn't offered or priced on this website, and our online estimates don't include it." },
+      reply: "Our online estimates don't include plumbing or electrical work, and toilets, sinks, showers, and bathtubs also need plumbing work, so expect it to add to the cost. Tell us about your project on the Contact page and we'll tell you how that work will be handled and priced before any work is agreed." },
     { keywords: ["quote", "price", "cost", "estimate"],
       reply: "We only take on bathroom restorations. If it's a bathroom, say “bathroom quote” and I can give you a rough, non-binding labor estimate right now, or tell us about it on the Contact page." },
     { keywords: ["bathroom"],
@@ -652,7 +680,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (lower.indexOf(entry.keywords[j]) !== -1) return entry.reply;
       }
     }
-    return "Thanks for the message! We take on bathroom restorations only. For anything specific to your bathroom project, the best next step is requesting a free quote on our Contact page.";
+    return "Thanks for the message! We take on bathroom restorations only. For anything specific to your bathroom project, the best next step is requesting a quote on our Contact page.";
   }
 
   // Returns a plain-text reply, OR null when the reply was already handled

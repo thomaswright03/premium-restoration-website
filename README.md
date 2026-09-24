@@ -13,6 +13,8 @@ A blank starting template for the Premium Restoration website. Plain HTML/CSS/JS
 - `terms.html` — Terms of Use, incl. estimate disclaimer, third-party licences and accessibility contact (linked from every footer)
 - `admin/index.html` — Internal restoration quoting tool (password-gated, not linked from the public nav)
 
+The site says "Get a Quote" / "Request a Quote", not "Free Quote": nothing confirms quotes are always free. Only bring "free" back once the owner confirms it.
+
 ## Structure
 
 ```
@@ -36,7 +38,7 @@ premium-restoration/
 
 ## Public chat quote assistant
 
-The chat widget on the home page (between the hero and "What We Do") is front-end only — no AI, no backend, no API key. It's keyword-matched scripted responses and it tells visitors so (greeting, section subtitle, and an honest answer if asked "are you a person / AI?"). Don't market it as AI. **One real feature**: click "Get a bathroom price estimate" (or type something like "bathroom quote") and it walks the visitor through a scripted flow, then computes and shows an itemized, non-binding **labor-only** estimate. The public estimate prices **only the work the visitor explicitly chooses** (demolition, floor tile / other flooring / none, wall tile, wall paint, ceiling paint — nothing pre-selected, every question must be answered), shows each line's quantity × rate, and lists its assumptions (floor/wall area formulas, full-height walls with no deductions, what's excluded) on screen and in the PDF. **Plumbing and electrical work is not offered or priced on the public site** (no plumbing points, electrical points, no-stack or bad-valve surcharges) until the licence position is confirmed — see "Licence line" below. The public estimate shows **no tax line** (Utah generally treats labor on real property as not subject to sales tax — get tax advice before adding one back) and ends in an "Estimated Labor Total" with a not-a-quote disclaimer. Out-of-scope requests (kitchen, exterior, roofing, damage, mold, etc.) get a "bathrooms only" reply, and that check runs **before** every other keyword, so "water damage in my bathroom" or "kitchen quote" never gets a bathroom answer.
+The chat widget on the home page (between the hero and "What We Do") is front-end only — no AI, no backend, no API key. It's keyword-matched scripted responses and it tells visitors so (greeting, section subtitle, and an honest answer if asked "are you a person / AI?"). Don't market it as AI. **One real feature**: click "Get a bathroom price estimate" (or type something like "bathroom quote") and it walks the visitor through a scripted flow, then computes and shows an itemized, non-binding **labor-only** estimate. The public estimate prices **only the work the visitor explicitly chooses** (demolition, floor tile / other flooring / none, wall tile, wall paint, ceiling paint — nothing pre-selected, every question must be answered), shows each line's quantity × rate, and lists its assumptions (floor/wall area formulas, full-height walls with no deductions, what's excluded) on screen and in the PDF. **Plumbing and electrical work is not priced on the public site** (no plumbing points, electrical points, no-stack or bad-valve surcharges) until the licence position is confirmed — see "Licence line" below. The site no longer says plumbing/electrical is "not offered" (the admin tool does charge for it); instead every page, the estimate card and the PDF say it is **not included and will add to the cost**, and that toilets, sinks, showers and bathtubs need plumbing work. When the visitor lists any of those fixtures, the estimate card shows an extra "Plumbing for the N … item(s) you listed — Extra, not included" line (`PLUMBING_NOTE` / `plumbingFixtureCount` in `js/script.js`). If the owner decides how plumbing is handled (in-house with a licence, a named licensed subcontractor, or not at all), update that wording everywhere (`grep -rni plumb *.html js/script.js`). The public estimate shows **no tax line** (Utah generally treats labor on real property as not subject to sales tax — get tax advice before adding one back) and ends in an "Estimated Labor Total" with a not-a-quote disclaimer. Out-of-scope requests (kitchen, exterior, roofing, damage, mold, etc.) get a "bathrooms only" reply, and that check runs **before** every other keyword, so "water damage in my bathroom" or "kitchen quote" never gets a bathroom answer.
 
 **Fullscreen:** the moment someone starts using the chat (focuses the input, or taps the quote-estimate suggestion), it expands to fill the whole screen so the conversation is the only thing visible, with an "×" button (or Escape) to close it and go back to browsing the page.
 
@@ -44,7 +46,7 @@ The chat widget on the home page (between the hero and "What We Do") is front-en
 
 **The finished estimate is a styled card**, not plain text — itemized lines (each with quantity × rate), "Not included" lines, a bold Estimated Labor Total band, a "What this estimate assumes" list, plus two buttons: **"Export as PDF"** (downloads a formatted PDF of the estimate, generated client-side with jsPDF — no backend involved) and **"Contact Us About This →"** (links to the Contact page). jsPDF is fetched from cdnjs **only when the visitor clicks Export** (no third-party script on normal page views); the PDF-building logic is `exportEstimateAsPdf()` in `js/script.js`. The PDF carries the business identity placeholders in `BUSINESS_IDENTITY`, the `ESTIMATE_DISCLAIMER` text and the same assumptions list.
 
-That math comes from `js/bathroom-pricing.js` (`computePublicEstimate`), using the same prices as the admin quoting tool — the two are built from one shared file so they can never drift apart. The chat estimate always uses the default prices (or whatever's saved under `pr_business_rates` in that visitor's own browser, which in practice means the defaults, since a customer's browser won't have the admin's saved settings — see the "no backend" limitations below).
+That math comes from `js/bathroom-pricing.js` (`computePublicEstimate`), using the same prices as the admin quoting tool — the two are built from one shared file so they can never drift apart. The chat estimate always uses `DEFAULT_PRICES` from `js/bathroom-pricing.js` — it deliberately ignores prices saved under `pr_business_rates` from the admin screen, so every visitor (including staff browsers) sees the same published figures. If you change a price under Business Prices, also change `DEFAULT_PRICES` (and the $60 / $5 figures on `index.html`, `faq.html`, `terms.html` and in the chat replies) if the public prices should change too.
 
 This shows visitors your actual live prices in real time. If that's not what you want, the trigger and math live in `js/script.js` (`getBotReply`, `startBathroomQuote`, `BATHROOM_QUOTE_GROUPS`) — easy to disable or change to "we'll follow up" instead of showing a number.
 
@@ -87,12 +89,14 @@ A few line items work a little differently:
 
 ## Retention and privacy requests routine
 
-The Privacy Notice promises deletion after set periods and a response time for access/deletion requests. Until real periods are chosen these are placeholders (see below). Once they are:
+Until real retention periods are chosen, the Privacy Notice says plainly that no fixed periods are set yet and that enquiries/quotes are kept until deleted (deleted on request). The period-based wording, with the `[RETENTION PERIOD]` and `[CUSTOMER RECORD RETENTION PERIOD]` placeholders, is kept in an HTML comment in `privacy.html` — swap it in only once the periods are chosen **and** the routine below is actually running. The response time for requests is still `[PRIVACY RESPONSE PERIOD]`. Once the periods are chosen:
 
 1. **Monthly** (put a recurring calendar reminder in place): open `/admin/` and delete quotes past retention; delete Gmail enquiries (and any offline notes) about jobs that didn't go ahead once they pass `[RETENTION PERIOD]`; delete customer records past `[CUSTOMER RECORD RETENTION PERIOD]` unless the law requires keeping them.
 2. **Every privacy request** (email subject "Privacy request", or by phone): log it in a private spreadsheet (not in this public repo) with: date received, who asked, how identity was confirmed, what was found (Gmail, admin quotes in the browser, offline records), action taken, date closed. Respond within `[PRIVACY RESPONSE PERIOD]`.
 
 ## Licence line
+
+The site does not state any licence status. Fixture installation (toilets, sinks, showers, bathtubs) is still advertised and priced, with wording that plumbing is extra and that the licences and permits it needs are confirmed with the customer before work is agreed — make sure that actually happens. Whether the business performs, subcontracts or drops plumbing/electrical/fixture work is the owner's decision; the site's wording must follow it.
 
 The "Contractor License #" line has been **removed** from every footer, `terms.html` and the PDF estimate, and plumbing/electrical work is no longer advertised or priced on the public site, because showing a placeholder licence number could read as claiming a licence. Once the licence number and classification are confirmed and verifiable, restore the commented-out line in each footer and in `terms.html`, and set `BUSINESS_IDENTITY.license` in `js/script.js`.
 
@@ -137,6 +141,6 @@ These bracketed placeholders appear on the public site and must be replaced cons
 - `[CONTRACTOR LICENSE #]`, `[LICENSE CLASSIFICATION]` — currently only in HTML comments (every footer, `terms.html`) and a code comment in `js/script.js`; see "Licence line" above
 - `[GOVERNING STATE]` — `terms.html`
 - `[EFFECTIVE DATE]` — `privacy.html`, `terms.html`
-- `[RETENTION PERIOD]` — `privacy.html`, `admin/index.html` (also set `QUOTE_RETENTION_DAYS` in `js/admin.js`)
-- `[CUSTOMER RECORD RETENTION PERIOD]` — `privacy.html`
+- `[RETENTION PERIOD]` — `privacy.html` (in an HTML comment until the routine runs; see "Retention and privacy requests routine"), `admin/index.html` (also set `QUOTE_RETENTION_DAYS` in `js/admin.js`)
+- `[CUSTOMER RECORD RETENTION PERIOD]` — `privacy.html` (in the same HTML comment)
 - `[PRIVACY RESPONSE PERIOD]` — `privacy.html`
