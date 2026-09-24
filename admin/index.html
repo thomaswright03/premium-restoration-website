@@ -86,57 +86,101 @@
         </div>
       </header>
 
-      <!-- Backups: quotes live only in this browser, so this panel always says when the last backup was
-           made and whether the browser has agreed to keep the data (js/admin/backup.js renderBackupPanel). -->
-      <section id="backup-panel" class="backup-panel" aria-labelledby="backup-panel-title">
-        <div class="backup-panel-text">
-          <h2 id="backup-panel-title" class="backup-panel-title">Backups</h2>
-          <p id="backup-status" class="backup-status"></p>
-          <p id="storage-status" class="backup-status" hidden></p>
-        </div>
-        <div class="admin-inline-actions">
-          <button id="export-quotes-btn" class="btn btn-outline-dark" type="button">Export Backup</button>
-          <label class="btn btn-outline-dark admin-file-btn" for="import-quotes-input">Restore from Backup</label>
-          <input id="import-quotes-input" class="visually-hidden" type="file" accept="application/json,.json" />
-          <button id="persist-retry-btn" class="btn btn-outline-dark" type="button" hidden>
-            Ask Browser to Keep Data
-          </button>
-        </div>
-      </section>
+      <div class="admin-toolbar">
+        <button id="create-quote-btn" class="btn btn-primary" type="button">Create New Quote</button>
+        <button id="open-rates-btn" class="btn btn-outline-dark" type="button">Business Prices</button>
+      </div>
 
       <div id="draft-banner" class="admin-panel-note" hidden>
         <p id="draft-banner-text"></p>
         <ul id="draft-list" class="draft-list"></ul>
       </div>
 
-      <div class="admin-toolbar">
-        <button id="create-quote-btn" class="btn btn-primary" type="button">Create New Quote</button>
-        <button id="open-rates-btn" class="btn btn-outline-dark" type="button">Business Prices</button>
-      </div>
+      <!-- Backups: quotes live only in this browser, so this line always says when the last backup was made.
+           It turns red with Export Now while a backup is due; the rest (whether the browser agreed to keep the
+           data, Restore from Backup) opens on demand (js/admin/backup.js renderBackupPanel). -->
+      <section id="backup-panel" class="backup-panel admin-status" aria-labelledby="backup-panel-title">
+        <div class="admin-status-summary">
+          <p class="admin-status-text">
+            <span id="backup-panel-title" class="admin-status-title">Backups</span>
+            <span id="backup-status" class="backup-status"></span>
+            <span id="storage-chip" class="admin-status-chip" hidden></span>
+          </p>
+          <div class="admin-status-actions">
+            <button id="export-quotes-btn" class="btn btn-outline-dark" type="button">Export Backup</button>
+            <button
+              id="backup-toggle"
+              class="admin-status-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="backup-details"
+            >
+              <span class="visually-hidden">Backup </span>Details
+            </button>
+          </div>
+        </div>
+        <div id="backup-details" class="admin-status-details" hidden>
+          <p id="storage-status" class="backup-status" hidden></p>
+          <div class="admin-inline-actions">
+            <label class="btn btn-outline-dark admin-file-btn" for="import-quotes-input">Restore from Backup</label>
+            <input id="import-quotes-input" class="visually-hidden" type="file" accept="application/json,.json" />
+            <button id="persist-retry-btn" class="btn btn-outline-dark" type="button" hidden>
+              Ask Browser to Keep Data
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Retention: one line; opens (and turns prominent) when quotes are past the retention period or the
+           monthly clean-up is overdue (js/admin/dashboard.js renderRetentionBar). -->
+      <section id="retention-bar" class="retention-bar admin-status" aria-labelledby="retention-title" hidden>
+        <div class="admin-status-summary">
+          <p class="admin-status-text">
+            <span id="retention-title" class="admin-status-title">Clean-up</span>
+            <span id="retention-summary"></span>
+          </p>
+          <div class="admin-status-actions">
+            <button
+              id="retention-toggle"
+              class="admin-status-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="retention-details"
+            >
+              <span class="visually-hidden">Clean-up </span>Details
+            </button>
+          </div>
+        </div>
+        <div id="retention-details" class="admin-status-details" hidden></div>
+      </section>
 
       <div id="price-drift-notice" class="admin-notice-slot" hidden></div>
-      <div id="retention-bar" class="retention-bar" hidden></div>
 
-      <div class="admin-filter">
+      <div id="quote-filter-wrap" class="admin-filter">
         <label for="quote-filter">Find a quote by address or customer</label>
         <input type="search" id="quote-filter" placeholder="Address, name, phone or email" autocomplete="off" />
       </div>
       <p id="quote-count" class="admin-muted admin-count" aria-live="polite"></p>
       <div id="quote-list" class="quote-list"></div>
-      <p id="quote-list-empty" class="admin-muted" hidden>
-        No quotes in this browser. Choose "Create New Quote" to get started, or "Restore from Backup" to bring back
-        quotes from a backup file.
-      </p>
-      <p class="admin-muted admin-footnote">
-        Data handling: quotes contain homeowners' property addresses and, if entered, customers' names and contact
-        details. They are saved only in this browser, so export a backup regularly and keep the file somewhere other
-        than this browser; backup files hold the same personal details, so delete old ones in the monthly clean-up.
-        Delete quotes that didn't become jobs after about a month (30 days; the public Privacy Notice says enquiries are
-        kept for about a month), mark quotes that became jobs as booked so they are kept, and delete a quote promptly if
-        the homeowner asks. The clean-up record above is kept only in this browser, so also note each clean-up in the
-        business's own records. Tax on labor: the tax rate defaults to 0% &mdash; only change it under Business Prices
-        once a tax adviser confirms tax applies.
-      </p>
+      <!-- The one message when there are no quotes, in the list's place (js/admin/dashboard.js). -->
+      <div id="dashboard-empty" class="admin-empty" hidden>
+        <p id="quote-list-empty" class="admin-muted"></p>
+        <button id="empty-restore-btn" class="btn btn-outline-dark" type="button">Restore from Backup</button>
+      </div>
+
+      <details class="admin-footnote">
+        <summary>Data handling and tax: what the owner must do</summary>
+        <p class="admin-muted">
+          Data handling: quotes contain homeowners' property addresses and, if entered, customers' names and contact
+          details. They are saved only in this browser, so export a backup regularly and keep the file somewhere other
+          than this browser; backup files hold the same personal details, so delete old ones in the monthly clean-up.
+          Delete quotes that didn't become jobs after about a month (30 days; the public Privacy Notice says enquiries
+          are kept for about a month), mark quotes that became jobs as booked so they are kept, and delete a quote
+          promptly if the homeowner asks. The clean-up record above is kept only in this browser, so also note each
+          clean-up in the business's own records. Tax on labor: the tax rate defaults to 0% &mdash; only change it under
+          Business Prices once a tax adviser confirms tax applies.
+        </p>
+      </details>
     </main>
 
     <!-- QUOTE: property, customer and the bathroom calculator on one screen -->

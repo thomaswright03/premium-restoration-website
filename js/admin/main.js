@@ -156,6 +156,11 @@
       navigate("prices");
     });
     document.getElementById("export-quotes-btn").addEventListener("click", A.exportQuotes);
+    A.initDisclosure("backup", A.renderBackupPanel);
+    document.getElementById("empty-restore-btn").addEventListener("click", function () {
+      document.getElementById("import-quotes-input").click();
+    });
+    A.initDisclosure("retention", A.renderRetentionBar);
     document.getElementById("import-quotes-input").addEventListener("change", function (e) {
       var picker = /** @type {HTMLInputElement} */ (e.target);
       var file = picker.files && picker.files[0];

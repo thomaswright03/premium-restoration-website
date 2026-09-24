@@ -624,6 +624,10 @@ test.describe("admin: messages and retention", () => {
     });
     await loginAdmin(page);
     await expect(page.locator("#retention-bar")).toContainText("3 quotes have not been updated in over 30 days");
+    // Due: the line is marked and open, with the actions on show.
+    await expect(page.locator("#retention-bar")).toHaveAttribute("data-retention", "due");
+    await expect(page.locator("#retention-summary")).toHaveText("3 quotes past the 30-day retention period.");
+    await expect(page.getByRole("button", { name: "Clean-up Details" })).toHaveAttribute("aria-expanded", "true");
     const won = page.locator(".quote-card", { hasText: "42 Won Lane" });
     await won.getByRole("button", { name: "Mark Job Booked" }).click();
     await expect(won).toContainText("Job booked");
@@ -646,6 +650,39 @@ test.describe("admin: messages and retention", () => {
     await answerDialog(page, "Log clean-up");
     await expect(page.locator("#retention-bar")).toContainText("Last monthly clean-up logged in this browser: ");
     await expect(page.locator("#retention-bar")).not.toContainText("logged in this browser: none");
+  });
+
+  test("the monthly clean-up line turns prominent once the last logged clean-up is over a month old", async ({
+    page,
+  }) => {
+    await page.goto("/admin/");
+    await page.evaluate(() => {
+      const now = new Date().toISOString();
+      const longAgo = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString();
+      localStorage.setItem(
+        "pr_quotes",
+        JSON.stringify([
+          {
+            id: "q_new",
+            address: "7 Fresh Lane",
+            data: { bathroom: { calcVersion: 2, jobValues: { Cabinet_Quantity: 1 }, scope: {}, totalPrice: 60 } },
+            createdAt: now,
+            updatedAt: now,
+          },
+        ]),
+      );
+      localStorage.setItem("pr_retention_log", JSON.stringify([{ date: longAgo, type: "monthly-clean-up" }]));
+    });
+    await loginAdmin(page);
+    const bar = page.locator("#retention-bar");
+    await expect(bar).toHaveAttribute("data-retention", "due");
+    await expect(bar).toHaveClass(/is-due/);
+    await expect(page.locator("#retention-summary")).toContainText("Monthly clean-up due (last logged");
+    await page.getByRole("button", { name: "Log This Month's Clean-Up" }).click();
+    await answerDialog(page, "Log clean-up");
+    await expect(bar).toHaveAttribute("data-retention", "ok");
+    await expect(page.locator("#retention-summary")).toContainText("Nothing past 30 days; last clean-up logged");
+    await expect(page.getByRole("button", { name: "Log This Month's Clean-Up" })).toBeHidden();
   });
 });
 

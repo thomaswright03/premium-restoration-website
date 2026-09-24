@@ -253,10 +253,30 @@
   font-size: var(--fs-sm);
 }
 
+/* The only message when there are no quotes, in the same column as the list. */
+.admin-empty {
+  max-width: 900px;
+  margin: var(--space-4) auto 0;
+}
+
+.admin-empty p {
+  margin: 0 0 var(--space-3);
+}
+
 .admin-footnote {
   max-width: 900px;
   margin: var(--space-6) auto 0;
   font-size: var(--fs-sm);
+}
+
+.admin-footnote summary {
+  padding: var(--space-3) 0;
+  cursor: pointer;
+  color: var(--color-ink-soft);
+}
+
+.admin-footnote p {
+  margin: var(--space-2) 0 0;
 }
 
 .admin-inline-actions {
@@ -308,53 +328,174 @@
   color: var(--color-ink-soft);
 }
 
-/* Backups: always on the dashboard; a strong warning while a backup is due. */
-.backup-panel {
+/* Status lines (Backups, Clean-up): one short line each, so the quote list
+   stays near the top. Details open on demand; a line is marked only while
+   something is due (.is-due). */
+.admin-status {
   max-width: 900px;
-  margin: 0 auto var(--space-5);
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--color-line-strong);
+  margin: 0 auto var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
+}
+
+.admin-status.is-due {
+  border-color: var(--color-danger);
+  border-left-width: 6px;
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+
+.admin-status-summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+/* The backup line has Export as well, so it may wrap under the text. */
+#backup-panel .admin-status-summary {
   flex-wrap: wrap;
-  gap: var(--space-4);
 }
 
-.backup-panel.is-due {
-  border-color: var(--color-danger);
-  border-left-width: 6px;
+.admin-status-actions {
+  flex: none;
 }
 
-.backup-panel-text {
-  flex: 1 1 380px;
+.admin-status-text {
+  flex: 1 1 260px;
   min-width: 0;
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-ink-soft);
 }
 
-.backup-panel-title {
-  margin: 0 0 var(--space-1);
-  font-family: var(--font-body);
-  font-size: var(--fs-base);
+.admin-status-title {
+  margin-right: var(--space-2);
   font-weight: 600;
-  letter-spacing: 0.02em;
+  color: var(--color-ink);
 }
 
-.backup-status {
+.admin-status.is-due .admin-status-text > span:not(.admin-status-title):not(.admin-status-chip) {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.admin-status-chip {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-danger);
+  border-radius: 999px;
+  color: var(--color-danger);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admin-status-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.admin-status-toggle {
+  min-height: var(--tap);
+  padding: 0 var(--space-2);
+  background: none;
+  border: none;
+  color: var(--color-accent-text);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* A chevron drawn with borders (no text, so screen readers don't read it). */
+.admin-status-toggle::after {
+  content: "";
+  display: inline-block;
+  width: 0.45em;
+  height: 0.45em;
+  margin-left: 0.5em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-0.2em) rotate(45deg);
+}
+
+.admin-status-toggle[aria-expanded="true"]::after {
+  transform: translateY(0.1em) rotate(-135deg);
+}
+
+.admin-status-details {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.admin-status-details[hidden] {
+  display: none;
+}
+
+.admin-status-details p {
   margin: 0;
   color: var(--color-ink-soft);
 }
 
-.backup-status + .backup-status {
-  margin-top: var(--space-2);
+.admin-status-details p.retention-log {
   font-size: var(--fs-sm);
+  color: var(--color-muted);
 }
 
-.backup-panel.is-due #backup-status,
 .backup-status.is-warning {
   color: var(--color-danger);
   font-weight: 600;
+}
+
+/* On a phone the dashboard is tighter, so the first quote and Create New
+   Quote are on screen without scrolling. */
+@media (max-width: 640px) {
+  #screen-dashboard {
+    padding-top: var(--space-5);
+  }
+
+  #screen-dashboard .admin-header {
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+
+  .admin-count {
+    margin-bottom: var(--space-2);
+  }
+
+  .admin-toolbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+
+  .admin-toolbar .btn {
+    padding: var(--space-2) var(--space-3);
+    letter-spacing: 0.06em;
+    text-align: center;
+  }
+
+  #backup-panel .admin-status-text {
+    flex-basis: 100%;
+  }
+
+  .admin-status {
+    margin-bottom: var(--space-2);
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
+  }
 }
 
 /* Quote list */
@@ -459,6 +600,13 @@
   color: var(--color-accent-text);
 }
 
+@media (max-width: 640px) {
+  .quote-card {
+    padding: var(--space-3) var(--space-4);
+    gap: var(--space-3);
+  }
+}
+
 /* Delete always looks destructive, not only on hover. */
 .quote-card-actions button.danger {
   border-color: var(--color-danger);
@@ -476,32 +624,7 @@
   cursor: not-allowed;
 }
 
-/* Retention and warnings */
-.retention-bar {
-  max-width: 900px;
-  margin: 0 auto var(--space-5);
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.retention-bar p {
-  margin: 0;
-  color: var(--color-ink-soft);
-}
-
-.retention-bar p.retention-log {
-  margin-top: var(--space-1);
-  font-size: var(--fs-sm);
-  color: var(--color-muted);
-}
-
+/* Warnings */
 .admin-notice-slot {
   max-width: 900px;
   margin: 0 auto var(--space-5);

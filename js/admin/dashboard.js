@@ -31,97 +31,139 @@
     return A.writeJson(A.RETENTION_LOG_KEY, log);
   }
 
+  // The monthly clean-up is overdue when the last one logged is more than
+  // this many days old (or none is logged and a quote is older than that).
+  var CLEAN_UP_DUE_DAYS = 31;
+
+  function lastLogged(log, type) {
+    return log
+      .filter(function (e) {
+        return e.type === type;
+      })
+      .pop();
+  }
+
+  function cleanUpOverdue(quotes, lastCleanUp) {
+    if (lastCleanUp) return A.daysSince(lastCleanUp.date) > CLEAN_UP_DUE_DAYS;
+    return quotes.some(function (q) {
+      return q.createdAt && A.daysSince(q.createdAt) > CLEAN_UP_DUE_DAYS;
+    });
+  }
+
+  function retentionSummary(expired, lastCleanUp, overdue) {
+    if (expired.length) {
+      return A.plural(expired.length, "quote") + " past the " + A.QUOTE_RETENTION_DAYS + "-day retention period.";
+    }
+    if (overdue) {
+      return lastCleanUp
+        ? "Monthly clean-up due (last logged " + A.formatDate(lastCleanUp.date) + ")."
+        : "Monthly clean-up due (none logged yet).";
+    }
+    return (
+      "Nothing past " +
+      A.QUOTE_RETENTION_DAYS +
+      " days" +
+      (lastCleanUp ? "; last clean-up logged " + A.formatDate(lastCleanUp.date) + "." : ".")
+    );
+  }
+
+  function deleteOldEnquiries(expired) {
+    A.confirmAction(
+      "Delete old enquiries?",
+      "Delete " +
+        expired.length +
+        (expired.length === 1 ? " quote" : " quotes") +
+        " not updated in over " +
+        A.QUOTE_RETENTION_DAYS +
+        " days? Quotes marked as booked jobs are kept. This can't be undone.",
+      "Delete " + expired.length + (expired.length === 1 ? " quote" : " quotes"),
+    ).then(function (ok) {
+      if (!ok) return;
+      var ids = A.getQuotes()
+        .filter(isPastRetention)
+        .map(function (q) {
+          return q.id;
+        });
+      var saved = A.saveQuotes(
+        A.getQuotes().filter(function (q) {
+          return ids.indexOf(q.id) === -1;
+        }),
+      );
+      if (!saved) return A.alertError(A.STORAGE_ERROR);
+      addRetentionLogEntry("quote-purge", ids.length);
+      A.toast(ids.length + (ids.length === 1 ? " quote" : " quotes") + " deleted.");
+      renderDashboard();
+    });
+  }
+
+  function logCleanUp() {
+    A.confirmAction(
+      "Log this month's clean-up?",
+      "Only log today's date once you have deleted, everywhere they are kept (email, voicemail and texts, the form " +
+        "service if one is used, quotes in every browser that holds them, and old backup files), enquiries that " +
+        "didn't become jobs and are about a month old.",
+      "Log clean-up",
+      "primary",
+    ).then(function (ok) {
+      if (!ok) return;
+      if (!addRetentionLogEntry("monthly-clean-up", null)) return A.alertError(A.STORAGE_ERROR);
+      A.toast("This month's clean-up is logged.");
+      renderDashboard();
+    });
+  }
+
+  // One line about retention. It opens, and is marked, only while something
+  // is due: quotes past the retention period, or the monthly clean-up.
   function renderRetentionBar(quotes) {
     var bar = document.getElementById("retention-bar");
+    var details = document.getElementById("retention-details");
     var expired = quotes.filter(isPastRetention);
-    bar.innerHTML = "";
-    bar.hidden = false;
-
-    var textWrap = document.createElement("div");
-    var text = document.createElement("p");
-    text.textContent = expired.length
-      ? expired.length +
-        (expired.length === 1 ? " quote has" : " quotes have") +
-        " not been updated in over " +
-        A.QUOTE_RETENTION_DAYS +
-        " days and not marked as a booked job. Mark any that became jobs, then delete the rest."
-      : "No quotes in this browser are past the " + A.QUOTE_RETENTION_DAYS + "-day retention period.";
-    textWrap.appendChild(text);
-
     var log = getRetentionLog();
-    var lastCleanUp = log
-      .filter(function (e) {
-        return e.type === "monthly-clean-up";
-      })
-      .pop();
-    var lastPurge = log
-      .filter(function (e) {
-        return e.type === "quote-purge";
-      })
-      .pop();
-    var logText = document.createElement("p");
-    logText.className = "retention-log";
-    logText.textContent =
-      "Last monthly clean-up logged in this browser: " +
-      (lastCleanUp ? A.formatDate(lastCleanUp.date) : "none") +
-      ". Old enquiries last deleted: " +
-      (lastPurge ? A.formatDate(lastPurge.date) + " (" + lastPurge.deleted + " deleted)" : "none") +
-      ".";
-    textWrap.appendChild(logText);
-    bar.appendChild(textWrap);
+    var lastCleanUp = lastLogged(log, "monthly-clean-up");
+    var lastPurge = lastLogged(log, "quote-purge");
+    var overdue = cleanUpOverdue(quotes, lastCleanUp);
+    var due = expired.length > 0 || overdue;
+    bar.hidden = false;
+    bar.classList.toggle("is-due", due);
+    bar.setAttribute("data-retention", due ? "due" : "ok");
+    document.getElementById("retention-summary").textContent = retentionSummary(expired, lastCleanUp, overdue);
 
-    var actions = document.createElement("div");
-    actions.className = "admin-inline-actions";
+    details.innerHTML = "";
+    details.appendChild(
+      A.el(
+        "p",
+        "",
+        expired.length
+          ? expired.length +
+              (expired.length === 1 ? " quote has" : " quotes have") +
+              " not been updated in over " +
+              A.QUOTE_RETENTION_DAYS +
+              " days and not marked as a booked job. Mark any that became jobs, then delete the rest."
+          : "No quotes in this browser are past the " + A.QUOTE_RETENTION_DAYS + "-day retention period.",
+      ),
+    );
+    details.appendChild(
+      A.el(
+        "p",
+        "retention-log",
+        "Last monthly clean-up logged in this browser: " +
+          (lastCleanUp ? A.formatDate(lastCleanUp.date) : "none") +
+          ". Old enquiries last deleted: " +
+          (lastPurge ? A.formatDate(lastPurge.date) + " (" + lastPurge.deleted + " deleted)" : "none") +
+          ".",
+      ),
+    );
+    var actions = A.el("div", "admin-inline-actions");
     if (expired.length) {
       actions.appendChild(
         A.makeButton("Delete Old Enquiries", "btn btn-outline-dark", function () {
-          A.confirmAction(
-            "Delete old enquiries?",
-            "Delete " +
-              expired.length +
-              (expired.length === 1 ? " quote" : " quotes") +
-              " not updated in over " +
-              A.QUOTE_RETENTION_DAYS +
-              " days? Quotes marked as booked jobs are kept. This can't be undone.",
-            "Delete " + expired.length + (expired.length === 1 ? " quote" : " quotes"),
-          ).then(function (ok) {
-            if (!ok) return;
-            var ids = A.getQuotes()
-              .filter(isPastRetention)
-              .map(function (q) {
-                return q.id;
-              });
-            var saved = A.saveQuotes(
-              A.getQuotes().filter(function (q) {
-                return ids.indexOf(q.id) === -1;
-              }),
-            );
-            if (!saved) return A.alertError(A.STORAGE_ERROR);
-            addRetentionLogEntry("quote-purge", ids.length);
-            A.toast(ids.length + (ids.length === 1 ? " quote" : " quotes") + " deleted.");
-            renderDashboard();
-          });
+          deleteOldEnquiries(expired);
         }),
       );
     }
-    actions.appendChild(
-      A.makeButton("Log This Month's Clean-Up", "btn btn-outline-dark", function () {
-        A.confirmAction(
-          "Log this month's clean-up?",
-          "Only log today's date once you have deleted, everywhere they are kept (email, voicemail and texts, the form " +
-            "service if one is used, quotes in every browser that holds them, and old backup files), enquiries that " +
-            "didn't become jobs and are about a month old.",
-          "Log clean-up",
-          "primary",
-        ).then(function (ok) {
-          if (!ok) return;
-          if (!addRetentionLogEntry("monthly-clean-up", null)) return A.alertError(A.STORAGE_ERROR);
-          A.toast("This month's clean-up is logged.");
-          renderDashboard();
-        });
-      }),
-    );
-    bar.appendChild(actions);
+    actions.appendChild(A.makeButton("Log This Month's Clean-Up", "btn btn-outline-dark", logCleanUp));
+    details.appendChild(actions);
+    A.renderDisclosure("retention", due);
   }
 
   function getPublishedPriceDrift() {
@@ -246,9 +288,11 @@
 
     var list = document.getElementById("quote-list");
     var empty = document.getElementById("quote-list-empty");
+    document.getElementById("dashboard-empty").hidden = all.length > 0;
+    document.getElementById("quote-filter-wrap").hidden = !all.length;
     var count = document.getElementById("quote-count");
     list.innerHTML = "";
-    empty.hidden = all.length > 0;
+    empty.textContent = all.length ? "" : A.emptyListMessage();
     count.textContent = !all.length
       ? ""
       : filter
@@ -398,5 +442,8 @@
   A.getRetentionLog = getRetentionLog;
   A.buildPriceDriftNotice = buildPriceDriftNotice;
   A.renderDashboard = renderDashboard;
+  A.renderRetentionBar = function () {
+    renderRetentionBar(A.getQuotes());
+  };
   A.startNewQuote = startNewQuote;
 })((window.PRAdmin = window.PRAdmin || { state: {} }));

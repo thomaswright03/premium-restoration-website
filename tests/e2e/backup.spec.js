@@ -52,8 +52,14 @@ test.describe("admin backups", () => {
     await stubPersistence(page, { persisted: false, grant: false });
     await loginAdmin(page);
     const panel = page.locator("#backup-panel");
-    await expect(panel).toContainText("No quotes in this browser");
+    await expect(page.locator("#backup-status")).toHaveText("Nothing to back up yet.");
     await expect(page.locator("#export-quotes-btn")).toBeDisabled();
+    // The empty dashboard says so once, in the quote list's place.
+    await expect(page.locator("#quote-list-empty")).toHaveText(
+      'No quotes in this browser. Choose "Create New Quote" to get started. If you had quotes here before, the browser ' +
+        'may have cleared its storage: choose "Restore from Backup" and pick your latest backup file.',
+    );
+    expect((await page.locator("body").innerText()).match(/No quotes in this browser/g)).toHaveLength(1);
 
     await saveQuote(page, "1 Backup Rd");
     await saveQuote(page, "2 Backup Rd");
@@ -99,8 +105,12 @@ test.describe("admin backups", () => {
     await loginAdmin(page);
     await expect(page.locator(".quote-card")).toHaveCount(0);
     expect(await page.evaluate(() => localStorage.getItem("pr_quotes"))).toBeNull();
-    await expect(page.locator("#backup-status")).toContainText("the browser may have cleared its storage");
-    await expect(panel.locator("label", { hasText: "Restore from Backup" })).toBeVisible();
+    await expect(page.locator("#quote-list-empty")).toContainText("the browser may have cleared its storage");
+    // With no quotes, the empty message has Restore from Backup, and it opens the file chooser.
+    const restore = page.locator("#dashboard-empty").getByRole("button", { name: "Restore from Backup" });
+    await expect(restore).toBeVisible();
+    const [chooser] = await Promise.all([page.waitForEvent("filechooser"), restore.click()]);
+    expect(chooser.isMultiple()).toBe(false);
 
     // One step: choosing the file restores it, no questions.
     await page.setInputFiles("#import-quotes-input", file);
@@ -149,9 +159,13 @@ test.describe("admin backups", () => {
     await expect(storage).toContainText("Storage: not protected");
     await expect(storage).toContainText("can delete them without warning");
     await expect(storage).toHaveClass(/is-warning/);
+    // The backup line carries the short version.
+    await expect(page.locator("#storage-chip")).toHaveText("Storage not protected");
+    await page.getByRole("button", { name: "Backup Details" }).click();
     await page.getByRole("button", { name: "Ask Browser to Keep Data" }).click();
     await expect(page.locator("#admin-toast")).toContainText("The browser has agreed to keep this tool's data.");
     await expect(storage).toContainText("Storage: protected");
+    await expect(page.locator("#storage-chip")).toBeHidden();
   });
 
   test("a browser that can't keep data at all gets the same clear warning", async ({ page }) => {
@@ -159,5 +173,105 @@ test.describe("admin backups", () => {
     await loginAdmin(page);
     await expect(page.locator("#storage-status")).toHaveAttribute("data-persistence", "unsupported");
     await expect(page.locator("#storage-status")).toContainText("Storage: not guaranteed");
+    await expect(page.locator("#storage-chip")).toHaveText("Storage not guaranteed");
+  });
+});
+
+// On a phone the quote list comes first: backups and clean-up are one line
+// each, and only become prominent when something is due.
+test.describe("admin dashboard on a phone", () => {
+  test.use({ viewport: { width: 375, height: 900 } });
+
+  async function seedQuote(page, { backedUpDaysAgo }) {
+    await page.goto("/admin/");
+    await page.evaluate((backedUpDaysAgo) => {
+      const now = new Date().toISOString();
+      const quote = {
+        id: "q_phone",
+        address: "12 Phone Street",
+        customer: { name: "Pat Example", phone: "801-555-0100" },
+        data: { bathroom: { calcVersion: 2, jobValues: { Cabinet_Quantity: 1 }, scope: {}, totalPrice: 60 } },
+        createdAt: now,
+        updatedAt: now,
+      };
+      localStorage.setItem("pr_quotes", JSON.stringify([quote]));
+      if (backedUpDaysAgo !== null) {
+        const at = new Date(Date.now() - backedUpDaysAgo * 24 * 60 * 60 * 1000 + 60 * 1000).toISOString();
+        localStorage.setItem("pr_last_backup", JSON.stringify({ at, quoteCount: 1 }));
+      }
+    }, backedUpDaysAgo);
+  }
+
+  test("the quote and Create New Quote are on screen without scrolling; an overdue backup still can't be missed", async ({
+    page,
+  }) => {
+    await stubPersistence(page, { persisted: false, grant: false });
+    await seedQuote(page, { backedUpDaysAgo: 5 });
+    await loginAdmin(page);
+    const card = page.locator(".quote-card", { hasText: "12 Phone Street" });
+    await expect(card).toBeVisible();
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    await expect(card).toBeInViewport({ ratio: 1 });
+    await expect(page.locator("#create-quote-btn")).toBeInViewport({ ratio: 1 });
+
+    // Overdue: the backup line is red, says so, and has Export Now on screen.
+    const panel = page.locator("#backup-panel");
+    await expect(panel).toHaveClass(/is-due/);
+    await expect(page.locator("#backup-status")).toContainText("Last backup: 5 days ago");
+    await expect(page.locator("#backup-status")).toContainText("— Export now.");
+    const exportNow = panel.getByRole("button", { name: "Export Now" });
+    await expect(exportNow).toBeInViewport({ ratio: 1 });
+    await expect(exportNow).toHaveClass(/btn-primary/);
+    expect(await page.locator("#backup-status").evaluate((node) => getComputedStyle(node).fontWeight)).toBe("600");
+    await expect(page.locator("#storage-chip")).toHaveText("Storage not protected");
+
+    // The rest opens on demand.
+    const toggle = page.getByRole("button", { name: "Backup Details" });
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator("#storage-status")).toBeHidden();
+    await expect(panel.locator("label", { hasText: "Restore from Backup" })).toBeHidden();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#storage-status")).toContainText("Storage: not protected");
+    await expect(panel.locator("label", { hasText: "Restore from Backup" })).toBeVisible();
+    await toggle.click();
+    await expect(page.locator("#storage-status")).toBeHidden();
+
+    // Nothing is due for clean-up: one quiet line, details on demand.
+    const retention = page.locator("#retention-bar");
+    await expect(retention).toHaveAttribute("data-retention", "ok");
+    await expect(page.locator("#retention-summary")).toHaveText("Nothing past 30 days.");
+    await expect(page.getByRole("button", { name: "Log This Month's Clean-Up" })).toBeHidden();
+    await page.getByRole("button", { name: "Clean-up Details" }).click();
+    await expect(page.getByRole("button", { name: "Log This Month's Clean-Up" })).toBeVisible();
+
+    // The data-handling note is one line under the list until opened.
+    const note = page.locator(".admin-footnote");
+    await expect(note.getByText("Data handling: quotes contain")).toBeHidden();
+    await note.locator("summary").click();
+    await expect(note.getByText("Data handling: quotes contain")).toBeVisible();
+  });
+
+  test("a recent backup is a quiet line", async ({ page }) => {
+    await seedQuote(page, { backedUpDaysAgo: 0 });
+    await loginAdmin(page);
+    const panel = page.locator("#backup-panel");
+    await expect(panel).toHaveAttribute("data-backup", "ok");
+    await expect(panel).not.toHaveClass(/is-due/);
+    await expect(page.locator("#backup-status")).toContainText("Last backup: today");
+    await expect(panel.getByRole("button", { name: "Export Backup" })).toHaveClass(/btn-outline-dark/);
+    await expect(page.locator(".quote-card")).toBeInViewport({ ratio: 1 });
+
+    // If the quotes go but the backup record stays, the one empty message says when they were backed up.
+    await page.evaluate(() => localStorage.removeItem("pr_quotes"));
+    await page.reload();
+    await expect(page.locator("#quote-list-empty")).toContainText(
+      "No quotes in this browser, but 1 quote was backed up",
+    );
+    await expect(page.locator("#quote-list-empty")).toBeInViewport();
+    await expect(page.getByRole("button", { name: "Restore from Backup" })).toBeInViewport();
+    await expect(page.locator("#quote-filter")).toBeHidden();
+    await expect(page.locator("#backup-status")).toHaveText("Nothing to back up yet.");
+    expect((await page.locator("body").innerText()).match(/No quotes in this browser/g)).toHaveLength(1);
   });
 });

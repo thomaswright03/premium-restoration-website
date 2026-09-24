@@ -72,58 +72,84 @@
       "Export a backup at the end of every day you add or change quotes.",
   };
 
-  function renderBackupPanel() {
-    var panel = document.getElementById("backup-panel");
-    if (!panel) return;
-    var quotes = A.getQuotes();
+  // The short version beside the backup line (the full text is in the details).
+  var PERSISTENCE_CHIP = { "not-persisted": "Storage not protected", unsupported: "Storage not guaranteed" };
+
+  // The dashboard's one message when there are no quotes. If quotes were
+  // backed up here before, they may have been cleared by the browser.
+  function emptyListMessage() {
     var last = getLastBackup();
-    var status = document.getElementById("backup-status");
-    var exportBtn = /** @type {HTMLButtonElement} */ (document.getElementById("export-quotes-btn"));
-    var text;
-    var due = false;
-    if (!quotes.length) {
-      text = last
-        ? "No quotes in this browser, but " +
+    var restore =
+      'the browser may have cleared its storage: choose "Restore from Backup" and pick your latest backup file.';
+    return last
+      ? "No quotes in this browser, but " +
           A.plural(last.quoteCount || 0, "quote") +
-          " were backed up here on " +
+          (last.quoteCount === 1 ? " was" : " were") +
+          " backed up here on " +
           A.formatDate(last.at) +
-          ". If you didn't delete them, the browser may have cleared its storage: choose Restore from Backup and pick your latest backup file."
-        : "No quotes in this browser. If you had quotes here before, the browser may have cleared its storage: choose Restore from Backup and pick your latest backup file.";
-    } else if (!last) {
-      due = true;
-      text =
-        "Last backup: never. " +
-        (quotes.length === 1 ? "This quote exists" : "These " + quotes.length + " quotes exist") +
-        " only in this browser — Export now and keep the file somewhere else.";
-    } else {
-      var days = A.daysSince(last.at);
-      var changed = quotes.filter(function (q) {
-        return A.lastChanged(q) > new Date(last.at).getTime();
-      }).length;
-      due = days >= A.BACKUP_REMINDER_DAYS;
-      text =
+          ". If you didn't delete them, " +
+          restore
+      : 'No quotes in this browser. Choose "Create New Quote" to get started. If you had quotes here before, ' +
+          restore;
+  }
+
+  function backupLine(quotes, last) {
+    if (!quotes.length) return { text: "Nothing to back up yet.", due: false };
+    if (!last) {
+      return {
+        due: true,
+        text:
+          "Last backup: never. " +
+          (quotes.length === 1 ? "This quote exists" : "These " + quotes.length + " quotes exist") +
+          " only in this browser — Export now and keep the file somewhere else.",
+      };
+    }
+    var days = A.daysSince(last.at);
+    var changed = quotes.filter(function (q) {
+      return A.lastChanged(q) > new Date(last.at).getTime();
+    }).length;
+    var due = days >= A.BACKUP_REMINDER_DAYS;
+    return {
+      due: due,
+      text:
         "Last backup: " +
         A.describeAge(days) +
         " (" +
         A.formatDate(last.at) +
         ")" +
         (changed ? ". " + A.plural(changed, "quote") + " added or changed since" : ", with every quote as it is now") +
-        (due ? " — Export now." : changed ? ". Export again before you finish for the day." : ".");
-    }
-    status.textContent = text;
-    panel.classList.toggle("is-due", due);
-    panel.setAttribute("data-backup", !quotes.length ? "empty" : due ? "due" : "ok");
-    exportBtn.textContent = due ? "Export Now" : "Export Backup";
-    exportBtn.className = "btn " + (due ? "btn-primary" : "btn-outline-dark");
+        (due ? " — Export now." : changed ? ". Export again before you finish for the day." : "."),
+    };
+  }
+
+  // One line: when the last backup was made. It turns red with Export Now
+  // while a backup is due. Whether the browser agreed to keep the data, and
+  // Restore from Backup, are under "Backup details" (with no quotes, the
+  // dashboard's empty message has its own Restore from Backup button).
+  function renderBackupPanel() {
+    var panel = document.getElementById("backup-panel");
+    if (!panel) return;
+    var quotes = A.getQuotes();
+    var line = backupLine(quotes, getLastBackup());
+    document.getElementById("backup-status").textContent = line.text;
+    panel.classList.toggle("is-due", line.due);
+    panel.setAttribute("data-backup", !quotes.length ? "empty" : line.due ? "due" : "ok");
+    var exportBtn = /** @type {HTMLButtonElement} */ (document.getElementById("export-quotes-btn"));
+    exportBtn.textContent = line.due ? "Export Now" : "Export Backup";
+    exportBtn.className = "btn " + (line.due ? "btn-primary" : "btn-outline-dark");
     exportBtn.disabled = !quotes.length;
 
+    var persistence = A.state.persistence;
     var storageEl = document.getElementById("storage-status");
-    storageEl.hidden = !A.state.persistence;
-    storageEl.textContent = A.state.persistence ? PERSISTENCE_TEXT[A.state.persistence] : "";
-    storageEl.className =
-      "backup-status" + (A.state.persistence && A.state.persistence !== "persisted" ? " is-warning" : "");
-    storageEl.setAttribute("data-persistence", A.state.persistence || "");
-    document.getElementById("persist-retry-btn").hidden = A.state.persistence !== "not-persisted";
+    storageEl.hidden = !persistence;
+    storageEl.textContent = persistence ? PERSISTENCE_TEXT[persistence] : "";
+    storageEl.className = "backup-status" + (persistence && persistence !== "persisted" ? " is-warning" : "");
+    storageEl.setAttribute("data-persistence", persistence || "");
+    var chip = document.getElementById("storage-chip");
+    chip.textContent = PERSISTENCE_CHIP[persistence] || "";
+    chip.hidden = !PERSISTENCE_CHIP[persistence];
+    document.getElementById("persist-retry-btn").hidden = persistence !== "not-persisted";
+    A.renderDisclosure("backup", false);
   }
 
   // ------------------------------------------------------------------
@@ -273,6 +299,7 @@
   // Used by the other parts of the admin tool.
   A.checkPersistence = checkPersistence;
   A.renderBackupPanel = renderBackupPanel;
+  A.emptyListMessage = emptyListMessage;
   A.exportQuotes = exportQuotes;
   A.importQuotes = importQuotes;
 })((window.PRAdmin = window.PRAdmin || { state: {} }));

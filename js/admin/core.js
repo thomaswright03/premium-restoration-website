@@ -15,6 +15,7 @@
   //   A.state.persistence    what the browser said about keeping data (backup.js)
   //   A.state.persistenceAsked  whether it has been asked on this visit (backup.js)
   //   A.state.ratesBaseline  the Business Prices fields as opened, or null (prices.js)
+  //   A.state.disclosures    status lines the owner opened or closed by hand (core.js)
 
   var Pricing = window.BathroomPricing;
   var money = Pricing.money;
@@ -226,6 +227,30 @@
     return node;
   }
 
+  // ------------------------------------------------------------------
+  // Status lines (Backups, Clean-up): a one-line summary whose details open
+  // on demand. They open by themselves while something needs doing; once the
+  // owner opens or closes one, that choice is kept until the page reloads.
+  // ------------------------------------------------------------------
+  A.state.disclosures = {};
+
+  function renderDisclosure(name, autoOpen) {
+    var toggle = /** @type {HTMLElement} */ (document.getElementById(name + "-toggle"));
+    var details = /** @type {HTMLElement} */ (document.getElementById(name + "-details"));
+    var chosen = A.state.disclosures[name];
+    var open = typeof chosen === "boolean" ? chosen : autoOpen;
+    details.hidden = !open;
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function initDisclosure(name, render) {
+    var toggle = /** @type {HTMLElement} */ (document.getElementById(name + "-toggle"));
+    toggle.addEventListener("click", function () {
+      A.state.disclosures[name] = toggle.getAttribute("aria-expanded") !== "true";
+      render();
+    });
+  }
+
   // Used by the other parts of the admin tool.
   A.Pricing = Pricing;
   A.money = money;
@@ -249,6 +274,8 @@
   A.daysSince = daysSince;
   A.describeAge = describeAge;
   A.plural = plural;
+  A.renderDisclosure = renderDisclosure;
+  A.initDisclosure = initDisclosure;
   A.PRICES_MISSING = PRICES_MISSING;
   A.pricesReady = pricesReady;
   A.toast = toast;
