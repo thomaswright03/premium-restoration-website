@@ -236,15 +236,18 @@
 
   // Public (chat) estimate. Unlike the admin calculator, it prices ONLY the
   // work the visitor explicitly chose, never assumes demolition, tile,
-  // flooring or paint, and never includes plumbing or electrical work. Every
+  // flooring or paint, and never prices plumbing or electrical work (the
+  // chat tells the visitor that work is extra). Every
   // line carries its quantity x rate so the assumptions can be shown.
   //
   // scope: { demolition: bool, floorFinish: "tile" | "flooring" | "none",
   //          wallTile: bool, paintWalls: bool, paintCeiling: bool }
   var PUBLIC_FIXTURE_SECTION = "B. Fixtures";
 
+  // Always uses the published DEFAULT_PRICES, never prices saved in this
+  // browser from the admin screen, so every visitor sees the same figures.
   function computePublicEstimate(rawValues, scope, prices) {
-    prices = prices || getPrices();
+    prices = prices || Object.assign({}, DEFAULT_PRICES);
     scope = scope || {};
     var jobValues = deriveDimensions(Object.assign({}, rawValues));
     var floorSqFt = jobValues.Bathroom_SqFt;
