@@ -1,6 +1,32 @@
 /* Premium Restoration — luxury editorial theme
    Swap the CSS variables below to re-theme the whole site. */
 
+/* Fonts are self-hosted (fonts/, latin subset, variable weight) so no
+   third-party request is made on page load. Licences: fonts/OFL-*.txt. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 300 600;
+  font-display: swap;
+  src: url("../fonts/inter-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Playfair Display";
+  font-style: normal;
+  font-weight: 500 700;
+  font-display: swap;
+  src: url("../fonts/playfair-display-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Playfair Display";
+  font-style: italic;
+  font-weight: 500 600;
+  font-display: swap;
+  src: url("../fonts/playfair-display-italic-latin.woff2") format("woff2");
+}
+
 :root {
   --color-bg: #faf8f4;
   --color-surface: #ffffff;
@@ -658,6 +684,21 @@ body.ai-chat-locked {
   opacity: 0.5;
 }
 
+.ai-chat-group-field.needs-answer .ai-chat-yesno-btn {
+  border-color: var(--color-accent);
+}
+
+.ai-chat-group-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-accent-dark);
+}
+
+.ai-chat-group-error[hidden] {
+  display: none;
+}
+
 /* Final estimate card */
 .ai-chat-estimate {
   max-width: 480px;
@@ -727,6 +768,38 @@ body.ai-chat-locked {
   font-weight: 600;
   color: var(--color-ink);
   font-variant-numeric: tabular-nums;
+}
+
+.ai-chat-estimate-detail {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.76rem;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ai-chat-estimate-assumptions {
+  margin-top: 18px;
+  font-size: 0.8rem;
+  color: var(--color-ink-soft);
+}
+
+.ai-chat-estimate-assumptions-title {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.ai-chat-estimate-assumptions ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.ai-chat-estimate-assumptions li {
+  margin-bottom: 4px;
 }
 
 .ai-chat-estimate-subtotal {

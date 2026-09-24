@@ -79,12 +79,20 @@ document.addEventListener("DOMContentLoaded", function () {
   var chatSend = document.getElementById("ai-chat-send");
 
   // ---------- guided bathroom quote flow ----------
-  // Fields are grouped into a few small fillable forms (dimensions,
-  // fixtures/electrical, plumbing conditions) instead of one question at a
-  // time, so the visitor fills several fields per turn.
+  // Fields are grouped into a few small fillable forms (dimensions, the
+  // work the job needs, fixture counts) instead of one question at a time,
+  // so the visitor fills several fields per turn. The estimate prices only
+  // what the visitor explicitly chooses: no scope is assumed and no choice
+  // is pre-selected. Plumbing and electrical work is not offered or priced
+  // on the public site.
+  var YES_NO = [
+    { label: "Yes", value: true },
+    { label: "No", value: false },
+  ];
+
   var BATHROOM_QUOTE_GROUPS = [
     {
-      intro: "Sure! Let's get you a rough, non-binding bathroom labor estimate — materials, permits, and any applicable taxes aren't included. Nothing you enter here is sent to us. First, the room's dimensions:",
+      intro: "Sure! Let's get you a rough, non-binding bathroom labor estimate — plumbing and electrical work, materials, permits, and any applicable taxes aren't included. Nothing you enter here is sent to us. First, the room's dimensions:",
       fields: [
         { key: "Bathroom_Width_Ft", label: "Width (ft)" },
         { key: "Bathroom_Length_Ft", label: "Length (ft)" },
@@ -92,7 +100,21 @@ document.addEventListener("DOMContentLoaded", function () {
       ],
     },
     {
-      intro: "Got it. Now, how many of each of these does the job need? (0 for any that don't apply)",
+      intro: "Which of this work does the job need? Only what you choose is priced.",
+      fields: [
+        { key: "demolition", label: "Remove the existing bathroom first (demolition)?", type: "choice", options: YES_NO },
+        { key: "floorFinish", label: "New floor?", type: "choice", options: [
+          { label: "Tile", value: "tile" },
+          { label: "Other flooring", value: "flooring" },
+          { label: "None", value: "none" },
+        ] },
+        { key: "wallTile", label: "Tile the walls (full height)?", type: "choice", options: YES_NO },
+        { key: "paintWalls", label: "Paint the walls?", type: "choice", options: YES_NO },
+        { key: "paintCeiling", label: "Paint the ceiling?", type: "choice", options: YES_NO },
+      ],
+    },
+    {
+      intro: "Last step — how many of each should we install? (0 for any that don't apply)",
       fields: [
         { key: "Toilet_Quantity", label: "Toilets" },
         { key: "Sink_Quantity", label: "Sinks" },
@@ -105,14 +127,6 @@ document.addEventListener("DOMContentLoaded", function () {
         { key: "Mirror_Quantity", label: "Standard mirrors" },
         { key: "Mirror_Huge_Quantity", label: "Huge mirrors" },
         { key: "Shower_Shelf_Quantity", label: "Shower shelves" },
-        { key: "Electrical_Points", label: "Electrical points (lamps, outlets, fans, switches, etc.)" },
-      ],
-    },
-    {
-      intro: "Almost done — two quick plumbing questions:",
-      fields: [
-        { key: "No_Stack_Surcharge_Included", label: "Is there already a plumbing stack in place?", type: "yesno", invert: true },
-        { key: "Bad_Valve_Surcharge_Included", label: "Does a valve need to be replaced?", type: "yesno" },
       ],
     },
   ];
@@ -134,18 +148,49 @@ document.addEventListener("DOMContentLoaded", function () {
   // Business identity shown on estimates. Replace the bracketed
   // placeholders with the real details (they must match privacy.html,
   // terms.html and every page footer).
+  // The licence line is left empty on purpose: only fill it in once the
+  // licence is confirmed and verifiable, e.g.
+  // "Contractor License # [CONTRACTOR LICENSE #] ([LICENSE CLASSIFICATION])".
   var BUSINESS_IDENTITY = {
     legalName: "[COMPANY LEGAL NAME]",
-    license: "Contractor License # [CONTRACTOR LICENSE #]",
+    license: "",
     phone: "(385) 356-8733",
     email: "eduardo.moroni77@gmail.com",
   };
 
   var ESTIMATE_DISCLAIMER =
-    "This is an automated, non-binding estimate of labor only, based solely on the numbers you entered. " +
-    "It is not a quote, offer, or contract. It excludes materials, permits, and any applicable taxes. " +
+    "This is an automated, non-binding estimate of labor only, based only on the measurements, counts, and " +
+    "choices you entered and the assumptions listed with it. It is not a quote, offer, or contract. It excludes " +
+    "plumbing and electrical work, materials, permits, and any applicable taxes. " +
     "Prices are current as of the date generated and may change. Your actual price is set only in a " +
     "written agreement after we review your project in person.";
+
+  var FLOOR_FINISH_LABELS = { tile: "Tile", flooring: "Other flooring", none: "None" };
+
+  function yesNo(value) {
+    return value ? "Yes" : "No";
+  }
+
+  // Plain-text list of everything the estimate assumed, shown on the
+  // estimate card and printed in the PDF.
+  function estimateAssumptions(answers, result) {
+    var w = BathroomPricing.formatQty(answers.Bathroom_Width_Ft);
+    var l = BathroomPricing.formatQty(answers.Bathroom_Length_Ft);
+    var h = BathroomPricing.formatQty(answers.Bathroom_Height_Ft);
+    return [
+      "Your choices: demolition " + yesNo(answers.demolition) +
+        "; new floor " + (FLOOR_FINISH_LABELS[answers.floorFinish] || "None") +
+        "; wall tile " + yesNo(answers.wallTile) +
+        "; paint walls " + yesNo(answers.paintWalls) +
+        "; paint ceiling " + yesNo(answers.paintCeiling) + ". Only this work is priced.",
+      "Floor area: " + w + " × " + l + " ft = " + BathroomPricing.formatQty(result.floorSqFt) +
+        " sq ft (the ceiling is taken to be the same size).",
+      "Wall area: 2 × " + h + " ft × (" + w + " + " + l + " ft) = " + BathroomPricing.formatQty(result.wallSqFt) +
+        " sq ft — all four walls, full height, with no deduction for doors, windows, or a tub/shower.",
+      "Fixtures are priced per item at our current labor rates, which may change.",
+      "Not included: plumbing and electrical work, materials, permits, and any applicable taxes.",
+    ];
+  }
 
   // jsPDF is only fetched from cdnjs when a visitor actually asks for a PDF,
   // so no third-party script loads on a normal page view.
@@ -166,10 +211,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Generates a downloadable PDF of the estimate using jsPDF (loaded on
   // demand from cdnjs). Mirrors the on-screen card's content and totals.
-  function exportEstimateAsPdf(result) {
+  function exportEstimateAsPdf(result, assumptions) {
     if (!window.jspdf) {
       loadJsPdf(function () {
-        if (window.jspdf) exportEstimateAsPdf(result);
+        if (window.jspdf) exportEstimateAsPdf(result, assumptions);
       });
       return;
     }
@@ -204,7 +249,11 @@ document.addEventListener("DOMContentLoaded", function () {
     doc.setTextColor(30);
     result.lineResults.forEach(function (r) {
       if (r.cost <= 0) return;
+      doc.setTextColor(30);
       doc.text(r.label, margin, y);
+      doc.setTextColor(130);
+      doc.text(r.detail, margin + 150, y);
+      doc.setTextColor(30);
       doc.text(BathroomPricing.money(r.cost), pageWidth - margin, y, { align: "right" });
       y += 20;
     });
@@ -224,8 +273,23 @@ document.addEventListener("DOMContentLoaded", function () {
     doc.setFont("times", "normal");
     doc.setFontSize(9);
     doc.setTextColor(130);
-    doc.text("Excludes materials, permits, and any applicable taxes. Non-binding.", margin, y);
-    y += 36;
+    doc.text("Excludes plumbing and electrical work, materials, permits, and any applicable taxes. Non-binding.", margin, y);
+    y += 30;
+
+    doc.setFont("times", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(30);
+    doc.text("What this estimate assumes", margin, y);
+    y += 16;
+    doc.setFont("times", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(70);
+    (assumptions || []).forEach(function (a) {
+      var aLines = doc.splitTextToSize("•  " + a, pageWidth - margin * 2);
+      doc.text(aLines, margin, y);
+      y += aLines.length * 13 + 3;
+    });
+    y += 24;
 
     doc.setTextColor(150);
     doc.text(
@@ -234,16 +298,16 @@ document.addEventListener("DOMContentLoaded", function () {
       y
     );
     y += 14;
-    doc.text(BUSINESS_IDENTITY.legalName + "  •  " + BUSINESS_IDENTITY.license, margin, y);
+    doc.text(BUSINESS_IDENTITY.legalName + (BUSINESS_IDENTITY.license ? "  •  " + BUSINESS_IDENTITY.license : ""), margin, y);
 
     doc.save("premium-restoration-bathroom-estimate.pdf");
   }
 
   // Builds the finished estimate as a styled card (not plain text) inside a
   // bot chat bubble: itemized lines, subtotal/tax, a bold total, and a CTA.
-  function appendEstimateCard(rawAnswers) {
-    var jobValues = BathroomPricing.deriveDimensions(Object.assign({}, rawAnswers));
-    var result = BathroomPricing.computeBathroomTotal(jobValues);
+  function appendEstimateCard(answers) {
+    var result = BathroomPricing.computePublicEstimate(answers, answers);
+    var assumptions = estimateAssumptions(answers, result);
 
     var row = document.createElement("div");
     row.className = "ai-chat-row bot";
@@ -267,7 +331,7 @@ document.addEventListener("DOMContentLoaded", function () {
     header.innerHTML =
       '<span class="eyebrow">Your Estimate</span>' +
       '<h3>Bathroom Restoration</h3>' +
-      '<p>Automated, non-binding labor estimate — not a quote, offer, or contract. Excludes materials, permits, and any applicable taxes. Your actual price is set only in a written agreement after we review your project in person.</p>';
+      '<p>Automated, non-binding labor estimate — not a quote, offer, or contract. Based only on what you entered and the assumptions listed below. Excludes plumbing and electrical work, materials, permits, and any applicable taxes. Your actual price is set only in a written agreement after we review your project in person.</p>';
     card.appendChild(header);
 
     var lines = document.createElement("div");
@@ -276,9 +340,17 @@ document.addEventListener("DOMContentLoaded", function () {
       if (r.cost <= 0) return;
       var line = document.createElement("div");
       line.className = "ai-chat-estimate-line";
-      line.innerHTML = "<span>" + r.label + "</span><span>" + BathroomPricing.money(r.cost) + "</span>";
+      line.innerHTML =
+        '<span>' + r.label + ' <small class="ai-chat-estimate-detail">' + r.detail + "</small></span>" +
+        "<span>" + BathroomPricing.money(r.cost) + "</span>";
       lines.appendChild(line);
     });
+    if (!result.lineResults.length) {
+      var emptyLine = document.createElement("div");
+      emptyLine.className = "ai-chat-estimate-line";
+      emptyLine.innerHTML = "<span>No priced work selected</span><span>" + BathroomPricing.money(0) + "</span>";
+      lines.appendChild(emptyLine);
+    }
     card.appendChild(lines);
 
     // Public estimates show labor only, with no tax line: whether any tax
@@ -286,6 +358,7 @@ document.addEventListener("DOMContentLoaded", function () {
     var subtotalWrap = document.createElement("div");
     subtotalWrap.className = "ai-chat-estimate-subtotal";
     subtotalWrap.innerHTML =
+      '<div class="ai-chat-estimate-line muted"><span>Plumbing &amp; electrical work</span><span>Not included</span></div>' +
       '<div class="ai-chat-estimate-line muted"><span>Materials, permits &amp; any applicable taxes</span><span>Not included</span></div>';
     card.appendChild(subtotalWrap);
 
@@ -296,6 +369,21 @@ document.addEventListener("DOMContentLoaded", function () {
       '<span class="ai-chat-estimate-total-value">' + BathroomPricing.money(result.subtotal) + "</span>";
     card.appendChild(totalWrap);
 
+    var assumptionsWrap = document.createElement("div");
+    assumptionsWrap.className = "ai-chat-estimate-assumptions";
+    var assumptionsTitle = document.createElement("p");
+    assumptionsTitle.className = "ai-chat-estimate-assumptions-title";
+    assumptionsTitle.textContent = "What this estimate assumes";
+    assumptionsWrap.appendChild(assumptionsTitle);
+    var assumptionsList = document.createElement("ul");
+    assumptions.forEach(function (a) {
+      var li = document.createElement("li");
+      li.textContent = a;
+      assumptionsList.appendChild(li);
+    });
+    assumptionsWrap.appendChild(assumptionsList);
+    card.appendChild(assumptionsWrap);
+
     var actions = document.createElement("div");
     actions.className = "ai-chat-estimate-actions";
 
@@ -304,7 +392,7 @@ document.addEventListener("DOMContentLoaded", function () {
     exportBtn.className = "ai-chat-estimate-export";
     exportBtn.textContent = "Export as PDF ↓";
     exportBtn.addEventListener("click", function () {
-      exportEstimateAsPdf(result);
+      exportEstimateAsPdf(result, assumptions);
     });
     actions.appendChild(exportBtn);
 
@@ -393,48 +481,42 @@ document.addEventListener("DOMContentLoaded", function () {
       labelEl.id = fieldId + "-label";
       fieldWrap.appendChild(labelEl);
 
-      if (field.type === "yesno") {
-        var yesnoWrap = document.createElement("div");
-        yesnoWrap.className = "ai-chat-yesno";
-        yesnoWrap.setAttribute("role", "group");
-        yesnoWrap.setAttribute("aria-labelledby", fieldId + "-label");
-        var selected = true; // matches "Yes" being pre-selected below
+      if (field.type === "choice") {
+        // Nothing is pre-selected: the visitor must pick every answer.
+        var choiceWrap = document.createElement("div");
+        choiceWrap.className = "ai-chat-yesno";
+        choiceWrap.setAttribute("role", "group");
+        choiceWrap.setAttribute("aria-labelledby", fieldId + "-label");
+        var chosen = null;
+        var optionBtns = [];
 
-        var yesBtn = document.createElement("button");
-        yesBtn.type = "button";
-        yesBtn.className = "ai-chat-yesno-btn selected";
-        yesBtn.textContent = "Yes";
-        yesBtn.setAttribute("aria-pressed", "true");
-
-        var noBtn = document.createElement("button");
-        noBtn.type = "button";
-        noBtn.className = "ai-chat-yesno-btn";
-        noBtn.textContent = "No";
-        noBtn.setAttribute("aria-pressed", "false");
-
-        yesBtn.addEventListener("click", function () {
-          selected = true;
-          yesBtn.classList.add("selected");
-          noBtn.classList.remove("selected");
-          yesBtn.setAttribute("aria-pressed", "true");
-          noBtn.setAttribute("aria-pressed", "false");
+        field.options.forEach(function (option) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "ai-chat-yesno-btn";
+          btn.textContent = option.label;
+          btn.setAttribute("aria-pressed", "false");
+          btn.addEventListener("click", function () {
+            chosen = option;
+            optionBtns.forEach(function (other) {
+              var isThis = other === btn;
+              other.classList.toggle("selected", isThis);
+              other.setAttribute("aria-pressed", isThis ? "true" : "false");
+            });
+            fieldWrap.classList.remove("needs-answer");
+          });
+          optionBtns.push(btn);
+          choiceWrap.appendChild(btn);
         });
-        noBtn.addEventListener("click", function () {
-          selected = false;
-          noBtn.classList.add("selected");
-          yesBtn.classList.remove("selected");
-          noBtn.setAttribute("aria-pressed", "true");
-          yesBtn.setAttribute("aria-pressed", "false");
-        });
-
-        yesnoWrap.appendChild(yesBtn);
-        yesnoWrap.appendChild(noBtn);
-        fieldWrap.appendChild(yesnoWrap);
+        fieldWrap.appendChild(choiceWrap);
 
         getters.push(function () {
-          var value = selected;
-          if (field.invert) value = !value;
-          bathroomQuoteState.answers[field.key] = value;
+          if (!chosen) {
+            fieldWrap.classList.add("needs-answer");
+            return false;
+          }
+          bathroomQuoteState.answers[field.key] = chosen.value;
+          return true;
         });
       } else {
         var input = document.createElement("input");
@@ -448,6 +530,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         getters.push(function () {
           bathroomQuoteState.answers[field.key] = parseFloat(input.value) || 0;
+          return true;
         });
       }
 
@@ -468,15 +551,25 @@ document.addEventListener("DOMContentLoaded", function () {
     continueBtn.className = "ai-chat-group-continue";
     continueBtn.textContent = groupIndex === BATHROOM_QUOTE_GROUPS.length - 1 ? "Get My Estimate →" : "Continue →";
 
+    var errorEl = document.createElement("p");
+    errorEl.className = "ai-chat-group-error";
+    errorEl.setAttribute("role", "alert");
+    errorEl.hidden = true;
+    errorEl.textContent = "Please answer every question above.";
+    formEl.appendChild(errorEl);
+
     actionsWrap.appendChild(cancelBtn);
     actionsWrap.appendChild(continueBtn);
     formEl.appendChild(actionsWrap);
 
     formEl.addEventListener("submit", function (e) {
       e.preventDefault();
+      var allAnswered = true;
       getters.forEach(function (getValue) {
-        getValue();
+        if (!getValue()) allAnswered = false;
       });
+      errorEl.hidden = allAnswered;
+      if (!allAnswered) return;
       Array.prototype.forEach.call(formEl.querySelectorAll("input, button"), function (el) {
         el.disabled = true;
       });
@@ -509,17 +602,37 @@ document.addEventListener("DOMContentLoaded", function () {
     if (chatProgress) chatProgress.hidden = true;
   }
 
+  // Out-of-scope work. Checked BEFORE every other keyword (including
+  // "bathroom" and "quote"), so e.g. "water damage in my bathroom" or
+  // "kitchen quote" always gets the bathroom-restorations-only answer.
+  var OUT_OF_SCOPE_KEYWORDS = [
+    "kitchen", "exterior", "roof", "siding", "stucco", "deck", "fence", "gutter", "basement", "garage",
+    "damage", "damaged", "leak", "flood", "storm", "fire", "smoke", "mold", "mould", "mildew", "sewage",
+    "asbestos", "whole home", "whole house", "full home", "entire home", "remodel my home",
+  ];
+  var OUT_OF_SCOPE_REPLY =
+    "Sorry, we currently only take on bathroom restorations — not kitchens, exteriors, roofing, or damage restoration " +
+    "(such as water, fire, or mold damage) — so we can't help with that. For a bathroom project with none of " +
+    "those, say “bathroom quote” and I can give you a rough estimate.";
+
+  function isOutOfScope(lower) {
+    for (var i = 0; i < OUT_OF_SCOPE_KEYWORDS.length; i++) {
+      if (lower.indexOf(OUT_OF_SCOPE_KEYWORDS[i]) !== -1) return true;
+    }
+    return false;
+  }
+
   var CHAT_RESPONSES = [
+    { keywords: ["plumb", "electric", "wiring", "outlet", "pipe", "valve", "drain"],
+      reply: "Plumbing and electrical work isn't offered or priced on this website, and our online estimates don't include it." },
     { keywords: ["quote", "price", "cost", "estimate"],
-      reply: "For an accurate price, our team puts together a free quote based on your project — head to the Contact page and tell us a bit about it, and we'll follow up personally. Or if it's a bathroom, just say “bathroom quote” and I can run the numbers with you right now." },
+      reply: "We only take on bathroom restorations. If it's a bathroom, say “bathroom quote” and I can give you a rough, non-binding labor estimate right now, or tell us about it on the Contact page." },
     { keywords: ["bathroom"],
-      reply: "We handle full bathroom restorations — demolition, fixtures, tile, plumbing, electrical, and finishing work. Want a rough price estimate? Just say “bathroom quote.”" },
+      reply: "We take on bathroom restorations — demolition, fixtures and cabinets, tile, flooring, and painting. We don't take on damage restoration. Want a rough price estimate? Just say “bathroom quote.”" },
     { keywords: ["floor", "flooring"],
       reply: "We do bathroom flooring as part of a bathroom restoration, at $5 per sq ft of bathroom floor (labor only). Say “bathroom quote” for a rough estimate." },
     { keywords: ["cabinet"],
       reply: "Bathroom cabinet installation is $60 per cabinet (labor only). Say “bathroom quote” for a rough estimate of the whole job." },
-    { keywords: ["kitchen", "exterior", "roof", "siding", "stucco", "deck", "fence", "gutter", "water damage", "fire damage", "storm", "mold", "sewage", "flood", "whole home", "full home"],
-      reply: "Sorry, we currently only take on bathroom restorations, so we can't help with that. Ask me about a bathroom project any time." },
     { keywords: ["privacy", "personal data", "delete my", "my data"],
       reply: "Our Privacy Notice (linked at the bottom of every page) explains what we collect and how to ask us to access or delete your information." },
     { keywords: ["contact", "phone", "call", "email", "reach"],
@@ -532,13 +645,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function chatReplyFor(message) {
     var lower = message.toLowerCase();
+    if (isOutOfScope(lower)) return OUT_OF_SCOPE_REPLY;
     for (var i = 0; i < CHAT_RESPONSES.length; i++) {
       var entry = CHAT_RESPONSES[i];
       for (var j = 0; j < entry.keywords.length; j++) {
         if (lower.indexOf(entry.keywords[j]) !== -1) return entry.reply;
       }
     }
-    return "Thanks for the message! For anything specific to your project, the best next step is requesting a free quote on our Contact page.";
+    return "Thanks for the message! We take on bathroom restorations only. For anything specific to your bathroom project, the best next step is requesting a free quote on our Contact page.";
   }
 
   // Returns a plain-text reply, OR null when the reply was already handled
@@ -552,6 +666,7 @@ document.addEventListener("DOMContentLoaded", function () {
   function getBotReply(message) {
     var lower = message.toLowerCase();
     if (IDENTITY_QUESTION.test(lower)) return IDENTITY_REPLY;
+    if (isOutOfScope(lower)) return OUT_OF_SCOPE_REPLY;
     if (lower.indexOf("bathroom") !== -1 && /(quote|price|cost|estimate)/.test(lower)) {
       startBathroomQuote();
       return null;

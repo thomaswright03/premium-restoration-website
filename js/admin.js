@@ -13,6 +13,12 @@
   var QUOTES_KEY = "pr_quotes";
   var RATES_KEY = "pr_business_rates";
 
+  // Retention for quotes that didn't lead to work, in days. Leave as null
+  // until the business has chosen its [RETENTION PERIOD] (it must match the
+  // public Privacy Notice). Once set, the dashboard flags quotes not
+  // updated within that many days and offers a one-click purge.
+  var QUOTE_RETENTION_DAYS = null;
+
   var CATEGORY_LABELS = {
     exterior: "Exterior",
     kitchen: "Kitchen",
@@ -99,7 +105,7 @@
 
   var RATES_SECTION_NOTES = {
     "B. Fixtures": 'Bathtub price isn’t set here — it’s automatically 30% less than the shower price above.',
-    "C. Surfaces": "Tile applies to combined floor + wall sq ft (no ceiling). Painting applies to combined ceiling + wall sq ft (no floor). “Floor” is a flat price that jumps to the higher tier once the bathroom is over 50 sq ft.",
+    "C. Surfaces": "Tile applies to combined floor + wall sq ft (no ceiling). Painting applies to combined ceiling + wall sq ft (no floor). “Floor” is charged per sq ft of bathroom floor.",
     "D. Plumbing": "Points of plumbing entry are counted automatically from the toilets, sinks, showers, and bathtubs entered above — plus either surcharge below when it applies.",
     "E. Electrical": "Charged per point of electrical entry — lamps, outlets, fans, fan switches, light switches, and an electric toilet each count as one point.",
   };
@@ -223,9 +229,9 @@
     var taxGroup = document.createElement("div");
     taxGroup.innerHTML =
       '<h2 class="rate-group-title" style="margin-top:36px;">Tax</h2>' +
-      '<p class="rate-group-subtitle">Applied automatically to the subtotal of every bathroom quote.</p>';
+      '<p class="rate-group-subtitle">Leave at 0 unless a tax adviser has confirmed that tax applies to this labor. Any rate set here is added to the subtotal of every bathroom quote.</p>';
     taxGroup.appendChild(
-      buildRateRow("Tax_Rate_Percent", PRICE_LABELS.Tax_Rate_Percent, current.prices.Tax_Rate_Percent, "%")
+      buildRateRow("Labor_Tax_Rate_Percent", PRICE_LABELS.Labor_Tax_Rate_Percent, current.prices.Labor_Tax_Rate_Percent, "%")
     );
     container.appendChild(taxGroup);
   }
@@ -277,6 +283,46 @@
     showScreen("screen-dashboard");
   }
 
+  // ---------- retention ----------
+  function isPastRetention(quote) {
+    if (!QUOTE_RETENTION_DAYS) return false;
+    var last = new Date(quote.updatedAt || quote.createdAt).getTime();
+    if (isNaN(last)) return false;
+    return Date.now() - last > QUOTE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  }
+
+  function renderRetentionBar(quotes) {
+    var bar = document.getElementById("retention-bar");
+    if (!bar) return;
+    var expired = quotes.filter(isPastRetention);
+    bar.innerHTML = "";
+    bar.hidden = expired.length === 0;
+    if (!expired.length) return;
+
+    var text = document.createElement("p");
+    text.textContent =
+      expired.length + (expired.length === 1 ? " quote has" : " quotes have") +
+      " not been updated in over " + QUOTE_RETENTION_DAYS + " days. Delete any that didn't lead to work.";
+    bar.appendChild(text);
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-outline-dark";
+    btn.textContent = "Delete Quotes Past Retention";
+    btn.addEventListener("click", function () {
+      if (!confirm("Delete " + expired.length + " quote(s) not updated in over " + QUOTE_RETENTION_DAYS +
+        " days? Only continue if none of them led to work. This cannot be undone.")) return;
+      var expiredIds = expired.map(function (q) {
+        return q.id;
+      });
+      saveQuotes(getQuotes().filter(function (q) {
+        return expiredIds.indexOf(q.id) === -1;
+      }));
+      renderDashboard();
+    });
+    bar.appendChild(btn);
+  }
+
   // ---------- dashboard ----------
   function renderDashboard() {
     var quotes = getQuotes().slice().sort(function (a, b) {
@@ -285,6 +331,7 @@
     var list = document.getElementById("quote-list");
     var empty = document.getElementById("quote-list-empty");
     list.innerHTML = "";
+    renderRetentionBar(quotes);
 
     if (quotes.length === 0) {
       empty.hidden = false;
@@ -305,7 +352,9 @@
 
       var meta = document.createElement("div");
       meta.className = "quote-card-meta";
-      meta.textContent = "Updated " + formatDate(quote.updatedAt);
+      meta.textContent =
+        (quote.createdAt ? "Created " + formatDate(quote.createdAt) + " · " : "") +
+        "Updated " + formatDate(quote.updatedAt);
       main.appendChild(meta);
 
       var chips = document.createElement("div");
@@ -321,6 +370,12 @@
         priceChip.className = "quote-chip quote-price-chip";
         priceChip.textContent = "Bathroom: " + money(quote.data.bathroom.totalPrice);
         chips.appendChild(priceChip);
+      }
+      if (isPastRetention(quote)) {
+        var retentionChip = document.createElement("span");
+        retentionChip.className = "quote-chip quote-retention-chip";
+        retentionChip.textContent = "Past retention period";
+        chips.appendChild(retentionChip);
       }
       main.appendChild(chips);
 
@@ -739,7 +794,7 @@
         entry.costEl.classList.toggle("zero", r.cost <= 0);
         subtotal += r.cost;
       });
-      var taxRatePercent = config.prices.Tax_Rate_Percent || 0;
+      var taxRatePercent = config.prices.Labor_Tax_Rate_Percent || 0;
       var taxAmount = subtotal * (taxRatePercent / 100);
       subtotalEl.textContent = money(subtotal);
       taxLabelEl.textContent = "Tax (" + taxRatePercent + "%)";
@@ -769,7 +824,7 @@
         lineResults.push({ section: item.section, label: item.label, cost: r.cost });
         subtotal += r.cost;
       });
-      var taxRatePercent = config.prices.Tax_Rate_Percent || 0;
+      var taxRatePercent = config.prices.Labor_Tax_Rate_Percent || 0;
       var taxAmount = subtotal * (taxRatePercent / 100);
       return {
         jobValues: jobValuesOut,
