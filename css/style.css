@@ -1628,6 +1628,19 @@ textarea {
   min-height: 140px;
 }
 
+.char-count {
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--color-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.char-count.is-near-limit {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
 .field-error {
   margin: var(--space-2) 0 0;
   font-size: var(--fs-sm);

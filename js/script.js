@@ -987,10 +987,42 @@ document.addEventListener("DOMContentLoaded", function () {
       // when the estimate page navigates away.
       track(Analytics.EVENTS.CONTACT_ABOUT_ESTIMATE);
       if (summary && message && !message.value.trim()) {
-        message.value = summary;
+        message.value = summary.slice(0, Number(message.getAttribute("maxlength")) || summary.length);
         var note = document.getElementById("estimate-prefill-note");
         if (note) note.hidden = false;
       }
+    }
+
+    // Character counter for the project details (the field stops at its maxlength).
+    var counter = document.getElementById("message-count");
+    var counterLive = document.getElementById("message-count-live");
+    var lastAnnounced = null;
+    function updateCounter() {
+      if (!message || !counter) return;
+      var max = Number(message.getAttribute("maxlength")) || 2000;
+      var used = message.value.length;
+      var left = max - used;
+      counter.textContent =
+        used.toLocaleString("en-US") +
+        " / " +
+        max.toLocaleString("en-US") +
+        " characters" +
+        (left <= 200 ? " — " + left.toLocaleString("en-US") + " left" : "");
+      counter.classList.toggle("is-near-limit", left <= 200);
+      // Screen readers hear only when the limit gets close, not every keystroke.
+      var step = left <= 0 ? "full" : left <= 50 ? "50" : left <= 200 ? "200" : null;
+      if (counterLive && step !== lastAnnounced) {
+        lastAnnounced = step;
+        counterLive.textContent = step
+          ? left <= 0
+            ? "Project details are at the " + max.toLocaleString("en-US") + "-character limit."
+            : left + " characters left in project details."
+          : "";
+      }
+    }
+    if (message) {
+      message.addEventListener("input", updateCounter);
+      updateCounter();
     }
 
     function value(id) {
@@ -1146,6 +1178,7 @@ document.addEventListener("DOMContentLoaded", function () {
         .then(function (res) {
           if (!res.ok) throw new Error("HTTP " + res.status);
           form.reset();
+          updateCounter();
           try {
             sessionStorage.removeItem(SUMMARY_KEY);
           } catch (e) {

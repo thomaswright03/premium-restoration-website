@@ -41,6 +41,32 @@ test.describe("contact form without a form endpoint (email app)", () => {
   });
 });
 
+test.describe("contact form field limits", () => {
+  test("short fields have sensible maximum lengths and the message has a visible counter and limit", async ({
+    page,
+  }) => {
+    await page.goto("/contact.html");
+    await expect(page.locator("#name")).toHaveAttribute("maxlength", "100");
+    await expect(page.locator("#phone")).toHaveAttribute("maxlength", "25");
+    await expect(page.locator("#email")).toHaveAttribute("maxlength", "254");
+    await expect(page.locator("#message")).toHaveAttribute("maxlength", "2000");
+    const counter = page.locator("#message-count");
+    await expect(counter).toHaveText("0 / 2,000 characters");
+    await page.fill("#message", "Small bathroom.");
+    await expect(counter).toHaveText("15 / 2,000 characters");
+    await page.fill("#message", "x".repeat(1850));
+    await expect(counter).toHaveText("1,850 / 2,000 characters — 150 left");
+    await expect(counter).toHaveClass(/is-near-limit/);
+    await expect(page.locator("#message-count-live")).toHaveText("150 characters left in project details.");
+    // Typing past the limit stops at it.
+    await page.locator("#message").press("End");
+    await page.keyboard.type("y".repeat(200));
+    await expect(page.locator("#message")).toHaveValue(/^x{1850}y{150}$/);
+    await expect(counter).toHaveText("2,000 / 2,000 characters — 0 left");
+    await expect(page.locator("#message-count-live")).toHaveText("Project details are at the 2,000-character limit.");
+  });
+});
+
 test.describe("contact form with a form endpoint (site-config.json leadForm.endpoint)", () => {
   const ENDPOINT = "https://forms.example.test/f/abc123";
 

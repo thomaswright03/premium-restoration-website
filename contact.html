@@ -70,7 +70,15 @@
 
               <div class="form-group">
                 <label for="name">Full Name</label>
-                <input type="text" id="name" name="name" autocomplete="name" required aria-describedby="name-error" />
+                <input
+                  type="text"
+                  id="name"
+                  name="name"
+                  autocomplete="name"
+                  maxlength="100"
+                  required
+                  aria-describedby="name-error"
+                />
                 <p class="field-error" id="name-error" hidden></p>
               </div>
 
@@ -82,6 +90,7 @@
                   name="phone"
                   autocomplete="tel"
                   inputmode="tel"
+                  maxlength="25"
                   required
                   aria-describedby="phone-error"
                 />
@@ -95,6 +104,7 @@
                   id="email"
                   name="email"
                   autocomplete="email"
+                  maxlength="254"
                   required
                   aria-describedby="email-error"
                 />
@@ -115,8 +125,12 @@
                 <textarea
                   id="message"
                   name="message"
+                  maxlength="2000"
+                  aria-describedby="message-count"
                   placeholder="Property type, rough timeline, and anything else we should know..."
                 ></textarea>
+                <p class="char-count" id="message-count">Up to 2,000 characters.</p>
+                <p class="visually-hidden" id="message-count-live" aria-live="polite"></p>
               </div>
 
               <div class="form-honeypot" aria-hidden="true">
