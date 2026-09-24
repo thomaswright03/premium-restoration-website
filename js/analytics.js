@@ -108,10 +108,11 @@
     }
   }
 
-  // Only a standard kind of error ("TypeError"), never its message.
+  // Only a standard kind of error ("TypeError"): a name of letters ending in
+  // "Error", never its message.
   function kindOf(error) {
     var name = error && typeof error.name === "string" ? error.name : "";
-    return /^[A-Z][A-Za-z]{0,30}Error$/.test(name) ? name : "Error";
+    return /^[A-Za-z]{0,31}Error$/.test(name) ? name : "Error";
   }
 
   // The first place in the stack that is on this website: "/js/x.js:12:5".
