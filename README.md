@@ -62,7 +62,7 @@ Every link to the Get a Quote page (nav, hero, calls to action, footers, the 404
 ├── fonts/                    self-hosted Inter + Playfair Display, with OFL licence texts
 ├── fonts/pdf/                the same typefaces as fixed-weight .ttf files for the PDFs (made by scripts/make-pdf-fonts.py)
 ├── scripts/partials/         the ONE copy of the shared <head> bits, header/nav and footer
-├── scripts/sync-pages.mjs    copies the partials, published prices (from site-config.json) and contact details into every page
+├── scripts/sync-pages.mjs    copies the partials, published prices and the visitor-count/error-report settings (from site-config.json) and contact details into every page
 ├── scripts/check-placeholders.mjs   fails if a [BRACKETED PLACEHOLDER] is visible
 ├── scripts/serve.mjs         local server that behaves like Vercel (404.html for unknown URLs)
 ├── scripts/check-deploy.mjs  checks a deployed site serves exactly this checkout (npm run check:deploy -- <url>)
@@ -82,7 +82,7 @@ Everything the owner may want to change without a developer is in `site-config.j
 2. Change the value (keep the quotes, colons and commas exactly as they are; `true`, `false` and prices are typed without quotes), then click **Commit changes**. Commit to the production branch (normally `main`); if branch protection is on, see "While branch protection is on" below.
 3. Vercel redeploys automatically, usually in under a minute. Visitors get the change the next time they load or refresh a page: the pages fetch `site-config.json` fresh every time (never from a cache).
 
-If you can't see the change after two minutes, check the deployment on the Vercel dashboard (see "Deploying"). If the file ever can't be read (for example, a typo that breaks the JSON), pages fall back to safe defaults: **price estimator and online prices off** (the pages, the greeting and the chat all say "call for a price"), the quote form on with the email-app route, **visitor counts off**, and no owner details shown. The `npm test` checks (`tests/unit/site-config.test.js`) catch broken JSON, a switch typed in quotes, unusable prices, a non-`https` form endpoint, a form service with no name, and an unsupported analytics provider — and CI runs them on every commit, so a mistake shows as a red cross on GitHub within a few minutes.
+If you can't see the change after two minutes, check the deployment on the Vercel dashboard (see "Deploying"). If the file ever can't be read (for example, a typo that breaks the JSON), pages fall back to safe defaults: **price estimator and online prices off** (the pages, the greeting and the chat all say "call for a price"), the quote form on with the email-app route, and no owner details shown. Visitor counts and error reports then follow the copy of those two settings written into every page by `npm run pages` (so a settings failure can itself be reported, and the Privacy Notice still describes what the page does); after changing `analytics` or `errorReports`, a developer runs `npm run pages` and commits. `npm run check:pages` only notes a copy that is behind, but fails if a page's copy would count or report something `site-config.json` has switched off. The `npm test` checks (`tests/unit/site-config.test.js`) catch broken JSON, a switch typed in quotes, unusable prices, a non-`https` form endpoint, a form service with no name, an unsupported analytics provider, error reports without analytics, and an unusable `estimates.validForDays` — and CI runs them on every commit, so a mistake shows as a red cross on GitHub within a few minutes.
 
 ### The two switches (turning things off quickly)
 
@@ -113,6 +113,7 @@ Set the value back to `true` to switch it on again. **How long it takes:** the t
 | `analytics.domain`            | Plausible only: the site's domain as registered in Plausible. Blank = the website's own domain.                                                                                                                                                                                                                                            |
 | `analytics.scriptUrl`         | Optional: a different script address from the provider (e.g. the per-site script Plausible gives you). Blank = the provider's standard script.                                                                                                                                                                                             |
 | `analytics.servicePrivacyUrl` | Optional `https://` link to the provider's privacy policy, linked from the Privacy Notice.                                                                                                                                                                                                                                                 |
+| `errorReports.enabled`        | `false` (default) = no error reports. `true` = when something breaks for a visitor, a short report goes to the analytics provider (see "Error reports"); needs `analytics.enabled` with a provider, or `npm test` fails. The Privacy Notice describes it only when this is `true`.                                                         |
 | `estimates.validForDays`      | How many days the prices on an estimate or quote PDF are held, as a whole number from 1 to 365 (e.g. `30`, no quotes). `null` (current: not decided by the owner) = the PDFs print no "prices held until" date and keep "Prices are current as of the date generated and may change." Anything else fails `npm test`.                      |
 
 ### Changing a published price
@@ -270,6 +271,21 @@ Both providers count **without cookies** and show only totals. Nothing is counte
 - **Plausible Analytics** (`"provider": "plausible"`): add the site in Plausible (paid service), put its domain in `analytics.domain` if it differs from the website's, and, for each event name above, add a **custom event goal** in the site's settings so it shows on the dashboard. If Plausible gives you a per-site script address, put it in `analytics.scriptUrl`.
 
 To check it works: complete one estimate and send one request on the live site, then see both counted in the provider's dashboard (allow a few minutes).
+
+## Error reports
+
+Off by default, so nobody is told when something breaks for a visitor until the owner switches it on. With `"errorReports": { "enabled": true }` **and** visitor counts on (it uses the same provider, so no extra service or account), `js/analytics.js` sends one named event when something goes wrong on a public page:
+
+| Event                     | When                                                                                                   | Details sent (as event properties)                                                                                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Script error`            | an uncaught script error or rejected promise, or a script/style/image that fails to load               | `kind` (`TypeError`, `File failed to load`, …), `source` (this site's file and line, e.g. `/js/chat/main.js:40:12`, without any `?…`; "other site" for anything else), `page` |
+| `Settings failed to load` | `site-config.json` can't be fetched or read, or its prices are unusable (the estimator then stays off) | `reason` (`Not loaded: HTTP 404`, `Not loaded: not valid JSON`, `Not loaded: network error`, `Prices unusable`), `page`                                                       |
+
+The failures visitors run into in the estimate and the form are counted with visitor counts already (`Estimate PDF failed`, `Quote request failed`; see above).
+
+**Privacy:** the error's own message is never sent (it could contain something the visitor typed), nor anything from the chat or the form; no cookies; at most 5 reports per page view, each different; nothing is sent when the browser sends Do Not Track or Global Privacy Control, and nothing on `/admin/`. Errors that happen before `js/analytics.js` has loaded are held by a few lines in each page's `<head>` (`scripts/partials/head.html`) and discarded if reports are off. While reports are on, the Privacy Notice's analytics paragraph says so; while they are off it says nothing about them.
+
+**Where to see them:** Plausible — add `Script error` and `Settings failed to load` as custom event goals, and `kind`, `source`, `reason` and `page` as custom properties, then open a goal to see its breakdown. Vercel — the **Events** panel (custom events with properties need a plan that includes them). **To check it works** on a preview deployment: temporarily rename `site-config.json` (or break its JSON) in a preview branch, load a page, and see `Settings failed to load` in the dashboard within a few minutes; then undo the change.
 
 ## Colour theme and design tokens
 

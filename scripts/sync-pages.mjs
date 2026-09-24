@@ -6,6 +6,9 @@
 //   <span data-price="Cabinet_Price">$60</span>        from "prices" in site-config.json (via js/bathroom-pricing.js)
 //   <a data-contact="phone" href="tel:…">…</a>         from js/business-info.js (phone or email;
 //   <span data-contact="email">…</span>                 a mailto link keeps its ?subject=…)
+//   <meta name="pr-settings-fallback" content="…">     a copy of the visitor-count and error-report
+//                                                      settings from site-config.json, used if that
+//                                                      file can't be read (js/site-config.js)
 //
 // The check also fails if a page still has the phone number, the email
 // address, or a tel:/mailto: link that is NOT marked with data-contact, so
@@ -19,7 +22,10 @@
 // so visitors see a new price straight away even before this script is run.
 // So in --check mode, pages whose only difference is price text are reported
 // as a notice ("run npm run pages to refresh the text in the files", which
-// matters only for visitors without JavaScript), not as a failure.
+// matters only for visitors without JavaScript), not as a failure. The same
+// goes for the settings copy, except when the copy in the pages would count
+// visitors or send error reports that site-config.json has switched off:
+// that fails, so a page never does more than the owner has chosen.
 //
 //   node scripts/sync-pages.mjs          rewrite the pages
 //   node scripts/sync-pages.mjs --check  exit 1 if any page is out of date (CI)
@@ -50,20 +56,66 @@ export const PAGES = [
 
 const BLOCKS = ["head", "header", "footer"];
 
+const RAW_CONFIG = JSON.parse(await readFile(join(root, "site-config.json"), "utf8"));
+
 if (!Pricing.hasPublishedPrices()) {
-  const raw = JSON.parse(await readFile(join(root, "site-config.json"), "utf8"));
-  const problems = Pricing.validatePublishedPrices(raw.prices).errors;
+  const problems = Pricing.validatePublishedPrices(RAW_CONFIG.prices).errors;
   throw new Error("site-config.json prices can't be used:\n  " + problems.join("\n  "));
 }
 
-// The page with every price text blanked and whitespace collapsed, to tell a
-// price-only difference from any other.
+// The page with every price text and the settings copy blanked and
+// whitespace collapsed, to tell such a difference from any other.
 export function withoutPriceText(html) {
   return html
     .replace(/(<span[^>]*\bdata-price="\w+"[^>]*>)[^<]*(<\/span>)/g, "$1$2")
+    .replace(/<meta name="pr-settings-fallback" content=("[^"]*"|'[^']*')/g, '<meta name="pr-settings-fallback"')
     .replace(/\s+/g, " ")
     .trim();
 }
+
+// The copy of the visitor-count and error-report settings written into each
+// page: only what js/site-config.js needs if site-config.json can't be read.
+export function settingsFallback(raw) {
+  const a = (raw && raw.analytics) || {};
+  const on = a.enabled === true;
+  return {
+    analytics: on
+      ? {
+          enabled: true,
+          provider: a.provider || "",
+          domain: a.domain || "",
+          scriptUrl: a.scriptUrl || "",
+          servicePrivacyUrl: a.servicePrivacyUrl || "",
+        }
+      : { enabled: false },
+    errorReports: { enabled: on && !!(raw.errorReports && raw.errorReports.enabled === true) },
+  };
+}
+
+function readFallback(html) {
+  // Prettier may write the attribute in either kind of quotes.
+  const m = /<meta name="pr-settings-fallback" content=(?:"([^"]*)"|'([^']*)')/.exec(html);
+  try {
+    return JSON.parse(
+      (m ? m[1] || m[2] : "{}")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&amp;/g, "&"),
+    );
+  } catch {
+    return {};
+  }
+}
+
+// True if a page's settings copy switches on something site-config.json has off.
+export function fallbackDoesMore(pageHtml, raw) {
+  const inPage = readFallback(pageHtml);
+  const wanted = settingsFallback(raw);
+  const on = (s, key) => !!(s && s[key] && s[key].enabled === true);
+  return ["analytics", "errorReports"].some((key) => on(inPage, key) && !on(wanted, key));
+}
+
+const escapeAttr = (text) => text.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
 async function partial(name) {
   return readFile(join(root, "scripts/partials", name + ".html"), "utf8");
@@ -88,6 +140,7 @@ export async function renderPage(source, page) {
     const re = new RegExp(`(<!-- chrome:${block} -->)[\\s\\S]*?(<!-- /chrome:${block} -->)`);
     if (!re.test(html)) continue;
     let body = (await partial(block)).trim().replaceAll("{{base}}", page.base);
+    body = body.replaceAll("{{settingsFallback}}", escapeAttr(JSON.stringify(settingsFallback(RAW_CONFIG))));
     if (block === "header") body = renderHeader(body, page);
     html = html.replace(re, (m, open, close) => `${open}\n${body}\n${close}`);
   }
@@ -137,17 +190,22 @@ async function main() {
       process.exitCode = 1;
     }
     if (output !== source) {
-      if (check && withoutPriceText(output) === withoutPriceText(source)) priceOnly.push(page.file);
+      if (check && fallbackDoesMore(source, RAW_CONFIG)) {
+        console.error(
+          `${page.file}: its copy of the settings still counts visitors or sends error reports, which site-config.json has switched off.`,
+        );
+        stale.push(page.file);
+      } else if (check && withoutPriceText(output) === withoutPriceText(source)) priceOnly.push(page.file);
       else stale.push(page.file);
       if (!check) await writeFile(path, output);
     }
   }
   if (check && priceOnly.length) {
     console.warn(
-      "Notice: the price text written in these files is older than the prices in site-config.json:\n  " +
+      "Notice: the price text, or the copy of the visitor-count settings, written in these files is older than site-config.json:\n  " +
         priceOnly.join("\n  ") +
-        "\nVisitors already see the new prices (pages fill them in when they load). " +
-        "Run `npm run pages` and commit to refresh the files for visitors without JavaScript.",
+        "\nVisitors already see the new prices and settings (pages read them when they load). " +
+        "Run `npm run pages` and commit to refresh the files (for visitors without JavaScript, and for when site-config.json can't be read).",
     );
   }
   if (check && stale.length) {

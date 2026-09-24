@@ -11,12 +11,21 @@
     <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="../favicon.ico" sizes="32x32" />
     <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
+    <meta name="pr-settings-fallback" content='{"analytics":{"enabled":false},"errorReports":{"enabled":false}}' />
     <script>
       (function () {
         try {
           var t = localStorage.getItem("pr_theme");
           if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
         } catch (e) {}
+        // Script errors before js/analytics.js has loaded are kept for it; it
+        // reports them only if error reports are switched on (README "Error reports").
+        var q = (window.__prErrors = []);
+        function keep(e) {
+          if (q.length < 20) q.push(e);
+        }
+        addEventListener("error", keep, true);
+        addEventListener("unhandledrejection", keep);
       })();
     </script>
     <link rel="stylesheet" href="../css/style.css" />

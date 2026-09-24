@@ -35,6 +35,7 @@
     privacy: { responsePeriod: "" },
     analytics: { enabled: false, provider: "", domain: "", scriptUrl: "", servicePrivacyUrl: "" },
     estimates: { validForDays: null },
+    errorReports: { enabled: false },
   };
 
   // How long the prices on an estimate or quote PDF are held, in days: a
@@ -87,14 +88,18 @@
     var privacy = raw.privacy || {};
     var an = raw.analytics || {};
     var est = raw.estimates || {};
+    var er = raw.errorReports || {};
     var provider = clean(an.provider).toLowerCase();
     var knownProvider = Object.prototype.hasOwnProperty.call(ANALYTICS_PROVIDERS, provider);
     var scriptUrl = clean(an.scriptUrl);
     var endpoint = clean(lf.endpoint);
+    var analyticsOn = an.enabled === true && knownProvider;
     var priceCheck = Pricing ? Pricing.validatePublishedPrices(raw.prices) : null;
     var pricesOk = !!(priceCheck && priceCheck.valid);
     return {
       loaded: true,
+      // Set when the settings couldn't be used as they are (js/analytics.js reports it).
+      loadProblem: "",
       // The estimator needs valid published prices: without them it stays
       // off, so a wrong price is never shown.
       priceEstimator: { enabled: pe.enabled === true && pricesOk },
@@ -114,13 +119,15 @@
       privacy: { responsePeriod: clean(privacy.responsePeriod) },
       // Off unless switched on with a provider this site knows how to use.
       analytics: {
-        enabled: an.enabled === true && knownProvider,
+        enabled: analyticsOn,
         provider: knownProvider ? provider : "",
         serviceName: knownProvider ? ANALYTICS_PROVIDERS[provider] : "",
         domain: clean(an.domain),
         scriptUrl: /^(https:\/\/|\/)\S*$/.test(scriptUrl) ? scriptUrl : "",
         servicePrivacyUrl: /^https:\/\//.test(clean(an.servicePrivacyUrl)) ? clean(an.servicePrivacyUrl) : "",
       },
+      // Error reports go through the analytics provider, so they need it on.
+      errorReports: { enabled: er.enabled === true && analyticsOn },
       // Unset or unusable: no "prices held until" date is printed.
       estimates: {
         validForDays:
@@ -174,6 +181,28 @@
     });
   }
 
+  // If site-config.json can't be read, the visitor-count and error-report
+  // settings still come from the copy written into each page by
+  // `npm run pages` (<meta name="pr-settings-fallback">), so a settings
+  // failure can be reported, and the Privacy Notice still describes what
+  // the page does.
+  function pageFallback() {
+    var meta = document.querySelector('meta[name="pr-settings-fallback"]');
+    try {
+      var saved = JSON.parse((meta && meta.getAttribute("content")) || "{}");
+      return { analytics: saved.analytics, errorReports: saved.errorReports };
+    } catch (e) {
+      return {};
+    }
+  }
+
+  // Why the settings couldn't be used, in words safe to report.
+  function problemOf(err) {
+    if (err && /^HTTP \d+$/.test(err.message)) return "Not loaded: " + err.message;
+    if (err && err.name === "SyntaxError") return "Not loaded: not valid JSON";
+    return "Not loaded: network error";
+  }
+
   var script = /** @type {HTMLScriptElement | null} */ (document.currentScript);
   var url = script && script.src ? new URL("../site-config.json", script.src).href : "site-config.json";
 
@@ -182,10 +211,15 @@
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.json();
     })
-    .then(normalize)
-    .catch(function () {
-      var fallback = normalize(DEFAULTS);
+    .then(function (raw) {
+      var config = normalize(raw);
+      if (config.priceProblems.length) config.loadProblem = "Prices unusable";
+      return config;
+    })
+    .catch(function (err) {
+      var fallback = normalize(Object.assign({}, DEFAULTS, pageFallback()));
       fallback.loaded = false;
+      fallback.loadProblem = problemOf(err);
       return fallback;
     });
 

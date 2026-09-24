@@ -40,6 +40,10 @@
     "scriptUrl": "",
     "servicePrivacyUrl": ""
   },
+  "errorReports": {
+    "_help": "true = when something breaks for a visitor (a script error, a file not loading, this settings file not loading), the analytics service above is sent a short report without anything the visitor typed. Needs analytics switched on. After changing this or analytics, a developer runs `npm run pages`. See README 'Error reports'.",
+    "enabled": false
+  },
   "estimates": {
     "_help": "How many days the prices on an estimate or quote PDF are held, as a whole number (e.g. 30), or null. While it is null the PDFs print no 'prices held until' date. The owner decides this; see README 'Site settings'.",
     "validForDays": null

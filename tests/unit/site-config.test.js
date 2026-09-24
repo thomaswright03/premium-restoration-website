@@ -128,3 +128,22 @@ test("leadForm.enabled: false puts the quote form into 'please call us' mode; an
   assert.equal(SiteConfig.normalize({}).leadForm.paused, false);
   assert.equal(SiteConfig.normalize(SiteConfig.DEFAULTS).leadForm.paused, false);
 });
+
+test("error reports are off by default, and need visitor counting (their provider) switched on", () => {
+  const raw = JSON.parse(fs.readFileSync(FILE, "utf8"));
+  if (raw.errorReports && raw.errorReports.enabled === true) {
+    assert.equal(
+      SiteConfig.normalize(raw).analytics.enabled,
+      true,
+      "errorReports.enabled is true, but analytics is off: switch on analytics with a provider, or set errorReports.enabled to false",
+    );
+  }
+  assert.equal(SiteConfig.normalize({}).errorReports.enabled, false);
+  assert.equal(SiteConfig.normalize({ errorReports: { enabled: true } }).errorReports.enabled, false);
+  const on = { analytics: { enabled: true, provider: "plausible" }, errorReports: { enabled: true } };
+  assert.equal(SiteConfig.normalize(on).errorReports.enabled, true);
+  assert.equal(
+    SiteConfig.normalize(Object.assign({}, on, { errorReports: { enabled: "true" } })).errorReports.enabled,
+    false,
+  );
+});

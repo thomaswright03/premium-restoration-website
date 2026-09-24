@@ -48,6 +48,8 @@ interface SiteConfigData {
     servicePrivacyUrl: string;
   };
   estimates: { validForDays: number | null };
+  errorReports: { enabled: boolean };
+  loadProblem: string;
 }
 
 interface Window {
@@ -59,7 +61,8 @@ interface Window {
     build: (options: object) => { save: (filename: string) => void };
   };
   ChatReplies: typeof import("../js/chat-replies.js");
-  SiteAnalytics: { EVENTS: Record<string, string>; track: (event: string) => void };
+  SiteAnalytics: { EVENTS: Record<string, string>; track: (event: string, props?: Record<string, string>) => void };
+  __prErrors?: unknown[];
   CalendarDays: typeof import("../js/admin/dates.js");
   PRAdmin: any;
   PRChat: any;

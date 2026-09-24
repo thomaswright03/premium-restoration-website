@@ -14,12 +14,21 @@
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="favicon.ico" sizes="32x32" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="pr-settings-fallback" content='{"analytics":{"enabled":false},"errorReports":{"enabled":false}}' />
     <script>
       (function () {
         try {
           var t = localStorage.getItem("pr_theme");
           if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
         } catch (e) {}
+        // Script errors before js/analytics.js has loaded are kept for it; it
+        // reports them only if error reports are switched on (README "Error reports").
+        var q = (window.__prErrors = []);
+        function keep(e) {
+          if (q.length < 20) q.push(e);
+        }
+        addEventListener("error", keep, true);
+        addEventListener("unhandledrejection", keep);
       })();
     </script>
     <link rel="stylesheet" href="css/style.css" />
@@ -155,8 +164,18 @@
             from an estimate, and a quote request being sent, not sent, or opened in your email app. It receives basic
             technical information about each visit (such as the page, your browser and device type, and your approximate
             location from your IP address) and shows us only totals. It does not use cookies, and nothing you type into
-            the chat or the form is included. If your browser sends a Do Not Track or Global Privacy Control signal,
-            nothing is counted.
+            the chat or the form is included.
+            <span data-show-if="errorReports.enabled" hidden
+              >It is also told when something on this website goes wrong for you, so we can fix it: a script error or a
+              file that fails to load (which file and line, the kind of error and the page), or the website's settings
+              not loading. The error's own message is never sent, so nothing you typed can be included.</span
+            >
+            If your browser sends a Do Not Track or Global Privacy Control signal, nothing is counted<span
+              data-show-if="errorReports.enabled"
+              hidden
+            >
+              or reported</span
+            >.
             <a
               data-show-if="analytics.servicePrivacyUrl"
               data-fill-href="analytics.servicePrivacyUrl"

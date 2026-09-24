@@ -14,13 +14,24 @@ const FLOORING = { demolition: "No", floorFinish: "Other flooring", walls: "Neit
 // Stands in for the provider's script: records the events it is given.
 const RECORDER = `
   window.__counted = [];
+  window.__details = [];
   var queued = (window.plausible && window.plausible.q) || [];
-  window.plausible = function (name) { window.__counted.push(name); };
+  window.plausible = function (name, options) {
+    window.__counted.push(name);
+    window.__details.push([name, (options && options.props) || null]);
+  };
   queued.forEach(function (args) { window.plausible.apply(null, args); });
 `;
 
 async function counted(page) {
   return page.evaluate(() => window.__counted || []);
+}
+
+// The error reports sent: [event name, details].
+async function reports(page) {
+  return page.evaluate(() =>
+    (window.__details || []).filter(([name]) => name === "Script error" || name === "Settings failed to load"),
+  );
 }
 
 test("off by default: no counting script is loaded and the Privacy Notice says there are no analytics", async ({
@@ -138,4 +149,146 @@ test("Vercel Web Analytics is loaded from the site itself and sent named events"
   await expect.poll(() => page.evaluate(() => window.__vercelLoaded === true)).toBe(true);
   const queued = await page.evaluate(() => (window.vaq || []).map((args) => [args[0], args[1] && args[1].name]));
   expect(queued).toEqual([["event", "Estimate started"]]);
+});
+
+// Error reports: off by default; with errorReports.enabled (and counting on)
+// a script error, a file that fails to load, or the settings not loading is
+// sent through the same provider — where and what kind, never the message.
+test.describe("error reports", () => {
+  const ON = {
+    analytics: { enabled: true, provider: "plausible", domain: "example.test" },
+    errorReports: { enabled: true },
+  };
+
+  // Serves the home page with extra scripts in its <head>, which run before js/analytics.js has loaded.
+  async function withEarlyScripts(page, tags, settingsCopy) {
+    await page.route("**/index.html", async (route) => {
+      const res = await route.fetch();
+      let html = await res.text();
+      html = html.replace("</head>", tags + "</head>");
+      if (settingsCopy) {
+        html = html.replace(
+          /<meta name="pr-settings-fallback" content='[^']*'/,
+          `<meta name="pr-settings-fallback" content='${JSON.stringify(settingsCopy)}'`,
+        );
+      }
+      await route.fulfill({ response: res, body: html });
+    });
+  }
+
+  test.beforeEach(async ({ page }) => {
+    await page.route(PLAUSIBLE, (route) =>
+      route.fulfill({ status: 200, contentType: "text/javascript", body: RECORDER }),
+    );
+    // A script of this site with a mistake in it; the error message holds something "typed".
+    await page.route("**/js/test-broken.js*", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "text/javascript",
+        body: 'var typed = "Jamie 801-555-0199";\nnull.missing(typed);\n',
+      }),
+    );
+  });
+
+  test("a script error and a file that fails to load are reported without the message", async ({ page, context }) => {
+    await useConfig(page, ON);
+    await withEarlyScripts(page, '<script src="js/test-broken.js"></script><script src="js/test-missing.js"></script>');
+    await page.goto("/index.html");
+    await expect
+      .poll(() => reports(page))
+      .toEqual([
+        ["Script error", { kind: "TypeError", source: "/js/test-broken.js:2:6", page: "/index.html" }],
+        ["Script error", { kind: "File failed to load", source: "/js/test-missing.js", page: "/index.html" }],
+      ]);
+    // An error after the page has loaded is reported too, once however often it happens.
+    await page.evaluate(() => {
+      const again = () => {
+        const s = document.createElement("script");
+        s.src = "js/test-broken.js?again=" + Math.random();
+        document.head.appendChild(s);
+      };
+      again();
+      again();
+    });
+    await expect.poll(async () => (await reports(page)).length).toBe(2);
+    await page.waitForTimeout(300);
+    expect(await reports(page)).toHaveLength(2);
+    const sent = JSON.stringify(await page.evaluate(() => window.__details));
+    expect(sent).not.toMatch(/Jamie|555|Cannot read|reading/);
+    expect(await context.cookies()).toEqual([]);
+  });
+
+  test("no more than 5 reports from one page view", async ({ page }) => {
+    await useConfig(page, ON);
+    await page.goto("/index.html");
+    await expect.poll(() => counted(page)).toEqual([]);
+    await page.evaluate(() => {
+      for (let i = 0; i < 8; i++) {
+        const s = document.createElement("script");
+        s.src = "js/test-missing-" + i + ".js";
+        document.head.appendChild(s);
+      }
+    });
+    await expect.poll(async () => (await reports(page)).length).toBe(5);
+    await page.waitForTimeout(500);
+    expect(await reports(page)).toHaveLength(5);
+  });
+
+  test("the settings failing to load is reported, using the copy of the settings in the page", async ({ page }) => {
+    await page.route("**/site-config.json", (route) => route.fulfill({ status: 500, body: "" }));
+    await withEarlyScripts(page, "", {
+      analytics: { enabled: true, provider: "plausible", domain: "example.test" },
+      errorReports: { enabled: true },
+    });
+    await page.goto("/index.html");
+    await expect(page.locator("html")).toHaveAttribute("data-config", "defaults");
+    await expect
+      .poll(() => reports(page))
+      .toEqual([["Settings failed to load", { reason: "Not loaded: HTTP 500", page: "/index.html" }]]);
+  });
+
+  test("unusable prices in the settings are reported too", async ({ page }) => {
+    await useConfig(page, Object.assign({ prices: { cabinetEach: "sixty" } }, ON));
+    await page.goto("/index.html");
+    await expect
+      .poll(() => reports(page))
+      .toEqual([["Settings failed to load", { reason: "Prices unusable", page: "/index.html" }]]);
+  });
+
+  test("off by default: with counting on but error reports off, nothing is reported", async ({ page }) => {
+    await useConfig(page, { analytics: ON.analytics });
+    await withEarlyScripts(page, '<script src="js/test-broken.js"></script>');
+    await page.goto("/index.html");
+    await page.click("#ai-chat-quote-starter");
+    await expect.poll(() => counted(page)).toEqual(["Estimate started"]);
+    expect(await reports(page)).toEqual([]);
+  });
+
+  test("the Privacy Notice mentions error reports only while they are on", async ({ page }) => {
+    await useConfig(page, { analytics: ON.analytics });
+    await page.goto("/privacy.html");
+    await expect(page.locator("html")).toHaveAttribute("data-config", "loaded");
+    let text = await page.locator("main").innerText();
+    expect(text).not.toContain("goes wrong for you");
+    expect(text).toContain("Global Privacy Control signal, nothing is counted.");
+
+    await page.unrouteAll();
+    await useConfig(page, ON);
+    await page.goto("/privacy.html");
+    await expect(page.locator("html")).toHaveAttribute("data-config", "loaded");
+    text = await page.locator("main").innerText();
+    expect(text).toContain("It is also told when something on this website goes wrong for you");
+    expect(text).toContain("The error's own message is never sent");
+    expect(text).toContain("Global Privacy Control signal, nothing is counted or reported.");
+  });
+
+  test("nothing is reported when the browser sends Global Privacy Control", async ({ page }) => {
+    await useConfig(page, ON);
+    await page.addInitScript(() => Object.defineProperty(navigator, "globalPrivacyControl", { value: true }));
+    await withEarlyScripts(page, '<script src="js/test-broken.js"></script>');
+    await page.goto("/index.html");
+    await expect(page.locator("html")).toHaveAttribute("data-config", "loaded");
+    await page.waitForTimeout(300);
+    expect(await reports(page)).toEqual([]);
+  });
 });
