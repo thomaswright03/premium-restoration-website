@@ -55,3 +55,28 @@ test("the safe defaults keep the estimator off and the email-app form", () => {
   assert.equal(config.priceEstimator.enabled, false);
   assert.equal(config.leadForm.endpoint, "");
 });
+
+test("visitor counts are off by default and need a known provider to switch on", () => {
+  assert.equal(SiteConfig.normalize(SiteConfig.DEFAULTS).analytics.enabled, false);
+  assert.equal(SiteConfig.normalize({}).analytics.enabled, false);
+  assert.equal(SiteConfig.normalize({ analytics: { enabled: true } }).analytics.enabled, false);
+  assert.equal(SiteConfig.normalize({ analytics: { enabled: true, provider: "google" } }).analytics.enabled, false);
+  assert.equal(SiteConfig.normalize({ analytics: { enabled: "true", provider: "vercel" } }).analytics.enabled, false);
+  const vercel = SiteConfig.normalize({ analytics: { enabled: true, provider: " Vercel " } }).analytics;
+  assert.deepEqual([vercel.enabled, vercel.provider, vercel.serviceName], [true, "vercel", "Vercel Web Analytics"]);
+  const plausible = SiteConfig.normalize({
+    analytics: { enabled: true, provider: "plausible", scriptUrl: "javascript:x", servicePrivacyUrl: "http://x" },
+  }).analytics;
+  assert.equal(plausible.serviceName, "Plausible Analytics");
+  assert.equal(plausible.scriptUrl, "");
+  assert.equal(plausible.servicePrivacyUrl, "");
+});
+
+test("if visitor counts are switched on in site-config.json, the provider is one the site supports", () => {
+  const raw = JSON.parse(fs.readFileSync(FILE, "utf8"));
+  if (!(raw.analytics && raw.analytics.enabled === true)) return;
+  assert.ok(
+    SiteConfig.normalize(raw).analytics.enabled,
+    'analytics.provider must be "vercel" or "plausible" when analytics.enabled is true',
+  );
+});

@@ -12,6 +12,11 @@ document.addEventListener("DOMContentLoaded", function () {
   var EMAIL = Business.EMAIL;
   var PHONE_HREF = Business.PHONE_HREF;
   var configReady = window.SiteConfig ? window.SiteConfig.ready : Promise.resolve(null);
+  // Anonymous event counts, only when switched on in site-config.json (js/analytics.js).
+  var Analytics = window.SiteAnalytics || { EVENTS: {}, track: function () {} };
+  function track(event) {
+    if (event) Analytics.track(event);
+  }
   var siteConfig = null;
   configReady.then(function (c) {
     siteConfig = c;
@@ -429,6 +434,7 @@ document.addEventListener("DOMContentLoaded", function () {
       setProgress(0);
       appendGroupForm();
       persistEstimate();
+      track(Analytics.EVENTS.ESTIMATE_STARTED);
     }
 
     function removeStepRows(fromIndex) {
@@ -479,6 +485,7 @@ document.addEventListener("DOMContentLoaded", function () {
       quoteState = null;
       chatForm.hidden = false;
       saveEstimate({ status: "done", values: state.values, scope: state.scope });
+      track(Analytics.EVENTS.ESTIMATE_COMPLETED);
       appendEstimateCard(state.values, state.scope);
       setTimeout(hideProgress, 1200);
     }
@@ -879,6 +886,7 @@ document.addEventListener("DOMContentLoaded", function () {
           button.textContent = "Retry PDF";
           status.hidden = false;
           status.textContent = "Sorry, the PDF couldn't be prepared. Check your connection and press Retry PDF.";
+          track(Analytics.EVENTS.ESTIMATE_PDF_FAILED);
           status.classList.add("is-error");
         });
     }
@@ -960,6 +968,9 @@ document.addEventListener("DOMContentLoaded", function () {
       } catch (e) {
         summary = null;
       }
+      // Counted here, once the Get a Quote page has opened, so it isn't lost
+      // when the estimate page navigates away.
+      track(Analytics.EVENTS.CONTACT_ABOUT_ESTIMATE);
       if (summary && message && !message.value.trim()) {
         message.value = summary;
         var note = document.getElementById("estimate-prefill-note");
@@ -1082,6 +1093,7 @@ document.addEventListener("DOMContentLoaded", function () {
         link(PHONE_HREF, PHONE),
         ".",
       ]);
+      track(Analytics.EVENTS.QUOTE_EMAIL_OPENED);
       window.location.href = href;
     }
 
@@ -1126,6 +1138,7 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           var note = document.getElementById("estimate-prefill-note");
           if (note) note.hidden = true;
+          track(Analytics.EVENTS.QUOTE_REQUEST_SENT);
           showStatus("success", [
             strong("Request sent."),
             " Thank you — we've received your request and will get back to you as soon as we can. If it's urgent, call ",
@@ -1134,6 +1147,7 @@ document.addEventListener("DOMContentLoaded", function () {
           ]);
         })
         .catch(function () {
+          track(Analytics.EVENTS.QUOTE_REQUEST_FAILED);
           var fallback = link(mailtoHref(), "send it with your email app instead");
           fallback.id = "mailto-fallback";
           showStatus("error", [

@@ -24,7 +24,12 @@
     leadForm: { endpoint: "", serviceName: "", servicePrivacyUrl: "" },
     owner: { legalName: "", contactAddress: "" },
     privacy: { responsePeriod: "" },
+    analytics: { enabled: false, provider: "", domain: "", scriptUrl: "", servicePrivacyUrl: "" },
   };
+
+  // Visitor-count services the site can use (see js/analytics.js). Both
+  // count without cookies and show only totals.
+  var ANALYTICS_PROVIDERS = { vercel: "Vercel Web Analytics", plausible: "Plausible Analytics" };
 
   function clean(value) {
     return typeof value === "string" ? value.trim() : "";
@@ -59,6 +64,10 @@
     var lf = raw.leadForm || {};
     var owner = raw.owner || {};
     var privacy = raw.privacy || {};
+    var an = raw.analytics || {};
+    var provider = clean(an.provider).toLowerCase();
+    var knownProvider = Object.prototype.hasOwnProperty.call(ANALYTICS_PROVIDERS, provider);
+    var scriptUrl = clean(an.scriptUrl);
     var endpoint = clean(lf.endpoint);
     return {
       loaded: true,
@@ -71,12 +80,22 @@
       },
       owner: { legalName: clean(owner.legalName), contactAddress: clean(owner.contactAddress) },
       privacy: { responsePeriod: clean(privacy.responsePeriod) },
+      // Off unless switched on with a provider this site knows how to use.
+      analytics: {
+        enabled: an.enabled === true && knownProvider,
+        provider: knownProvider ? provider : "",
+        serviceName: knownProvider ? ANALYTICS_PROVIDERS[provider] : "",
+        domain: clean(an.domain),
+        scriptUrl: /^(https:\/\/|\/)\S*$/.test(scriptUrl) ? scriptUrl : "",
+        servicePrivacyUrl: /^https:\/\//.test(clean(an.servicePrivacyUrl)) ? clean(an.servicePrivacyUrl) : "",
+      },
     };
   }
 
   if (typeof module === "object" && module.exports) {
     module.exports = {
       DEFAULTS: DEFAULTS,
+      ANALYTICS_PROVIDERS: ANALYTICS_PROVIDERS,
       GENERIC_FORM_SERVICE: GENERIC_FORM_SERVICE,
       normalize: normalize,
       formServiceName: formServiceName,

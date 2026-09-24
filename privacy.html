@@ -24,6 +24,7 @@
     </script>
     <link rel="stylesheet" href="css/style.css" />
     <script src="js/business-info.js"></script>
+    <script src="js/analytics.js" defer></script>
     <!-- /chrome:head -->
   </head>
   <body>
@@ -119,10 +120,16 @@
 
         <h2>Cookies, analytics and third-party services</h2>
         <p>
-          We do not use cookies, analytics, advertising pixels, or other tracking tools on this website. Your browser
-          remembers your light/dark colour theme choice on your own device; it is never sent to us. Some third-party
-          services still receive basic technical information (such as your IP address, browser type, and the page
-          requested) when you visit:
+          <span data-show-unless="analytics.enabled"
+            >We do not use cookies, analytics, advertising pixels, or other tracking tools on this website.</span
+          >
+          <span data-show-if="analytics.enabled" hidden
+            >We do not use cookies, advertising pixels, or tools that follow you across websites. We do count visits and
+            a few actions on this website, anonymously, as described below.</span
+          >
+          Your browser remembers your light/dark colour theme choice on your own device; it is never sent to us. Some
+          third-party services still receive basic technical information (such as your IP address, browser type, and the
+          page requested) when you visit:
         </p>
         <ul>
           <li>
@@ -135,6 +142,23 @@
             <a
               data-show-if="leadForm.servicePrivacyUrl"
               data-fill-href="leadForm.servicePrivacyUrl"
+              rel="noopener"
+              target="_blank"
+              hidden
+              >Its privacy policy</a
+            >
+          </li>
+          <li data-show-if="analytics.enabled" hidden>
+            <strong><span data-fill="analytics.serviceName"></span></strong> counts visits to this website and a few
+            actions on it: an estimate being started or finished (or its PDF failing), &ldquo;Contact Us About
+            This&rdquo; being pressed, and a quote request being sent, not sent, or opened in your email app. It
+            receives basic technical information about each visit (such as the page, your browser and device type, and
+            your approximate location from your IP address) and shows us only totals. It does not use cookies, and
+            nothing you type into the chat or the form is included. If your browser sends a Do Not Track or Global
+            Privacy Control signal, nothing is counted.
+            <a
+              data-show-if="analytics.servicePrivacyUrl"
+              data-fill-href="analytics.servicePrivacyUrl"
               rel="noopener"
               target="_blank"
               hidden
@@ -154,9 +178,13 @@
           The fonts and the PDF tool on this website are served from the same place as the website itself (Vercel), so
           loading a page or exporting an estimate as a PDF does not send your information to a separate provider.
         </p>
-        <p>
+        <p data-show-unless="analytics.enabled">
           Your browser's &ldquo;Do Not Track&rdquo; setting does not change how this website works, because we do not
           track visitors across websites.
+        </p>
+        <p data-show-if="analytics.enabled" hidden>
+          If your browser sends a &ldquo;Do Not Track&rdquo; or Global Privacy Control signal, this website does not
+          count your visit or anything you do on it.
         </p>
 
         <h2>How we use your information</h2>

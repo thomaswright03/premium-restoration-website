@@ -14,5 +14,12 @@
   },
   "privacy": {
     "responsePeriod": ""
+  },
+  "analytics": {
+    "enabled": false,
+    "provider": "",
+    "domain": "",
+    "scriptUrl": "",
+    "servicePrivacyUrl": ""
   }
 }
