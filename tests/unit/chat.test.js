@@ -40,6 +40,29 @@ const CASES = [
   ["How long does a bathroom take?", null, /expected timeline/, null],
   ["asdfgh qwerty", "offerEstimate", /didn't understand.*\(385\) 356-8733/, null],
   ["hello", "offerEstimate", /Hello!/, null],
+  // A bathroom is never refused because another room is named.
+  ["Do you do basement bathrooms?", "offerEstimate", /We do bathroom restorations/, /can't help with that/],
+  ["I need a quote for the bathroom in my basement", "startEstimate", null, null],
+  ["Can you redo our master bedroom bathroom?", "offerEstimate", /bathroom restorations/, /can't help with that/],
+  // Bathroom plus other work: the bathroom can be quoted, the rest can't.
+  [
+    "quote for my bathroom and kitchen",
+    "offerEstimate",
+    /We can help with the bathroom.*can't quote the kitchen part.*rough estimate of the bathroom/,
+    /can't help with that/,
+  ],
+  ["Can I get a quote for my bathroom and kitchen?", "offerEstimate", /can't quote the kitchen part/, null],
+  ["Bathroom and roof repairs please", "offerEstimate", /can't quote the roof part/, null],
+  ["Do you do kitchens?", null, /only take on bathroom restorations.*can't help with that/, /help with the bathroom/],
+  ["Can you finish my basement?", null, /only take on bathroom restorations/, null],
+  // Timeline, warranty and licence questions win over the item they name.
+  ["How long does a tile job take?", null, /expected timeline/, /Tile is/],
+  ["Is there a warranty on the tile?", null, /don't advertise a standard warranty/, /Tile is/],
+  ["Are you licensed to install toilets?", null, /do not currently hold a contractor licence/, /Toilet installation/],
+  ["How much for tile and how long will it take?", "offerEstimate", /Tile is \$4 per sq ft.*expected timeline/, null],
+  // Every message gets a reply, even emoji only.
+  ["😀👍", "offerEstimate", /didn't understand.*\(385\) 356-8733/, null],
+  ["🛁🚿", "offerEstimate", /didn't understand/, null],
 ];
 
 for (const [question, action, match, notMatch] of CASES) {
@@ -65,6 +88,17 @@ test("with the estimator switched off, price questions get the call-us reply and
   const fallback = Chat.reply("asdfgh", OFF);
   assert.equal(fallback.action, null);
   assert.match(fallback.text, /\(385\) 356-8733/);
+});
+
+test("a mixed request with the estimator off still names the bathroom and gives the phone number", () => {
+  const r = Chat.reply("quote for my bathroom and kitchen", OFF);
+  assert.equal(r.action, null);
+  assert.match(r.text, /We can help with the bathroom.*kitchen part.*\(385\) 356-8733/);
+});
+
+test("emoji-only messages get the did-not-understand reply with the estimator off too; blank gets nothing", () => {
+  assert.match(Chat.reply("🙂", OFF).text, /didn't understand.*\(385\) 356-8733/);
+  assert.equal(Chat.reply("   ", ON), null);
 });
 
 test("matching is whole-word: 'fire' does not match 'fireplace' as damage, 'work' does not trigger photos", () => {

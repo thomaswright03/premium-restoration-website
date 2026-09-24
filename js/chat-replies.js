@@ -77,11 +77,66 @@
     "Sorry, we don't take on damage restoration (such as water, fire, smoke or mold damage), so we can't help with that. " +
     "We only do bathroom restorations — for a bathroom project without damage, say “bathroom quote” and I can give you a rough estimate.";
 
-  var NOT_BATHROOM =
-    "\\b(kitchens?|exteriors?|roof(s|ing)?|siding|stucco|decks?|fences?|gutters?|basements?|garages?|fireplaces?|chimneys?|driveways?|patios?|landscaping|pools?|hvac|furnaces?|bedrooms?|living room|whole (home|house)|entire (home|house)|full (home|house)|remodel my (home|house))\\b";
+  // Words that mean a bathroom. A message that is about a bathroom is never
+  // turned away, even if it also names another room.
+  var BATHROOM = "\\b(bathrooms?|baths?|restrooms?|washrooms?|powder rooms?|ensuites?|en suites?)\\b";
+
+  // Other work we don't take on.
+  var OTHER_WORK =
+    "\\b(kitchens?|exteriors?|roof(s|ing)?|siding|stucco|decks?|fences?|gutters?|fireplaces?|chimneys?|driveways?|patios?|landscaping|pools?|hvac|furnaces?|whole (home|house)|entire (home|house)|full (home|house)|remodel my (home|house))\\b";
+  // Other rooms. On their own they are declined, but they can also say
+  // where a bathroom is ("basement bathroom", "bathroom in the garage").
+  var OTHER_ROOMS = "\\b(basements?|garages?|bedrooms?|living rooms?)\\b";
+  var ROOM_WORDS = "(basements?|garages?|bedrooms?|master bedrooms?|living rooms?|pool house|pool)";
+  var BATHROOM_WORDS = "(bathrooms?|baths?|restrooms?|washrooms?|powder rooms?|ensuites?|en suites?)";
+
   var NOT_BATHROOM_REPLY =
     "Sorry, we currently only take on bathroom restorations — not kitchens, exteriors, roofing, other rooms, or damage restoration — so we can't help with that. " +
     "For a bathroom project, say “bathroom quote” and I can give you a rough estimate.";
+
+  // The non-bathroom work or rooms a message names, ignoring room words that
+  // only say where the bathroom is.
+  function otherWorkNamed(t) {
+    var rest = t
+      .replace(new RegExp("\\b" + ROOM_WORDS + "\\s+" + BATHROOM_WORDS + "\\b", "g"), " bathroom ")
+      .replace(
+        new RegExp(
+          "\\b" +
+            BATHROOM_WORDS +
+            "\\s+(in|off|next to|by|downstairs in|upstairs in)\\s+(the |my |our |a )?" +
+            ROOM_WORDS +
+            "\\b",
+          "g",
+        ),
+        " bathroom ",
+      );
+    var found = [];
+    [OTHER_WORK, OTHER_ROOMS].forEach(function (pattern) {
+      (rest.match(new RegExp(pattern, "g")) || []).forEach(function (word) {
+        if (found.indexOf(word) === -1) found.push(word);
+      });
+    });
+    return found;
+  }
+
+  function listWords(words) {
+    if (words.length === 1) return words[0];
+    return words.slice(0, -1).join(", ") + " and " + words[words.length - 1];
+  }
+
+  function mixedReply(others, estimator) {
+    var text =
+      "We can help with the bathroom, but we only take on bathroom restorations, so we can't quote the " +
+      listWords(others) +
+      " part.";
+    if (!estimator) {
+      return { text: text + " For a price on the bathroom, call " + PHONE + " or use the Contact page.", action: null };
+    }
+    return {
+      text: text + " For a rough estimate of the bathroom, tap the button below or say “bathroom quote”.",
+      action: "offerEstimate",
+    };
+  }
 
   var FIXTURE_WORDS =
     "\\b(faucets?|taps?|toilets?|sinks?|showers?|tubs?|bathtubs?|pipes?|drains?|valves?|showerheads?)\\b";
@@ -226,6 +281,10 @@
     "We don't advertise a standard warranty on this website. If you'd like one, ask us before you agree to the work, and make sure any warranty terms are given to you in writing.";
 
   var TIMELINE = "\\b(how long|timeline|time frame|timeframe|duration|weeks?|days?|start)\\b";
+  // A clear question about time, answered even when it names an item
+  // ("How long does a tile job take?").
+  var TIMELINE_QUESTION =
+    "\\b(how long|timeline|time frame|timeframe|duration|how many (days|weeks|months)|how soon|when (can|could|would) you start)\\b";
   var TIMELINE_REPLY =
     "It depends on the size of the bathroom and the work involved. We'll give you an expected timeline once we've seen the job — call " +
     PHONE +
@@ -272,8 +331,13 @@
   function reply(message, options) {
     options = options || {};
     var estimator = options.estimatorEnabled === true;
+    if (!String(message || "").trim()) return null;
     var t = normalize(message);
-    if (!t.trim()) return null;
+    var fallback = estimator
+      ? { text: FALLBACK, action: "offerEstimate" }
+      : { text: FALLBACK_NO_ESTIMATE, action: null };
+    // Only emoji or symbols: still answer, never leave the visitor waiting.
+    if (!t.trim()) return fallback;
 
     function offer(text) {
       return estimator ? { text: text + " " + ESTIMATE_OFFER, action: "offerEstimate" } : { text: text, action: null };
@@ -282,8 +346,24 @@
     if (has(t, IDENTITY)) return { text: IDENTITY_REPLY, action: null };
     if (has(t, OTHER_LANGUAGE)) return { text: OTHER_LANGUAGE_REPLY, action: null };
     if (has(t, DAMAGE)) return { text: DAMAGE_REPLY, action: null };
-    if (has(t, NOT_BATHROOM)) return { text: NOT_BATHROOM_REPLY, action: null };
+    var others = otherWorkNamed(t);
+    if (others.length) {
+      return has(t, BATHROOM) ? mixedReply(others, estimator) : { text: NOT_BATHROOM_REPLY, action: null };
+    }
     if (has(t, FIXTURE_WORDS) && has(t, PROBLEM_WORDS)) return { text: FIXTURE_PROBLEM_REPLY, action: null };
+
+    // Licence, warranty and timeline questions get their own answer even
+    // when they name an item ("Is there a warranty on the tile?"). If they
+    // also ask a price, both answers are given.
+    var topical = has(t, LICENCE)
+      ? LICENCE_REPLY
+      : has(t, WARRANTY)
+        ? WARRANTY_REPLY
+        : has(t, TIMELINE_QUESTION)
+          ? TIMELINE_REPLY
+          : null;
+    var asksPrice = has(t, PRICE_WORDS);
+    if (topical && !asksPrice) return { text: topical, action: null };
 
     var matched = [];
     var matchedText = t;
@@ -296,23 +376,22 @@
       }
     });
     if (matched.length) {
-      if (!estimator) return { text: CALL_FOR_PRICE, action: null };
-      return offer(matched.join(" "));
+      if (!estimator) return { text: CALL_FOR_PRICE + (topical ? " " + topical : ""), action: null };
+      return offer(matched.join(" ") + (topical ? " " + topical : ""));
     }
+    if (topical) return { text: topical, action: null };
 
     if (has(t, TRADE)) return { text: TRADE_REPLY, action: null };
 
-    var bathroomPrice = has(t, "\\bbathrooms?\\b") && has(t, PRICE_WORDS);
-    if (has(t, ESTIMATE) || bathroomPrice || has(t, PRICE_WORDS)) {
+    var bathroomPrice = has(t, BATHROOM) && asksPrice;
+    if (has(t, ESTIMATE) || bathroomPrice || asksPrice) {
       if (!estimator) return { text: CALL_FOR_PRICE, action: null };
       return { text: null, action: "startEstimate" };
     }
 
-    if (has(t, LICENCE)) return { text: LICENCE_REPLY, action: null };
-    if (has(t, WARRANTY)) return { text: WARRANTY_REPLY, action: null };
     if (has(t, PHOTOS)) return { text: PHOTOS_REPLY, action: null };
     if (has(t, TIMELINE)) return { text: TIMELINE_REPLY, action: null };
-    if (has(t, SERVICES) || has(t, "\\bbathrooms?\\b")) return offer(SERVICES_REPLY);
+    if (has(t, SERVICES) || has(t, BATHROOM)) return offer(SERVICES_REPLY);
     if (has(t, PRIVACY)) return { text: PRIVACY_REPLY, action: null };
     if (has(t, AREA)) return { text: AREA_REPLY, action: null };
     if (has(t, HOURS)) return { text: HOURS_REPLY, action: null };
@@ -320,7 +399,7 @@
     if (has(t, THANKS)) return { text: THANKS_REPLY, action: null };
     if (has(t, GREETING)) return offer(GREETING_REPLY);
 
-    return estimator ? { text: FALLBACK, action: "offerEstimate" } : { text: FALLBACK_NO_ESTIMATE, action: null };
+    return fallback;
   }
 
   return {
