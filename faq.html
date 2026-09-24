@@ -1,175 +1,293 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>FAQs | Premium Restoration</title>
-<meta name="description" content="Frequently asked questions about Premium Restoration's bathroom restoration services." />
-<link rel="stylesheet" href="css/style.css" />
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FAQs | Premium Restoration</title>
+    <meta
+      name="description"
+      content="Frequently asked questions about Premium Restoration's bathroom restoration services."
+    />
+    <!-- chrome:head -->
+    <meta name="theme-color" content="#15130f" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("pr_theme");
+          if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="css/style.css" />
+    <!-- /chrome:head -->
+  </head>
+  <body>
+    <!-- chrome:header -->
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <nav class="nav" aria-label="Main">
+        <a href="index.html" class="nav-brand">Premium Restoration</a>
+        <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+            <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <ul class="nav-links" id="nav-links">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="index.html#pricing">How We Price</a></li>
+          <li><a href="about.html">About Us</a></li>
+          <li><a href="faq.html" class="current" aria-current="page">FAQs</a></li>
+          <li><a href="contact.html" class="nav-cta">Get a Quote</a></li>
+        </ul>
+      </nav>
+    </header>
+    <!-- /chrome:header -->
 
-<header class="site-header">
-  <nav class="nav">
-    <a href="index.html" class="nav-brand">Premium Restoration</a>
-    <button class="nav-toggle" aria-label="Toggle navigation">&#9776;</button>
-    <ul class="nav-links">
-      <li><a href="index.html">Home</a></li>
-      <li><a href="gallery.html">Our Work</a></li>
-      <li><a href="about.html">About Us</a></li>
-      <li><a href="faq.html" class="current">FAQs</a></li>
-      <li><a href="contact.html" class="nav-cta">Get a Quote</a></li>
-    </ul>
-  </nav>
-</header>
+    <main id="main">
+      <section class="hero hero-page">
+        <div class="hero-inner">
+          <p class="eyebrow center">Good to Know</p>
+          <h1>Frequently Asked <em>Questions</em></h1>
+          <p>Common questions about our bathroom restoration work.</p>
+        </div>
+      </section>
 
-<section class="hero" style="padding: 200px 32px 110px;">
-  <div class="hero-inner">
-    <span class="eyebrow center">Good to Know</span>
-    <h1>Frequently Asked <em>Questions</em></h1>
-    <p>Common questions about our bathroom restoration work.</p>
-  </div>
-</section>
+      <section class="section faq-list">
+        <div class="faq-item">
+          <h2 class="faq-heading">
+            <button class="faq-question" type="button">
+              What kind of work do you do?
+              <span class="icon" aria-hidden="true">+</span>
+            </button>
+          </h2>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>
+                We currently take on bathroom restorations only: demolition, fixtures and cabinets, tile, flooring, and
+                painting. We don't take on kitchens, exteriors, roofing, or damage restoration (such as water, fire, or
+                mold damage). Installing toilets, sinks, showers, or bathtubs also needs plumbing work. Plumbing and
+                electrical work is not included in our online estimates; if your project needs any, it will add to the
+                cost, and we'll tell you who will do it, how it will be priced, and whether your job needs any permits
+                before any work is agreed. We do not currently hold a contractor licence.
+              </p>
+            </div>
+          </div>
+        </div>
 
-<section class="section" style="max-width: 820px; margin: 0 auto; padding-top: 0;">
+        <div class="faq-item">
+          <h2 class="faq-heading">
+            <button class="faq-question" type="button">
+              How much does it cost?
+              <span class="icon" aria-hidden="true">+</span>
+            </button>
+          </h2>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>
+                Our labor is priced per item. For example, cabinet installation is
+                <span data-price="Cabinet_Price">$60</span> per cabinet and bathroom flooring is
+                <span data-price="Floor_Price_Per_SqFt">$5</span> per sq ft. Materials, permits, and any applicable
+                taxes are separate.
+                <span data-show-if="priceEstimator.enabled" hidden
+                  >The chat on our home page can give you a rough, non-binding labor estimate;</span
+                >
+                <span data-show-unless="priceEstimator.enabled">For a price, call us or use the Contact page;</span>
+                your actual price is confirmed with you after we see the job.
+              </p>
+            </div>
+          </div>
+        </div>
 
-  <div class="faq-item">
-    <button class="faq-question">
-      What kind of work do you do?
-      <span class="icon" aria-hidden="true">+</span>
-    </button>
-    <div class="faq-answer">
-      <p>We currently take on bathroom restorations only: demolition, fixtures and cabinets, tile, flooring, and painting. We don't take on kitchens, exteriors, roofing, or damage restoration (such as water, fire, or mold damage). Installing toilets, sinks, showers, or bathtubs also needs plumbing work. Plumbing and electrical work is not included in our online estimates; if your project needs any, it will add to the cost, and we'll tell you who will do it, how it will be priced, and whether your job needs any permits before any work is agreed. We do not currently hold a contractor licence.</p>
-    </div>
-  </div>
+        <div class="faq-item">
+          <h2 class="faq-heading">
+            <button class="faq-question" type="button">
+              Is the chat estimate a quote?
+              <span class="icon" aria-hidden="true">+</span>
+            </button>
+          </h2>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>
+                No. The chat is an automated tool with scripted replies (not a person and not AI). Its estimate is based
+                only on the measurements, counts, and choices you enter, plus the assumptions it lists with the estimate
+                (for example, that wall area is measured to full height with no deduction for doors or windows). It
+                covers labor only and excludes plumbing and electrical work (including the plumbing needed for any
+                toilets, sinks, showers, or bathtubs you list), which will add to the cost if your job needs it. It is
+                not a quote, offer, or contract. Nothing you enter in the chat is sent to us.
+              </p>
+            </div>
+          </div>
+        </div>
 
-  <div class="faq-item">
-    <button class="faq-question">
-      How much does it cost?
-      <span class="icon" aria-hidden="true">+</span>
-    </button>
-    <div class="faq-answer">
-      <p>Our labor is priced per item. For example, cabinet installation is $60 per cabinet and bathroom flooring is $5 per sq ft. Materials, permits, and any applicable taxes are separate. The chat on our home page can give you a rough, non-binding labor estimate; your actual price is confirmed with you after we see the job.</p>
-    </div>
-  </div>
+        <div class="faq-item">
+          <h2 class="faq-heading">
+            <button class="faq-question" type="button">
+              How long does a bathroom restoration take?
+              <span class="icon" aria-hidden="true">+</span>
+            </button>
+          </h2>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>
+                It depends on the size of the bathroom and the work involved. We'll give you an expected timeline once
+                we've seen the job.
+              </p>
+            </div>
+          </div>
+        </div>
 
-  <div class="faq-item">
-    <button class="faq-question">
-      Is the chat estimate a quote?
-      <span class="icon" aria-hidden="true">+</span>
-    </button>
-    <div class="faq-answer">
-      <p>No. The chat is an automated tool with scripted replies (not a person and not AI). Its estimate is based only on the measurements, counts, and choices you enter, plus the assumptions it lists with the estimate (for example, that wall area is measured to full height with no deduction for doors or windows). It covers labor only and excludes plumbing and electrical work (including the plumbing needed for any toilets, sinks, showers, or bathtubs you list), which will add to the cost if your job needs it. It is not a quote, offer, or contract. Nothing you enter in the chat is sent to us.</p>
-    </div>
-  </div>
+        <div class="faq-item">
+          <h2 class="faq-heading">
+            <button class="faq-question" type="button">
+              What materials are easier to maintain?
+              <span class="icon" aria-hidden="true">+</span>
+            </button>
+          </h2>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>
+                Materials such as quartz, porcelain tile, and luxury vinyl plank generally resist stains and moisture
+                better than many natural alternatives. We're happy to talk through the trade-offs between durability,
+                appearance, and upkeep with you.
+              </p>
+            </div>
+          </div>
+        </div>
 
-  <div class="faq-item">
-    <button class="faq-question">
-      How long does a bathroom restoration take?
-      <span class="icon" aria-hidden="true">+</span>
-    </button>
-    <div class="faq-answer">
-      <p>It depends on the size of the bathroom and the work involved. We'll give you an expected timeline once we've seen the job.</p>
-    </div>
-  </div>
+        <div class="faq-item">
+          <h2 class="faq-heading">
+            <button class="faq-question" type="button">
+              Can I stay in the home during the work?
+              <span class="icon" aria-hidden="true">+</span>
+            </button>
+          </h2>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>
+                Often, yes, since the work is limited to the bathroom. We'll talk with you upfront about access, noise,
+                and safety, and about using another bathroom while the work is done.
+              </p>
+            </div>
+          </div>
+        </div>
 
-  <div class="faq-item">
-    <button class="faq-question">
-      What materials are easier to maintain?
-      <span class="icon" aria-hidden="true">+</span>
-    </button>
-    <div class="faq-answer">
-      <p>Materials such as quartz, porcelain tile, and luxury vinyl plank generally resist stains and moisture better than many natural alternatives. We're happy to talk through the trade-offs between durability, appearance, and upkeep with you.</p>
-    </div>
-  </div>
+        <div class="faq-item">
+          <h2 class="faq-heading">
+            <button class="faq-question" type="button">
+              Can you work with my existing layout?
+              <span class="icon" aria-hidden="true">+</span>
+            </button>
+          </h2>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>
+                Yes. We can restore your bathroom within its existing layout. If you'd like layout changes, ask us and
+                we'll tell you what's involved.
+              </p>
+            </div>
+          </div>
+        </div>
 
-  <div class="faq-item">
-    <button class="faq-question">
-      Can I stay in the home during the work?
-      <span class="icon" aria-hidden="true">+</span>
-    </button>
-    <div class="faq-answer">
-      <p>Often, yes, since the work is limited to the bathroom. We'll talk with you upfront about access, noise, and safety, and about using another bathroom while the work is done.</p>
-    </div>
-  </div>
+        <div class="faq-item">
+          <h2 class="faq-heading">
+            <button class="faq-question" type="button">
+              Do you offer a warranty?
+              <span class="icon" aria-hidden="true">+</span>
+            </button>
+          </h2>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>
+                We don't advertise a standard warranty on this website. If you'd like a warranty, ask us before you
+                agree to the work, and make sure any warranty terms are given to you in writing.
+              </p>
+            </div>
+          </div>
+        </div>
 
-  <div class="faq-item">
-    <button class="faq-question">
-      Can you work with my existing layout?
-      <span class="icon" aria-hidden="true">+</span>
-    </button>
-    <div class="faq-answer">
-      <p>Yes. We can restore your bathroom within its existing layout. If you'd like layout changes, ask us and we'll tell you what's involved.</p>
-    </div>
-  </div>
+        <div class="faq-item">
+          <h2 class="faq-heading">
+            <button class="faq-question" type="button">
+              How do you handle my personal information?
+              <span class="icon" aria-hidden="true">+</span>
+            </button>
+          </h2>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>
+                See our <a href="privacy.html">Privacy Notice</a>. It explains what we collect, how long we keep it, and
+                how to ask us to access or delete it.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
-  <div class="faq-item">
-    <button class="faq-question">
-      Do you offer a warranty?
-      <span class="icon" aria-hidden="true">+</span>
-    </button>
-    <div class="faq-answer">
-      <p>We don't advertise a standard warranty on this website. If you'd like a warranty, ask us before you agree to the work, and make sure any warranty terms are given to you in writing.</p>
-    </div>
-  </div>
+      <section class="cta-band">
+        <p class="eyebrow center">Still Curious?</p>
+        <h2 class="section-title">Still Have Questions?</h2>
+        <a href="contact.html" class="btn btn-primary">Contact Us</a>
+      </section>
+    </main>
 
-  <div class="faq-item">
-    <button class="faq-question">
-      How do you handle my personal information?
-      <span class="icon" aria-hidden="true">+</span>
-    </button>
-    <div class="faq-answer">
-      <p>See our <a href="privacy.html">Privacy Notice</a>. It explains what we collect, how long we keep it, and how to ask us to access or delete it.</p>
-    </div>
-  </div>
-
-</section>
-
-<section class="cta-band">
-  <span class="eyebrow center">Still Curious?</span>
-  <h2 class="section-title">Still Have Questions?</h2>
-  <a href="contact.html" class="btn btn-primary">Contact Us</a>
-</section>
-
-<footer class="site-footer">
-  <div class="footer-grid">
-    <div class="footer-col">
-      <p class="footer-brand">Premium Restoration</p>
-      <p style="max-width:260px; font-size: 0.9rem;">Bathroom restoration services.</p>
-      <p class="footer-identity">
-        Operated by [OWNER LEGAL NAME], an individual<br />
-        (not a registered company)<br />
-        [OWNER CONTACT ADDRESS]
-        <!-- There is currently no contractor licence. Add a licence line here only once a licence is
+    <!-- chrome:footer -->
+    <footer class="site-footer">
+      <div class="footer-grid">
+        <div class="footer-col">
+          <p class="footer-brand">Premium Restoration</p>
+          <p class="footer-tagline">Bathroom restoration services.</p>
+          <p class="footer-identity">
+            Operated by
+            <span data-show-if="owner.legalName" hidden><span data-fill="owner.legalName"></span>,</span>
+            an individual<br />
+            (not a registered company)
+            <span data-show-if="owner.contactAddress" hidden><br /><span data-fill="owner.contactAddress"></span></span>
+            <!-- There is currently no contractor licence. Add a licence line here only once a licence is
              actually issued, as <br />Contractor License # [CONTRACTOR LICENSE #] ([LICENSE CLASSIFICATION]) -->
-      </p>
-    </div>
-    <div class="footer-col">
-      <h4>Explore</h4>
-      <a href="index.html">Home</a>
-      <a href="gallery.html">Our Work</a>
-      <a href="about.html">About Us</a>
-      <a href="faq.html">FAQs</a>
-      <a href="contact.html">Get a Quote</a>
-    </div>
-    <div class="footer-col">
-      <h4>Contact</h4>
-      <a href="tel:+13853568733">(385) 356-8733</a>
-      <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
-    </div>
-    <div class="footer-col">
-      <h4>Legal</h4>
-      <a href="privacy.html">Privacy Notice</a>
-      <a href="terms.html">Terms of Use</a>
-      <a href="privacy.html#your-rights">Access or Delete My Data</a>
-    </div>
-  </div>
-  <div class="footer-bottom">
-    &copy; <span id="year"></span> Premium Restoration, operated by [OWNER LEGAL NAME].
-  </div>
-</footer>
+          </p>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Explore</h2>
+          <a href="index.html">Home</a>
+          <a href="index.html#pricing">How We Price</a>
+          <a href="about.html">About Us</a>
+          <a href="faq.html">FAQs</a>
+          <a href="contact.html">Get a Quote</a>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Contact</h2>
+          <a href="tel:+13853568733">(385) 356-8733</a>
+          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Legal</h2>
+          <a href="privacy.html">Privacy Notice</a>
+          <a href="terms.html">Terms of Use</a>
+          <a href="privacy.html#your-rights">Access or Delete My Data</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">
+          &copy; <span data-year>2026</span> Premium Restoration<span data-show-if="owner.legalName" hidden
+            >, operated by <span data-fill="owner.legalName"></span></span
+          >.
+        </p>
+        <div class="theme-switch" role="group" aria-label="Colour theme">
+          <span class="theme-switch-label" aria-hidden="true">Theme</span>
+          <button type="button" data-theme-choice="system" aria-pressed="true">System</button>
+          <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+          <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+        </div>
+      </div>
+    </footer>
+    <!-- /chrome:footer -->
 
-<script src="js/script.js"></script>
-<script>document.getElementById("year").textContent = new Date().getFullYear();</script>
-</body>
+    <script src="js/site-config.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/script.js"></script>
+  </body>
 </html>

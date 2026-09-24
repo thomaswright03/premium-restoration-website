@@ -1,146 +1,229 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Get a Quote | Premium Restoration</title>
-<meta name="description" content="Request a quote from Premium Restoration for your bathroom restoration project." />
-<link rel="stylesheet" href="css/style.css" />
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Get a Quote | Premium Restoration</title>
+    <meta
+      name="description"
+      content="Request a quote from Premium Restoration for your bathroom restoration project."
+    />
+    <!-- chrome:head -->
+    <meta name="theme-color" content="#15130f" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("pr_theme");
+          if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="css/style.css" />
+    <!-- /chrome:head -->
+  </head>
+  <body>
+    <!-- chrome:header -->
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <nav class="nav" aria-label="Main">
+        <a href="index.html" class="nav-brand">Premium Restoration</a>
+        <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+            <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <ul class="nav-links" id="nav-links">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="index.html#pricing">How We Price</a></li>
+          <li><a href="about.html">About Us</a></li>
+          <li><a href="faq.html">FAQs</a></li>
+          <li><a href="contact.html" class="nav-cta current" aria-current="page">Get a Quote</a></li>
+        </ul>
+      </nav>
+    </header>
+    <!-- /chrome:header -->
 
-<header class="site-header">
-  <nav class="nav">
-    <a href="index.html" class="nav-brand">Premium Restoration</a>
-    <button class="nav-toggle" aria-label="Toggle navigation">&#9776;</button>
-    <ul class="nav-links">
-      <li><a href="index.html">Home</a></li>
-      <li><a href="gallery.html">Our Work</a></li>
-      <li><a href="about.html">About Us</a></li>
-      <li><a href="faq.html">FAQs</a></li>
-      <li><a href="contact.html" class="nav-cta current">Get a Quote</a></li>
-    </ul>
-  </nav>
-</header>
-
-<section class="hero" style="padding: 200px 32px 110px;">
-  <div class="hero-inner">
-    <span class="eyebrow center">Let's Talk</span>
-    <h1>Get a <em>Quote</em></h1>
-    <p>Tell us a bit about your bathroom project, then send it to us by email, or call us directly.</p>
-  </div>
-</section>
-
-<section class="section">
-  <div class="contact-wrap">
-
-    <div>
-      <div id="form-success" class="form-success" role="status">
-        Your email app should now open with your request filled in. <strong>Please press Send in your email app</strong> &mdash; we don't receive anything until you do. If nothing opened, email us at
-        <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a> or call <a href="tel:+13853568733">(385) 356-8733</a>.
-      </div>
-
-      <form id="lead-form">
-        <div class="form-group">
-          <label for="name">Full Name</label>
-          <input type="text" id="name" name="name" required />
+    <main id="main">
+      <section class="hero hero-page">
+        <div class="hero-inner">
+          <p class="eyebrow center">Let's Talk</p>
+          <h1>Get a <em>Quote</em></h1>
+          <p>Tell us a bit about your bathroom project and send it to us, or call us directly.</p>
         </div>
+      </section>
 
-        <div class="form-group">
-          <label for="phone">Phone Number</label>
-          <input type="tel" id="phone" name="phone" required />
+      <section class="section">
+        <div class="contact-wrap">
+          <div class="contact-form-col">
+            <div id="form-status" class="form-status" role="status" aria-live="polite" tabindex="-1" hidden></div>
+
+            <form id="lead-form" novalidate>
+              <p id="estimate-prefill-note" class="form-prefill-note" hidden>
+                We've added your estimate to the project details below. Edit it as you like before sending.
+              </p>
+
+              <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" name="name" autocomplete="name" required aria-describedby="name-error" />
+                <p class="field-error" id="name-error" hidden></p>
+              </div>
+
+              <div class="form-group">
+                <label for="phone">Phone Number</label>
+                <input
+                  type="tel"
+                  id="phone"
+                  name="phone"
+                  autocomplete="tel"
+                  inputmode="tel"
+                  required
+                  aria-describedby="phone-error"
+                />
+                <p class="field-error" id="phone-error" hidden></p>
+              </div>
+
+              <div class="form-group">
+                <label for="email">Email Address</label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  autocomplete="email"
+                  required
+                  aria-describedby="email-error"
+                />
+                <p class="field-error" id="email-error" hidden></p>
+              </div>
+
+              <div class="form-group">
+                <label for="service">Bathroom Work Needed</label>
+                <select id="service" name="service">
+                  <option value="full-bathroom">Full bathroom restoration</option>
+                  <option value="partial-bathroom">Part of a bathroom (e.g. fixtures, tile, or flooring)</option>
+                  <option value="other-bathroom">Other bathroom work / not sure yet</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="message">Tell Us About Your Project</label>
+                <textarea
+                  id="message"
+                  name="message"
+                  placeholder="Property type, rough timeline, and anything else we should know..."
+                ></textarea>
+              </div>
+
+              <div class="form-honeypot" aria-hidden="true">
+                <label for="company-website">Leave this empty</label>
+                <input type="text" id="company-website" name="_gotcha" tabindex="-1" autocomplete="off" />
+              </div>
+
+              <p class="form-consent" data-show-unless="leadForm.endpoint">
+                <strong>How this form works:</strong> this website doesn't store or send your details. When you press
+                the button, your own email app opens a message to us containing what you entered above, and we only
+                receive it if you press Send. We use your details to respond to your enquiry and prepare your quote,
+                and, if you hire us, to carry out and manage the work and keep the business records we are required to
+                keep. We don't sell them. See our <a href="privacy.html">Privacy Notice</a> for how long we keep them
+                and how to ask us to access or delete them.
+              </p>
+              <p class="form-consent" data-show-if="leadForm.endpoint" hidden>
+                <strong>How this form works:</strong> when you press Send Request, what you entered above is sent to us
+                through <span data-fill="leadForm.serviceName"></span>, the form service we use, which stores it and
+                emails it to us. We use your details to respond to your enquiry and prepare your quote, and, if you hire
+                us, to carry out and manage the work and keep the business records we are required to keep. We don't
+                sell them. See our <a href="privacy.html">Privacy Notice</a> for how long we keep them and how to ask us
+                to access or delete them.
+              </p>
+
+              <button type="submit" class="btn btn-primary btn-block" id="lead-submit">
+                <span data-show-unless="leadForm.endpoint">Open Email to Send Request</span>
+                <span data-show-if="leadForm.endpoint" hidden>Send Request</span>
+              </button>
+              <p class="form-note">
+                <span data-show-unless="leadForm.endpoint">Prefer not to use email?</span>
+                <span data-show-if="leadForm.endpoint" hidden>Prefer to talk?</span>
+                Call us at <a href="tel:+13853568733">(385) 356-8733</a>.
+              </p>
+            </form>
+          </div>
+
+          <div class="contact-info-card">
+            <h2 class="contact-info-title">Contact Us Directly</h2>
+            <div class="contact-info-row">
+              <span class="icon" aria-hidden="true">&#128222;</span>
+              <a href="tel:+13853568733">(385) 356-8733</a>
+            </div>
+            <div class="contact-info-row">
+              <span class="icon" aria-hidden="true">&#9993;</span>
+              <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+            </div>
+            <p class="note">
+              Prefer to talk it through first? Give us a call or send an email and we'll get back to you as soon as
+              possible.
+            </p>
+          </div>
         </div>
+      </section>
+    </main>
 
-        <div class="form-group">
-          <label for="email">Email Address</label>
-          <input type="email" id="email" name="email" required />
-        </div>
-
-        <div class="form-group">
-          <label for="service">Bathroom Work Needed</label>
-          <select id="service" name="service">
-            <option value="full-bathroom">Full bathroom restoration</option>
-            <option value="partial-bathroom">Part of a bathroom (e.g. fixtures, tile, or flooring)</option>
-            <option value="other-bathroom">Other bathroom work / not sure yet</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label for="message">Tell Us About Your Project</label>
-          <textarea id="message" name="message" placeholder="Property type, rough timeline, and anything else we should know..."></textarea>
-        </div>
-
-        <p class="form-consent">
-          <strong>How this form works:</strong> this website doesn't store or send your details. When you press the button,
-          your own email app opens a message to us containing what you entered above, and we only receive it if you press Send.
-          We use your details to respond to your enquiry and prepare your quote, and, if you hire us, to carry out and manage the work and keep the business records we are required to keep. We don't sell them.
-          See our <a href="privacy.html">Privacy Notice</a> for how long we keep them and how to ask us to access or delete them.
-        </p>
-
-        <button type="submit" class="btn btn-primary" style="width:100%;">Open Email to Send Request</button>
-        <p class="form-note">
-          Prefer not to use email? Call us at <a href="tel:+13853568733">(385) 356-8733</a>.
-        </p>
-      </form>
-    </div>
-
-    <div class="contact-info-card">
-      <h3>Contact Us Directly</h3>
-      <div class="contact-info-row">
-        <span class="icon">&#128222;</span>
-        <a href="tel:+13853568733">(385) 356-8733</a>
-      </div>
-      <div class="contact-info-row">
-        <span class="icon">&#9993;</span>
-        <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
-      </div>
-      <p class="note">
-        Prefer to talk it through first? Give us a call or send an email and we'll get back to you as soon as possible.
-      </p>
-    </div>
-
-  </div>
-</section>
-
-<footer class="site-footer">
-  <div class="footer-grid">
-    <div class="footer-col">
-      <p class="footer-brand">Premium Restoration</p>
-      <p style="max-width:260px; font-size: 0.9rem;">Bathroom restoration services.</p>
-      <p class="footer-identity">
-        Operated by [OWNER LEGAL NAME], an individual<br />
-        (not a registered company)<br />
-        [OWNER CONTACT ADDRESS]
-        <!-- There is currently no contractor licence. Add a licence line here only once a licence is
+    <!-- chrome:footer -->
+    <footer class="site-footer">
+      <div class="footer-grid">
+        <div class="footer-col">
+          <p class="footer-brand">Premium Restoration</p>
+          <p class="footer-tagline">Bathroom restoration services.</p>
+          <p class="footer-identity">
+            Operated by
+            <span data-show-if="owner.legalName" hidden><span data-fill="owner.legalName"></span>,</span>
+            an individual<br />
+            (not a registered company)
+            <span data-show-if="owner.contactAddress" hidden><br /><span data-fill="owner.contactAddress"></span></span>
+            <!-- There is currently no contractor licence. Add a licence line here only once a licence is
              actually issued, as <br />Contractor License # [CONTRACTOR LICENSE #] ([LICENSE CLASSIFICATION]) -->
-      </p>
-    </div>
-    <div class="footer-col">
-      <h4>Explore</h4>
-      <a href="index.html">Home</a>
-      <a href="gallery.html">Our Work</a>
-      <a href="about.html">About Us</a>
-      <a href="faq.html">FAQs</a>
-      <a href="contact.html">Get a Quote</a>
-    </div>
-    <div class="footer-col">
-      <h4>Contact</h4>
-      <a href="tel:+13853568733">(385) 356-8733</a>
-      <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
-    </div>
-    <div class="footer-col">
-      <h4>Legal</h4>
-      <a href="privacy.html">Privacy Notice</a>
-      <a href="terms.html">Terms of Use</a>
-      <a href="privacy.html#your-rights">Access or Delete My Data</a>
-    </div>
-  </div>
-  <div class="footer-bottom">
-    &copy; <span id="year"></span> Premium Restoration, operated by [OWNER LEGAL NAME].
-  </div>
-</footer>
+          </p>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Explore</h2>
+          <a href="index.html">Home</a>
+          <a href="index.html#pricing">How We Price</a>
+          <a href="about.html">About Us</a>
+          <a href="faq.html">FAQs</a>
+          <a href="contact.html">Get a Quote</a>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Contact</h2>
+          <a href="tel:+13853568733">(385) 356-8733</a>
+          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Legal</h2>
+          <a href="privacy.html">Privacy Notice</a>
+          <a href="terms.html">Terms of Use</a>
+          <a href="privacy.html#your-rights">Access or Delete My Data</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">
+          &copy; <span data-year>2026</span> Premium Restoration<span data-show-if="owner.legalName" hidden
+            >, operated by <span data-fill="owner.legalName"></span></span
+          >.
+        </p>
+        <div class="theme-switch" role="group" aria-label="Colour theme">
+          <span class="theme-switch-label" aria-hidden="true">Theme</span>
+          <button type="button" data-theme-choice="system" aria-pressed="true">System</button>
+          <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+          <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+        </div>
+      </div>
+    </footer>
+    <!-- /chrome:footer -->
 
-<script src="js/script.js"></script>
-<script>document.getElementById("year").textContent = new Date().getFullYear();</script>
-</body>
+    <script src="js/site-config.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/script.js"></script>
+  </body>
 </html>

@@ -1,120 +1,219 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Terms of Use | Premium Restoration</title>
-<meta name="description" content="Terms of use for the Premium Restoration website, including how online estimates work." />
-<link rel="stylesheet" href="css/style.css" />
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terms of Use | Premium Restoration</title>
+    <meta
+      name="description"
+      content="Terms of use for the Premium Restoration website, including how online estimates work."
+    />
+    <!-- chrome:head -->
+    <meta name="theme-color" content="#15130f" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("pr_theme");
+          if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="css/style.css" />
+    <!-- /chrome:head -->
+  </head>
+  <body>
+    <!-- chrome:header -->
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <nav class="nav" aria-label="Main">
+        <a href="index.html" class="nav-brand">Premium Restoration</a>
+        <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+            <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <ul class="nav-links" id="nav-links">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="index.html#pricing">How We Price</a></li>
+          <li><a href="about.html">About Us</a></li>
+          <li><a href="faq.html">FAQs</a></li>
+          <li><a href="contact.html" class="nav-cta">Get a Quote</a></li>
+        </ul>
+      </nav>
+    </header>
+    <!-- /chrome:header -->
 
-<header class="site-header">
-  <nav class="nav">
-    <a href="index.html" class="nav-brand">Premium Restoration</a>
-    <button class="nav-toggle" aria-label="Toggle navigation">&#9776;</button>
-    <ul class="nav-links">
-      <li><a href="index.html">Home</a></li>
-      <li><a href="gallery.html">Our Work</a></li>
-      <li><a href="about.html">About Us</a></li>
-      <li><a href="faq.html">FAQs</a></li>
-      <li><a href="contact.html" class="nav-cta">Get a Quote</a></li>
-    </ul>
-  </nav>
-</header>
+    <main id="main">
+      <section class="hero hero-page">
+        <div class="hero-inner">
+          <p class="eyebrow center">The Fine Print</p>
+          <h1>Terms of <em>Use</em></h1>
+          <p>How this website, our online estimates, and our published prices work.</p>
+        </div>
+      </section>
 
-<section class="hero" style="padding: 200px 32px 110px;">
-  <div class="hero-inner">
-    <span class="eyebrow center">The Fine Print</span>
-    <h1>Terms of <em>Use</em></h1>
-    <p>How this website, our online estimates, and our published prices work.</p>
-  </div>
-</section>
+      <section class="section legal-content">
+        <p class="legal-updated">Last updated: September 24, 2026</p>
 
-<section class="section legal-content">
-  <p class="legal-updated">Last updated: September 24, 2026</p>
+        <h2>About these terms</h2>
+        <p>
+          These terms apply to your use of this website. The website and the Premium Restoration business are run by one
+          individual, its owner<span data-show-if="owner.legalName" hidden
+            >, <span data-fill="owner.legalName"></span></span
+          >.<span data-show-if="owner.contactAddress" hidden>
+            Our contact address is <span data-fill="owner.contactAddress"></span>.</span
+          >
+          Premium Restoration is currently an unregistered business: it is not a company, LLC, or other registered
+          entity, and it has no registered business name or registered address.<!-- There is currently no contractor licence. Add " Contractor License # [CONTRACTOR LICENSE #] ([LICENSE CLASSIFICATION])." here only once a licence is actually issued. -->
+          These terms explain how the website, our online estimates, and our published prices work. They are not a
+          contract for any job: the terms of any work we do for you are set in your written agreement with us. Our
+          <a href="privacy.html">Privacy Notice</a> explains how we handle personal information.
+        </p>
 
-  <h2>About these terms</h2>
-  <p>These terms apply to your use of this website. The website and the Premium Restoration business are run by [OWNER LEGAL NAME], an individual, whose contact address is [OWNER CONTACT ADDRESS]. Premium Restoration is currently an unregistered business: it is not a company, LLC, or other registered entity, and it has no registered business name or registered address.<!-- There is currently no contractor licence. Add " Contractor License # [CONTRACTOR LICENSE #] ([LICENSE CLASSIFICATION])." here only once a licence is actually issued. --> These terms explain how the website, our online estimates, and our published prices work. They are not a contract for any job: the terms of any work we do for you are set in your written agreement with us. Our <a href="privacy.html">Privacy Notice</a> explains how we handle personal information.</p>
+        <h2>Our services</h2>
+        <p>
+          We currently take on bathroom restorations only. Information on this website is general and is not a promise
+          that we can take on any particular job. Online estimates do not include plumbing or electrical work.
+          Installing toilets, sinks, showers, or bathtubs also needs plumbing work, so if your project includes them, or
+          needs any other plumbing or electrical work, the cost will be higher than the online estimate. We do not
+          currently hold a contractor licence. Before any work is agreed, we will tell you who will do the plumbing and
+          electrical work, how it will be priced, and whether your job needs any permits.
+        </p>
 
-  <h2>Our services</h2>
-  <p>We currently take on bathroom restorations only. Information on this website is general and is not a promise that we can take on any particular job. Online estimates do not include plumbing or electrical work. Installing toilets, sinks, showers, or bathtubs also needs plumbing work, so if your project includes them, or needs any other plumbing or electrical work, the cost will be higher than the online estimate. We do not currently hold a contractor licence. Before any work is agreed, we will tell you who will do the plumbing and electrical work, how it will be priced, and whether your job needs any permits.</p>
+        <h2>Prices and online estimates</h2>
+        <ul>
+          <li>
+            Our published labor prices include <span data-price="Cabinet_Price">$60</span> per cabinet and
+            <span data-price="Floor_Price_Per_SqFt">$5</span> per sq ft of bathroom flooring. Prices may change; the
+            price that applies to your job is the one in your written agreement with us.
+          </li>
+          <li>
+            Estimates from the chat assistant on our home page, including any PDF you export, are automated, rough, and
+            non-binding. They cover labor only and are based only on the measurements, counts, and choices you enter,
+            together with the assumptions listed with each estimate. They exclude plumbing and electrical work
+            (including the plumbing needed for any toilets, sinks, showers, or bathtubs you list), materials, permits,
+            and any applicable taxes, all of which will add to the cost where your job needs them.
+          </li>
+          <li>
+            An online estimate is not a quote, offer, or contract. Your actual price is set only in a written agreement
+            after we have reviewed your project in person.
+          </li>
+        </ul>
 
-  <h2>Prices and online estimates</h2>
-  <ul>
-    <li>Our published labor prices include $60 per cabinet and $5 per sq ft of bathroom flooring. Prices may change; the price that applies to your job is the one in your written agreement with us.</li>
-    <li>Estimates from the chat assistant on our home page, including any PDF you export, are automated, rough, and non-binding. They cover labor only and are based only on the measurements, counts, and choices you enter, together with the assumptions listed with each estimate. They exclude plumbing and electrical work (including the plumbing needed for any toilets, sinks, showers, or bathtubs you list), materials, permits, and any applicable taxes, all of which will add to the cost where your job needs them.</li>
-    <li>An online estimate is not a quote, offer, or contract. Your actual price is set only in a written agreement after we have reviewed your project in person.</li>
-  </ul>
+        <h2>The chat assistant</h2>
+        <p>
+          The chat on our home page is an automated tool with scripted replies. It is not a person and not AI, and
+          nothing you type into it is sent to us. To reach a person, call or email us.
+        </p>
 
-  <h2>The chat assistant</h2>
-  <p>The chat on our home page is an automated tool with scripted replies. It is not a person and not AI, and nothing you type into it is sent to us. To reach a person, call or email us.</p>
+        <h2>Warranties</h2>
+        <p>
+          We do not offer a warranty through this website. Any warranty on work we perform applies only if it is set out
+          in your written agreement with us.
+        </p>
 
-  <h2>Warranties</h2>
-  <p>We do not offer a warranty through this website. Any warranty on work we perform applies only if it is set out in your written agreement with us.</p>
+        <h2>Website content and third-party materials</h2>
+        <ul>
+          <li>Please don't copy the text or design of this website without our permission.</li>
+          <li>
+            Fonts: <a href="https://fonts.google.com/specimen/Inter" rel="noopener" target="_blank">Inter</a> and
+            <a href="https://fonts.google.com/specimen/Playfair+Display" rel="noopener" target="_blank"
+              >Playfair Display</a
+            >, hosted on this website under the SIL Open Font License 1.1 (licence texts:
+            <a href="fonts/OFL-Inter.txt">Inter</a>, <a href="fonts/OFL-PlayfairDisplay.txt">Playfair Display</a>).
+          </li>
+          <li>
+            PDF export: <a href="https://github.com/parallax/jsPDF" rel="noopener" target="_blank">jsPDF</a> 4.2.1,
+            hosted on this website under the MIT License (<a href="js/vendor/jspdf-LICENSE.txt">licence text</a>).
+          </li>
+        </ul>
 
-  <h2>Website content and third-party materials</h2>
-  <ul>
-    <li>Please don't copy the text or design of this website without our permission.</li>
-    <li>Fonts: <a href="https://fonts.google.com/specimen/Inter" rel="noopener" target="_blank">Inter</a> and <a href="https://fonts.google.com/specimen/Playfair+Display" rel="noopener" target="_blank">Playfair Display</a>, hosted on this website under the SIL Open Font License 1.1 (licence texts: <a href="fonts/OFL-Inter.txt">Inter</a>, <a href="fonts/OFL-PlayfairDisplay.txt">Playfair Display</a>).</li>
-    <li>PDF export: <a href="https://github.com/parallax/jsPDF" rel="noopener" target="_blank">jsPDF</a> 2.5.1, served by cdnjs under the MIT License.</li>
-  </ul>
+        <h2>Accessibility</h2>
+        <p>
+          We want everyone to be able to use this website. If anything on it is hard to use or read, please call
+          <a href="tel:+13853568733">(385) 356-8733</a> or email
+          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>, and we'll help you get the
+          information you need another way.
+        </p>
 
-  <h2>Accessibility</h2>
-  <p>We want everyone to be able to use this website. If anything on it is hard to use or read, please call <a href="tel:+13853568733">(385) 356-8733</a> or email <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>, and we'll help you get the information you need another way.</p>
+        <h2>Limits on our responsibility</h2>
+        <p>
+          To the extent the law allows, this website is provided &ldquo;as is&rdquo;, and we are not responsible for
+          loss arising from reliance on its general information or on online estimates. Nothing in these terms limits
+          any rights you have under consumer protection law that cannot be excluded.
+        </p>
 
-  <h2>Limits on our responsibility</h2>
-  <p>To the extent the law allows, this website is provided &ldquo;as is&rdquo;, and we are not responsible for loss arising from reliance on its general information or on online estimates. Nothing in these terms limits any rights you have under consumer protection law that cannot be excluded.</p>
+        <!-- Governing law: add back only once the owner has confirmed the state, as
+        <h2>Governing law</h2>
+        <p>These terms are governed by the laws of [GOVERNING STATE].</p>
+        -->
 
-  <!-- Governing law: add back only once the owner has confirmed the state, as
-  <h2>Governing law</h2>
-  <p>These terms are governed by the laws of [GOVERNING STATE].</p>
-  -->
+        <h2>Changes to these terms</h2>
+        <p>
+          If we change these terms, we will post the new version on this page with a new &ldquo;last updated&rdquo;
+          date.
+        </p>
+      </section>
+    </main>
 
-  <h2>Changes to these terms</h2>
-  <p>If we change these terms, we will post the new version on this page with a new &ldquo;last updated&rdquo; date.</p>
-
-</section>
-
-<footer class="site-footer">
-  <div class="footer-grid">
-    <div class="footer-col">
-      <p class="footer-brand">Premium Restoration</p>
-      <p style="max-width:260px; font-size: 0.9rem;">Bathroom restoration services.</p>
-      <p class="footer-identity">
-        Operated by [OWNER LEGAL NAME], an individual<br />
-        (not a registered company)<br />
-        [OWNER CONTACT ADDRESS]
-        <!-- There is currently no contractor licence. Add a licence line here only once a licence is
+    <!-- chrome:footer -->
+    <footer class="site-footer">
+      <div class="footer-grid">
+        <div class="footer-col">
+          <p class="footer-brand">Premium Restoration</p>
+          <p class="footer-tagline">Bathroom restoration services.</p>
+          <p class="footer-identity">
+            Operated by
+            <span data-show-if="owner.legalName" hidden><span data-fill="owner.legalName"></span>,</span>
+            an individual<br />
+            (not a registered company)
+            <span data-show-if="owner.contactAddress" hidden><br /><span data-fill="owner.contactAddress"></span></span>
+            <!-- There is currently no contractor licence. Add a licence line here only once a licence is
              actually issued, as <br />Contractor License # [CONTRACTOR LICENSE #] ([LICENSE CLASSIFICATION]) -->
-      </p>
-    </div>
-    <div class="footer-col">
-      <h4>Explore</h4>
-      <a href="index.html">Home</a>
-      <a href="gallery.html">Our Work</a>
-      <a href="about.html">About Us</a>
-      <a href="faq.html">FAQs</a>
-      <a href="contact.html">Get a Quote</a>
-    </div>
-    <div class="footer-col">
-      <h4>Contact</h4>
-      <a href="tel:+13853568733">(385) 356-8733</a>
-      <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
-    </div>
-    <div class="footer-col">
-      <h4>Legal</h4>
-      <a href="privacy.html">Privacy Notice</a>
-      <a href="terms.html">Terms of Use</a>
-      <a href="privacy.html#your-rights">Access or Delete My Data</a>
-    </div>
-  </div>
-  <div class="footer-bottom">
-    &copy; <span id="year"></span> Premium Restoration, operated by [OWNER LEGAL NAME].
-  </div>
-</footer>
+          </p>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Explore</h2>
+          <a href="index.html">Home</a>
+          <a href="index.html#pricing">How We Price</a>
+          <a href="about.html">About Us</a>
+          <a href="faq.html">FAQs</a>
+          <a href="contact.html">Get a Quote</a>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Contact</h2>
+          <a href="tel:+13853568733">(385) 356-8733</a>
+          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Legal</h2>
+          <a href="privacy.html">Privacy Notice</a>
+          <a href="terms.html">Terms of Use</a>
+          <a href="privacy.html#your-rights">Access or Delete My Data</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">
+          &copy; <span data-year>2026</span> Premium Restoration<span data-show-if="owner.legalName" hidden
+            >, operated by <span data-fill="owner.legalName"></span></span
+          >.
+        </p>
+        <div class="theme-switch" role="group" aria-label="Colour theme">
+          <span class="theme-switch-label" aria-hidden="true">Theme</span>
+          <button type="button" data-theme-choice="system" aria-pressed="true">System</button>
+          <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+          <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+        </div>
+      </div>
+    </footer>
+    <!-- /chrome:footer -->
 
-<script src="js/script.js"></script>
-<script>document.getElementById("year").textContent = new Date().getFullYear();</script>
-</body>
+    <script src="js/site-config.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/script.js"></script>
+  </body>
 </html>
