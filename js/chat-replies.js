@@ -55,7 +55,33 @@
     );
   }
 
-  var IDENTITY = "\\b(human|real person|a person|robot|bot|ai|chatgpt|automated|are you real)\\b";
+  // Only real questions about who is answering ("Are you a real person?",
+  // "Is this a bot?", "Am I talking to a human?"). A message that merely
+  // mentions a person ("I need a person to look at my shower") is answered on
+  // its subject instead.
+  var WHO = "(a |an )?(real |actual |live )?(person|human|bot|robot|ai|chat ?bot|chatgpt|machine|computer program)\\b";
+  var IDENTITY = [
+    "\\b(are|r) (you|u) " + WHO,
+    "\\bare (you|u) (real|automated)\\b",
+    "\\bis (this|it|that) " + WHO,
+    "\\bis (this|it|that) (automated|chatgpt)\\b",
+    "\\b(am i|are we) (talking|chatting|speaking) (to|with) " + WHO,
+    "\\bwho am i (talking|chatting|speaking) (to|with)\\b",
+    "\\b(youre|you are|ur) " + WHO,
+    "\\bis (anyone|someone|somebody) (there|here|reading this)\\b",
+    "\\bis there (a )?(real )?(person|human) (there|here|on the other end|reading)\\b",
+  ].join("|");
+
+  // Asking for a person to talk to: the phone number and email.
+  var PERSON_REQUEST =
+    "\\b(talk|speak|chat) (to|with) (a |an )?(real |actual |live )?(person|human|someone|somebody|anyone|agent|representative|the owner)\\b";
+  var PERSON_REPLY =
+    "To talk to a person, call " +
+    PHONE +
+    " or email " +
+    EMAIL +
+    ". I'm an automated assistant with scripted replies, so nothing you type here reaches us.";
+
   var IDENTITY_REPLY =
     "I'm an automated assistant with scripted replies — not a person, and not AI. Nothing you type here is sent to or read by us. To reach a person, call " +
     PHONE +
@@ -63,8 +89,121 @@
     EMAIL +
     ".";
 
+  // Spanish or French messages, including short everyday phrasing
+  // ("hablas ingles", "parlez-vous anglais", "buenos días", "s'il vous
+  // plaît"), and English questions about those languages. Only words that
+  // aren't also English words are used, so English messages aren't caught.
   var OTHER_LANGUAGE =
-    "[¿¡ñ]|\\b(hola|cuanto|cuánto|cuesta|precio|baño|bano|necesito|quiero|gracias|usted|ustedes|hacen|remodelar|bonjour|combien|salle|merci|vous|voudrais|prix)\\b";
+    "[¿¡ñ]|\\b(" +
+    [
+      // Spanish
+      "hola",
+      "buenos",
+      "buenas",
+      "dias",
+      "días",
+      "tardes",
+      "noches",
+      "habla",
+      "hablas",
+      "hablan",
+      "hablo",
+      "ingles",
+      "inglés",
+      "espanol",
+      "español",
+      "cuanto",
+      "cuánto",
+      "cuanta",
+      "cuánta",
+      "cuesta",
+      "cuestan",
+      "precio",
+      "precios",
+      "baño",
+      "baños",
+      "bano",
+      "banos",
+      "ducha",
+      "regadera",
+      "inodoro",
+      "lavabo",
+      "azulejo",
+      "azulejos",
+      "piso",
+      "pisos",
+      "pintar",
+      "pintura",
+      "remodelar",
+      "remodelacion",
+      "remodelación",
+      "reparar",
+      "arreglar",
+      "necesito",
+      "necesita",
+      "necesitamos",
+      "quiero",
+      "quisiera",
+      "queremos",
+      "puede",
+      "puedes",
+      "pueden",
+      "ayuda",
+      "ayudar",
+      "gracias",
+      "usted",
+      "ustedes",
+      "hacen",
+      "tienen",
+      "cotizacion",
+      "cotización",
+      "presupuesto",
+      "trabajo",
+      "cuando",
+      "cuándo",
+      "donde",
+      "dónde",
+      "por favor",
+      // French
+      "bonjour",
+      "bonsoir",
+      "salut",
+      "parlez",
+      "parles",
+      "anglais",
+      "francais",
+      "français",
+      "combien",
+      "coute",
+      "coûte",
+      "salle",
+      "douche",
+      "toilettes",
+      "carrelage",
+      "peinture",
+      "devis",
+      "travaux",
+      "merci",
+      "vous",
+      "voudrais",
+      "voulez",
+      "pouvez",
+      "prix",
+      "je suis",
+      "je veux",
+      "sil vous plait",
+      "sil vous plaît",
+      "oui",
+      // English questions about Spanish or French
+      "speak spanish",
+      "speak french",
+      "in spanish",
+      "in french",
+      "spanish speaking",
+      "french speaking",
+      "habla espanol",
+    ].join("|") +
+    ")\\b";
   var OTHER_LANGUAGE_REPLY =
     "Sorry — this automated assistant only understands English. Lo sentimos, este asistente automático solo entiende inglés. " +
     "Désolé, cet assistant automatique ne comprend que l'anglais. Please call " +
@@ -83,7 +222,7 @@
 
   // Other work we don't take on.
   var OTHER_WORK =
-    "\\b(kitchens?|exteriors?|roof(s|ing)?|siding|stucco|decks?|fences?|gutters?|fireplaces?|chimneys?|driveways?|patios?|landscaping|pools?|hvac|furnaces?|whole (home|house)|entire (home|house)|full (home|house)|remodel my (home|house))\\b";
+    "\\b(kitchens?|exteriors?|roof(s|ing)?|siding|stucco|decks?|fences?|gutters?|fireplaces?|chimneys?|driveways?|patios?|landscaping|pools?|hvac|furnaces?|water heaters?|hot water heaters?|hot water tanks?|tankless water heaters?|boilers?|whole (home|house)|entire (home|house)|full (home|house)|remodel my (home|house))\\b";
   // Other rooms. On their own they are declined, but they can also say
   // where a bathroom is ("basement bathroom", "bathroom in the garage").
   var OTHER_ROOMS = "\\b(basements?|garages?|bedrooms?|living rooms?)\\b";
@@ -167,6 +306,19 @@
       },
     },
     {
+      // Grout and caulk are part of tile work.
+      pattern: "\\b(grout|grouting|regrout|re grout|caulk|caulking|recaulk|re caulk|sealant)\\b",
+      text: function () {
+        return (
+          "Grout and caulk are part of our tile work, priced with the tile: " +
+          $(PRICES.Tile_Price_Per_SqFt) +
+          " per sq ft of floor or wall tiled (labor only). For a grout or caulk repair on its own, call " +
+          PHONE +
+          " and we'll tell you whether we can take it on."
+        );
+      },
+    },
+    {
       pattern: "\\b(tile|tiles|tiling|tiled)\\b",
       text: function () {
         return "Tile is " + $(PRICES.Tile_Price_Per_SqFt) + " per sq ft of floor or wall tiled (labor only).";
@@ -233,7 +385,22 @@
       },
     },
     {
-      pattern: "\\b(bathtub|bathtubs|tub|tubs|bath tub)\\b",
+      // Jetted tubs (Jacuzzi, whirlpool) are installed as bathtubs; their
+      // electrical hook-up is extra.
+      pattern:
+        "\\b(jacuzzis?|jetted (tub|tubs|bath|baths|bathtub|bathtubs)|whirlpool (tub|tubs|bath|baths|bathtub|bathtubs)|whirlpools?|spa (tub|tubs|bath|baths))\\b",
+      text: function () {
+        return (
+          "A jetted tub (such as a Jacuzzi or whirlpool bath) is installed as a bathtub: " +
+          $(Pricing.bathtubPrice(PRICES)) +
+          " per bathtub (labor only). " +
+          PLUMBING_EXTRA +
+          " The electrical work for the jets isn't included either and also adds to the cost."
+        );
+      },
+    },
+    {
+      pattern: "\\b(bathtub|bathtubs|tub|tubs|bath tub|soaking tub|clawfoot)\\b",
       text: function () {
         return (
           "Bathtub installation is " + $(Pricing.bathtubPrice(PRICES)) + " per bathtub (labor only). " + PLUMBING_EXTRA
@@ -279,6 +446,22 @@
   var WARRANTY = "\\b(warrant(y|ies)|guarantee[ds]?)\\b";
   var WARRANTY_REPLY =
     "We don't advertise a standard warranty on this website. If you'd like one, ask us before you agree to the work, and make sure any warranty terms are given to you in writing.";
+
+  // Water heaters are plumbing work outside the bathroom restorations we do.
+  var WATER_HEATER = "\\b(water heaters?|hot water heaters?|hot water tanks?|tankless|boilers?)\\b";
+  var WATER_HEATER_REPLY =
+    "Sorry, we don't take on water heater installation or replacement: it's plumbing work outside the bathroom restorations we do, " +
+    "and plumbing isn't included in our online prices. A licensed plumber is the right person to ask. For a bathroom restoration, call " +
+    PHONE +
+    " or use the Contact page.";
+
+  // When someone can come out or start: only a person can answer that.
+  var AVAILABILITY =
+    "\\b(come|come out|come over|start|begin|visit|stop by|get here|be here|be there|fit me in|see it|look at it)\\s+(today|tonight|tomorrow|this week|next week|this weekend|this month|next month|soon|asap|right away|on (monday|tuesday|wednesday|thursday|friday|saturday|sunday))\\b|\\b(are you|is anyone) (available|free)\\b|\\b(any|your) availability\\b|\\bwhen (can|could|would|will) (you|someone|somebody) (come|come out|start|begin|visit|get here)\\b|\\bhow soon can\\b|\\b(earliest|next available) (date|day|opening|appointment|slot)\\b|\\b(book|schedule) (a|an) (visit|appointment|consultation)\\b";
+  var AVAILABILITY_REPLY =
+    "This chat can't check dates or book a visit. Call " +
+    PHONE +
+    " or send a request on the Contact page and we'll tell you when we could come out or start.";
 
   var TIMELINE = "\\b(how long|timeline|time frame|timeframe|duration|weeks?|days?|start)\\b";
   // A clear question about time, answered even when it names an item
@@ -345,10 +528,13 @@
 
     if (has(t, IDENTITY)) return { text: IDENTITY_REPLY, action: null };
     if (has(t, OTHER_LANGUAGE)) return { text: OTHER_LANGUAGE_REPLY, action: null };
+    if (has(t, PERSON_REQUEST)) return { text: PERSON_REPLY, action: null };
     if (has(t, DAMAGE)) return { text: DAMAGE_REPLY, action: null };
     var others = otherWorkNamed(t);
     if (others.length) {
-      return has(t, BATHROOM) ? mixedReply(others, estimator) : { text: NOT_BATHROOM_REPLY, action: null };
+      if (has(t, BATHROOM)) return mixedReply(others, estimator);
+      if (has(t, WATER_HEATER)) return { text: WATER_HEATER_REPLY, action: null };
+      return { text: NOT_BATHROOM_REPLY, action: null };
     }
     if (has(t, FIXTURE_WORDS) && has(t, PROBLEM_WORDS)) return { text: FIXTURE_PROBLEM_REPLY, action: null };
 
@@ -359,9 +545,11 @@
       ? LICENCE_REPLY
       : has(t, WARRANTY)
         ? WARRANTY_REPLY
-        : has(t, TIMELINE_QUESTION)
-          ? TIMELINE_REPLY
-          : null;
+        : has(t, AVAILABILITY)
+          ? AVAILABILITY_REPLY
+          : has(t, TIMELINE_QUESTION)
+            ? TIMELINE_REPLY
+            : null;
     var asksPrice = has(t, PRICE_WORDS);
     if (topical && !asksPrice) return { text: topical, action: null };
 
