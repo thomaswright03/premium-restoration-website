@@ -27,6 +27,7 @@ const MODULES = [
   "js/business-info.js",
   "js/site-config.js",
   "js/admin/dates.js",
+  "js/estimate-pdf.js",
 ];
 
 for (const mod of MODULES) {

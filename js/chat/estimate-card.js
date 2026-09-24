@@ -153,7 +153,9 @@
     var cta = C.el("a", "ai-chat-estimate-cta", "Get a Quote\u00a0→");
     cta.href = "contact.html?from=estimate";
     cta.addEventListener("click", function () {
-      C.saveSummary(Pricing().buildEstimateSummary(estimate.values, estimate.scope, estimate.result));
+      var summary = Pricing().buildEstimateSummary(estimate.values, estimate.scope, estimate.result);
+      // If the visitor saved a PDF, its reference comes too, so it can be matched.
+      C.saveSummary(summary + (estimate.reference ? "\n- Estimate PDF reference: " + estimate.reference : ""));
     });
     return cta;
   }
@@ -199,27 +201,35 @@
     if (!C.isFullscreen() && row.scrollIntoView) row.scrollIntoView({ block: "start" });
   }
 
+  // The PDF of this estimate. Its reference is made once per estimate, so
+  // exporting the same card again gives the same reference; the prices are
+  // held for the owner's set period (estimates.validForDays), if there is one.
   function pdfSpec(estimate) {
+    var Pdf = window.EstimatePdf;
     var money = Pricing().money;
     var result = estimate.result;
     var fixtureCount = result.plumbingFixtureCount;
     var Business = window.BusinessInfo;
+    var config = C.state.config;
+    var issued = new Date();
+    var until = Pdf.heldUntil(issued, config && config.estimates ? config.estimates.validForDays : null);
+    estimate.reference = estimate.reference || Pdf.estimateReference(issued);
     return {
       title: "Bathroom Restoration — Labor Estimate",
+      reference: estimate.reference,
+      issued: issued,
+      heldUntil: until,
       intro: "Rough, non-binding labor estimate.",
       lines: result.lines.map(function (r) {
         return { label: r.label, detail: r.detail, amount: money(r.cost) };
       }),
       excluded: excludedLines(fixtureCount),
       totals: [{ label: totalLabel(fixtureCount), value: money(result.subtotal), strong: true }],
-      afterTotal: (fixtureCount > 0 ? [plumbingTotalNote(fixtureCount)] : []).concat([ESTIMATE_DISCLAIMER]),
+      afterTotal: (fixtureCount > 0 ? [plumbingTotalNote(fixtureCount)] : []).concat([
+        Pdf.withHeldUntil(ESTIMATE_DISCLAIMER, until),
+      ]),
       sections: [{ title: "What this estimate assumes", items: estimate.assumptions }],
-      footer: {
-        business: businessLine(),
-        phone: Business.PHONE,
-        email: Business.EMAIL,
-        date: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
-      },
+      footer: { business: businessLine(), phone: Business.PHONE, email: Business.EMAIL },
     };
   }
 
@@ -232,7 +242,8 @@
     status.textContent = "";
     window.EstimatePdf.load()
       .then(function () {
-        window.EstimatePdf.build(pdfSpec(estimate)).save("premium-restoration-bathroom-estimate.pdf");
+        var spec = pdfSpec(estimate);
+        window.EstimatePdf.build(spec).save("premium-restoration-estimate-" + spec.reference + ".pdf");
         button.disabled = false;
         button.textContent = label;
       })

@@ -47,13 +47,17 @@ interface SiteConfigData {
     scriptUrl: string;
     servicePrivacyUrl: string;
   };
+  estimates: { validForDays: number | null };
 }
 
 interface Window {
   BathroomPricing: typeof import("../js/bathroom-pricing.js");
   BusinessInfo: typeof import("../js/business-info.js");
   SiteConfig: { ready: Promise<SiteConfigData>; apply: (config: SiteConfigData, scope?: ParentNode) => void };
-  EstimatePdf: { load: () => Promise<unknown>; build: (options: object) => { save: (filename: string) => void } };
+  EstimatePdf: typeof import("../js/estimate-pdf.js") & {
+    load: () => Promise<unknown>;
+    build: (options: object) => { save: (filename: string) => void };
+  };
   ChatReplies: typeof import("../js/chat-replies.js");
   SiteAnalytics: { EVENTS: Record<string, string>; track: (event: string) => void };
   CalendarDays: typeof import("../js/admin/dates.js");

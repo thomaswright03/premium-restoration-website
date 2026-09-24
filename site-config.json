@@ -39,5 +39,9 @@
     "domain": "",
     "scriptUrl": "",
     "servicePrivacyUrl": ""
+  },
+  "estimates": {
+    "_help": "How many days the prices on an estimate or quote PDF are held, as a whole number (e.g. 30), or null. While it is null the PDFs print no 'prices held until' date. The owner decides this; see README 'Site settings'.",
+    "validForDays": null
   }
 }

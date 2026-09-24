@@ -28,9 +28,18 @@
           totals.push({ label: "Tax (" + result.taxRatePercent + "%)", value: A.money(result.taxAmount) });
         }
         totals.push({ label: "Estimated Labor Total", value: A.money(result.total), strong: true });
-        var doc = window.EstimatePdf.build({
+        var Pdf = window.EstimatePdf;
+        var customer = A.cleanCustomer(quote.customer);
+        var issued = new Date();
+        var until = Pdf.heldUntil(issued, config && config.estimates ? config.estimates.validForDays : null);
+        var reference = Pdf.quoteReference(quote);
+        var doc = Pdf.build({
           title: "Bathroom Restoration — Labor Estimate",
-          preparedFor: [A.cleanCustomer(quote.customer).name, quote.address].filter(Boolean).join(", "),
+          reference: reference,
+          issued: issued,
+          heldUntil: until,
+          preparedFor: [customer.name, quote.address].filter(Boolean).join(", "),
+          contact: [customer.phone, customer.email].filter(Boolean).join("  ·  "),
           intro: "Labor estimate for the work listed below.",
           lines: result.lines.map(function (l) {
             return { label: l.label, detail: l.detail, amount: A.money(l.cost) };
@@ -45,7 +54,9 @@
           afterTotal: [
             "This is an estimate of labor only, for the work listed. It is not a contract. Materials and permits are not included" +
               (result.taxRatePercent > 0 ? "" : ", and neither are any applicable taxes") +
-              ". Prices are current as of the date generated and may change. Your actual price is set only in a written agreement with us.",
+              ". " +
+              Pdf.withHeldUntil("Prices are current as of the date generated and may change.", until) +
+              " Your actual price is set only in a written agreement with us.",
             "We do not currently hold a contractor licence. Before any work is agreed, we will tell you who will do any plumbing and electrical work, how it will be priced, and whether your job needs any permits.",
           ],
           sections: [
@@ -55,7 +66,6 @@
             business: A.Business.businessLine(config && config.owner.legalName),
             phone: A.Business.PHONE,
             email: A.Business.EMAIL,
-            date: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
           },
         });
         doc.save(
@@ -64,6 +74,8 @@
               .replace(/[^a-z0-9]+/gi, "-")
               .replace(/^-|-$/g, "")
               .toLowerCase() +
+            "-" +
+            reference +
             ".pdf",
         );
       })

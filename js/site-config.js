@@ -34,7 +34,18 @@
     owner: { legalName: "", contactAddress: "" },
     privacy: { responsePeriod: "" },
     analytics: { enabled: false, provider: "", domain: "", scriptUrl: "", servicePrivacyUrl: "" },
+    estimates: { validForDays: null },
   };
+
+  // How long the prices on an estimate or quote PDF are held, in days: a
+  // whole number from 1 to 365 set by the owner, or null (not set) — then
+  // the PDFs print no "held until" date. Returns a message if the setting
+  // can't be used.
+  function validForDaysProblem(value) {
+    if (value === null || value === undefined || value === "") return "";
+    if (typeof value === "number" && Math.floor(value) === value && value >= 1 && value <= 365) return "";
+    return "estimates.validForDays must be a whole number of days from 1 to 365 (no quotes), or null if not set.";
+  }
 
   // Visitor-count services the site can use (see js/analytics.js). Both
   // count without cookies and show only totals.
@@ -75,6 +86,7 @@
     var owner = raw.owner || {};
     var privacy = raw.privacy || {};
     var an = raw.analytics || {};
+    var est = raw.estimates || {};
     var provider = clean(an.provider).toLowerCase();
     var knownProvider = Object.prototype.hasOwnProperty.call(ANALYTICS_PROVIDERS, provider);
     var scriptUrl = clean(an.scriptUrl);
@@ -109,6 +121,13 @@
         scriptUrl: /^(https:\/\/|\/)\S*$/.test(scriptUrl) ? scriptUrl : "",
         servicePrivacyUrl: /^https:\/\//.test(clean(an.servicePrivacyUrl)) ? clean(an.servicePrivacyUrl) : "",
       },
+      // Unset or unusable: no "prices held until" date is printed.
+      estimates: {
+        validForDays:
+          est.validForDays !== null && est.validForDays !== undefined && !validForDaysProblem(est.validForDays)
+            ? est.validForDays
+            : null,
+      },
     };
   }
 
@@ -118,6 +137,7 @@
       GENERIC_FORM_SERVICE: GENERIC_FORM_SERVICE,
       normalize: normalize,
       formServiceName: formServiceName,
+      validForDaysProblem: validForDaysProblem,
     };
     return;
   }

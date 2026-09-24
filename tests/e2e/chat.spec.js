@@ -3,6 +3,7 @@
 const { test, expect } = require("@playwright/test");
 const fs = require("node:fs");
 const { useConfig, sendChat, startEstimate, answerScope, fillGroup } = require("./helpers");
+const { downloadText } = require("./pdf-text");
 
 const NOTHING_BUT_FLOORING = { demolition: "No", floorFinish: "Other flooring", walls: "Neither", paintCeiling: "No" };
 
@@ -49,13 +50,96 @@ test.describe("chat estimate", () => {
       page.waitForEvent("download"),
       card.getByRole("button", { name: "Export as PDF" }).click(),
     ]);
-    const pdf = fs.readFileSync(await download.path(), "latin1");
-    expect(pdf.startsWith("%PDF")).toBe(true);
+    const raw = fs.readFileSync(await download.path(), "latin1");
+    expect(raw.startsWith("%PDF")).toBe(true);
+    const pdf = await downloadText(download);
     expect(pdf).toContain("Estimated Labor Total");
     expect(pdf).toContain("$380.00");
     expect(pdf).toContain("It is not a quote, offer, or contract");
     expect(pdf).toMatch(/Page 1 of 1/);
     expect(pdf).not.toMatch(/\[[A-Z][A-Z0-9 #]{2,}\]/);
+    expect(pdf).not.toContain("\uFFFD");
+  });
+
+  test("the estimate PDF has the site's fonts, a reference and issue date, and no validity date unless the owner sets one", async ({
+    page,
+  }) => {
+    await startEstimate(page);
+    await answerScope(page, NOTHING_BUT_FLOORING);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8 });
+    await fillGroup(page, "fixtures", { Cabinet_Quantity: 3 });
+    const card = page.getByTestId("estimate-card");
+    const exportPdf = () =>
+      Promise.all([page.waitForEvent("download"), card.getByRole("button", { name: "Export as PDF" }).click()]).then(
+        (r) => r[0],
+      );
+    const download = await exportPdf();
+    const raw = fs.readFileSync(await download.path(), "latin1");
+    // The website's typefaces, embedded (only the letters used).
+    expect(raw).toContain("/BaseFont /PlayfairDisplay");
+    expect(raw).toContain("/BaseFont /Inter");
+    expect(raw).toContain("/FontFile2");
+    const pdf = await downloadText(download);
+    const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    const ref = /Reference (PR-E-(\d{8})-[A-Z2-9]{4})/.exec(pdf);
+    expect(ref).not.toBeNull();
+    const d = new Date();
+    expect(ref[2]).toBe(
+      `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`,
+    );
+    expect(pdf).toContain(`Issued ${today}`);
+    expect(download.suggestedFilename()).toBe(`premium-restoration-estimate-${ref[1]}.pdf`);
+    // The reference is on every page's footer too.
+    expect(pdf).toContain(`${ref[1]} • Page 1 of 1`);
+    // No validity period is set in site-config.json, so none is invented.
+    expect(pdf).not.toContain("held until");
+    expect(pdf).toContain("Prices are current as of the date generated and may change.");
+
+    // The same estimate exported again keeps its reference, and a quote request carries it.
+    expect(await downloadText(await exportPdf())).toContain(`Reference ${ref[1]}`);
+    await card.getByRole("link", { name: /Get a Quote/ }).click();
+    await expect(page.locator("#message")).toHaveValue(new RegExp(`Estimate PDF reference: ${ref[1]}`));
+  });
+
+  test("with a validity period set, the PDF says until when its prices are held", async ({ page }) => {
+    await useConfig(page, { estimates: { validForDays: 30 } });
+    await startEstimate(page);
+    await answerScope(page, NOTHING_BUT_FLOORING);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8 });
+    await fillGroup(page, "fixtures", { Cabinet_Quantity: 3 });
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByTestId("estimate-card").getByRole("button", { name: "Export as PDF" }).click(),
+    ]);
+    const pdf = await downloadText(download);
+    const d = new Date();
+    const until = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 30).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    expect(pdf).toContain(`Prices held until ${until}`);
+    expect(pdf).toContain(
+      `Prices are current as of the date generated and are held until ${until}; after that they may change.`,
+    );
+    expect(pdf).not.toContain("and may change.");
+  });
+
+  test("if the PDF fonts can't be fetched, the PDF is still made in standard fonts", async ({ page }) => {
+    await page.route("**/fonts/pdf/*.ttf", (route) => route.abort());
+    await startEstimate(page);
+    await answerScope(page, NOTHING_BUT_FLOORING);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8 });
+    await fillGroup(page, "fixtures", { Cabinet_Quantity: 3 });
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByTestId("estimate-card").getByRole("button", { name: "Export as PDF" }).click(),
+    ]);
+    const raw = fs.readFileSync(await download.path(), "latin1");
+    expect(raw).not.toContain("/FontFile2");
+    const pdf = await downloadText(download);
+    expect(pdf).toContain("$380.00");
+    expect(pdf).toMatch(/Reference PR-E-\d{8}-[A-Z2-9]{4}/);
   });
 
   test("a long estimate with everything chosen spills onto more pages, each with a footer", async ({ page }) => {
@@ -90,11 +174,14 @@ test.describe("chat estimate", () => {
       page.waitForEvent("download"),
       card.getByRole("button", { name: "Export as PDF" }).click(),
     ]);
-    const pdf = fs.readFileSync(await download.path(), "latin1");
+    const pdf = await downloadText(download);
     const pages = Number(/Page 1 of (\d+)/.exec(pdf)[1]);
     expect(pages).toBeGreaterThan(1);
     for (let i = 1; i <= pages; i++) expect(pdf).toContain(`Page ${i} of ${pages}`);
-    expect((pdf.match(/\(Generated /g) || []).length).toBe(pages);
+    // Every page's footer has the reference and the phone number.
+    const ref = /Reference (PR-E-\d{8}-[A-Z2-9]{4})/.exec(pdf)[1];
+    expect(pdf.split(`${ref} • Page `).length - 1).toBe(pages);
+    expect(pdf.split("(385) 356-8733 • ").length - 1).toBe(pages);
   });
 
   test("PDF export shows a loading state, an inline error with Retry, and recovers", async ({ page }) => {

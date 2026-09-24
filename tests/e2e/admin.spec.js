@@ -12,6 +12,7 @@ const {
   chooseAdmin,
   fillAdminQuote,
 } = require("./helpers");
+const { downloadText } = require("./pdf-text");
 
 const ROOM = { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 };
 const FLOORING_ONLY = { demolition: "No", floorFinish: "Other flooring", walls: "Neither", paintCeiling: "No" };
@@ -115,10 +116,20 @@ test.describe("admin bathroom quote", () => {
       page.waitForEvent("download"),
       page.locator(".quote-card", { hasText: "2 Save Ave" }).getByRole("button", { name: "Download PDF" }).click(),
     ]);
-    const pdf = fs.readFileSync(await download.path(), "latin1");
+    const pdf = await downloadText(download);
     expect(pdf).toContain("Prepared for: 2 Save Ave");
     expect(pdf).toContain("$440.00");
     expect(pdf).toContain("do not currently hold a contractor licence");
+    // A reference from the quote itself: every PDF of this quote carries the same one.
+    const ref = /Reference (PR-Q-\d{8}-[A-Z0-9]{6})/.exec(pdf)[1];
+    expect(download.suggestedFilename()).toBe(`estimate-2-save-ave-${ref}.pdf`);
+    const [again] = await Promise.all([
+      page.waitForEvent("download"),
+      page.locator(".quote-card", { hasText: "2 Save Ave" }).getByRole("button", { name: "Download PDF" }).click(),
+    ]);
+    expect(await downloadText(again)).toContain(`Reference ${ref}`);
+    expect(pdf).toContain("Issued ");
+    expect(pdf).not.toContain("held until");
 
     // Filter by address
     await page.fill("#quote-filter", "twice");
@@ -530,7 +541,10 @@ test.describe("admin: customer details", () => {
       page.waitForEvent("download"),
       card.getByRole("button", { name: "Download PDF" }).click(),
     ]);
-    expect(fs.readFileSync(await download.path(), "latin1")).toContain("Prepared for: Jamie Example, 20 Customer Ln");
+    const customerPdf = await downloadText(download);
+    expect(customerPdf).toContain("Prepared for: Jamie Example, 20 Customer Ln");
+    // The customer's phone and email, when entered.
+    expect(customerPdf).toContain("(801) 555-0199 · jamie@example.com");
 
     const [exported] = await Promise.all([page.waitForEvent("download"), page.click("#export-quotes-btn")]);
     const file = await exported.path();
@@ -565,7 +579,9 @@ test.describe("admin: customer details", () => {
       page.waitForEvent("download"),
       page.getByRole("button", { name: "Download PDF" }).click(),
     ]);
-    expect(fs.readFileSync(await download.path(), "latin1")).toContain("Prepared for: 21 Plain St");
+    const plainPdf = await downloadText(download);
+    // No contact line when none was entered.
+    expect(plainPdf).toContain("Prepared for: 21 Plain St Labor estimate for the work listed below.");
   });
 });
 
@@ -689,9 +705,8 @@ test.describe("admin: messages and retention", () => {
 test.describe("PDF business line", () => {
   test("the public estimate PDF and the admin quote PDF show the owner's name identically", async ({ page }) => {
     const LINE = "Premium Restoration, operated by Test Owner Name, an individual (not a registered company)";
-    // PDF text strings escape their brackets.
-    const pdfText = async (download) => fs.readFileSync(await download.path(), "latin1").replace(/\\([()])/g, "$1");
-    await useConfig(page, { owner: { legalName: "Test Owner Name" } });
+    const pdfText = downloadText;
+    await useConfig(page, { owner: { legalName: "Test Owner Name" }, estimates: { validForDays: 14 } });
 
     await startEstimate(page);
     await answerScope(page, FLOORING_ONLY);
@@ -711,5 +726,14 @@ test.describe("PDF business line", () => {
       page.locator(".quote-card", { hasText: "12 Owner Way" }).getByRole("button", { name: "Download PDF" }).click(),
     ]);
     expect(await pdfText(adminPdf)).toContain(LINE);
+    // The owner's validity period applies to admin quotes too.
+    const d = new Date();
+    const until = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 14).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    expect(await pdfText(adminPdf)).toContain(`Prices held until ${until}`);
+    expect(await pdfText(adminPdf)).toContain(`are held until ${until}; after that they may change.`);
   });
 });
