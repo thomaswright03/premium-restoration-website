@@ -1,171 +1,283 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Premium Restoration | Bathroom Restoration</title>
-<meta name="description" content="Premium Restoration — bathroom restoration, from demolition to finishing work." />
-<link rel="stylesheet" href="css/style.css" />
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Premium Restoration | Bathroom Restoration</title>
+    <meta name="description" content="Premium Restoration — bathroom restoration, from demolition to finishing work." />
+    <!-- chrome:head -->
+    <meta name="theme-color" content="#15130f" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("pr_theme");
+          if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="css/style.css" />
+    <!-- /chrome:head -->
+  </head>
+  <body>
+    <!-- chrome:header -->
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <nav class="nav" aria-label="Main">
+        <a href="index.html" class="nav-brand">Premium Restoration</a>
+        <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+            <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <ul class="nav-links" id="nav-links">
+          <li><a href="index.html" class="current" aria-current="page">Home</a></li>
+          <li><a href="index.html#pricing">How We Price</a></li>
+          <li><a href="about.html">About Us</a></li>
+          <li><a href="faq.html">FAQs</a></li>
+          <li><a href="contact.html" class="nav-cta">Get a Quote</a></li>
+        </ul>
+      </nav>
+    </header>
+    <!-- /chrome:header -->
 
-<header class="site-header">
-  <nav class="nav">
-    <a href="index.html" class="nav-brand">Premium Restoration</a>
-    <button class="nav-toggle" aria-label="Toggle navigation">&#9776;</button>
-    <ul class="nav-links">
-      <li><a href="index.html" class="current">Home</a></li>
-      <li><a href="gallery.html">Our Work</a></li>
-      <li><a href="about.html">About Us</a></li>
-      <li><a href="faq.html">FAQs</a></li>
-      <li><a href="contact.html" class="nav-cta">Get a Quote</a></li>
-    </ul>
-  </nav>
-</header>
-
-<section class="hero">
-  <div class="hero-inner">
-    <span class="eyebrow center">Bathroom Restoration</span>
-    <h1>Restoring Bathrooms, <em>Renewing</em> Comfort</h1>
-    <p>Premium Restoration focuses on one thing: bathroom restorations, from demolition through fixtures, tile, and finishing work.</p>
-    <div class="hero-actions">
-      <a href="contact.html" class="btn btn-primary">Request a Quote</a>
-      <a href="gallery.html" class="btn btn-outline">See Our Work</a>
-    </div>
-  </div>
-</section>
-
-<section class="ai-chat-section">
-  <div class="ai-chat-header">
-    <span class="eyebrow center">Ask Us Anything</span>
-    <h2 class="section-title">Chat With Our Automated Assistant</h2>
-    <p class="section-subtitle">Scripted replies, not a person and not AI. Nothing you type here is sent to us. Estimates are rough, non-binding labor figures — for a real quote, contact us directly.</p>
-  </div>
-  <button type="button" id="ai-chat-close" class="ai-chat-close" aria-label="Close chat" hidden>&times;</button>
-  <div class="ai-chat-window">
-    <div class="ai-chat-progress" id="ai-chat-progress" hidden>
-      <div class="ai-chat-progress-track"><div class="ai-chat-progress-fill" id="ai-chat-progress-fill"></div></div>
-      <span class="ai-chat-progress-label" id="ai-chat-progress-label">0% complete</span>
-    </div>
-    <div class="ai-chat-messages" id="ai-chat-messages">
-      <div class="ai-chat-row bot">
-        <div class="ai-chat-row-inner">
-          <div class="ai-chat-avatar">PR</div>
-          <div class="ai-chat-text">Hi! I'm Premium Restoration's automated assistant (scripted replies — not a person). We work on bathroom restorations only. Ask me about bathroom work or how to get a quote.</div>
+    <main id="main">
+      <section class="hero">
+        <div class="hero-inner">
+          <p class="eyebrow center">Bathroom Restoration</p>
+          <h1>Restoring Bathrooms, <em>Renewing</em> Comfort</h1>
+          <p>
+            Premium Restoration focuses on one thing: bathroom restorations, from demolition through fixtures, tile, and
+            finishing work.
+          </p>
+          <div class="hero-actions">
+            <a href="contact.html" class="btn btn-primary">Request a Quote</a>
+            <a href="#pricing" class="btn btn-outline">How We Price</a>
+          </div>
         </div>
-      </div>
-      <div class="ai-chat-row bot">
-        <div class="ai-chat-row-inner">
-          <div class="ai-chat-avatar">PR</div>
-          <button type="button" id="ai-chat-quote-starter" class="ai-chat-suggestion">Get a bathroom price estimate →</button>
+      </section>
+
+      <section class="ai-chat-section" aria-labelledby="ai-chat-title">
+        <div class="ai-chat-header">
+          <p class="eyebrow center">Ask Us Anything</p>
+          <h2 class="section-title" id="ai-chat-title">Chat With Our Automated Assistant</h2>
+          <p class="section-subtitle">
+            Scripted replies, not a person and not AI. Nothing you type here is sent to us.
+            <span data-show-if="priceEstimator.enabled" hidden
+              >Estimates are rough, non-binding labor figures — for a real quote, contact us directly.</span
+            >
+          </p>
         </div>
-      </div>
-    </div>
-    <form class="ai-chat-input-bar" id="ai-chat-form">
-      <div class="ai-chat-input-wrap">
-        <label for="ai-chat-input" class="visually-hidden">Message the automated assistant</label>
-        <input type="text" id="ai-chat-input" placeholder="Message the automated assistant…" autocomplete="off" maxlength="300" />
-      </div>
-      <button type="submit" class="ai-chat-send" id="ai-chat-send" aria-label="Send message">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
-      </button>
-    </form>
-  </div>
-</section>
+        <div class="ai-chat-window">
+          <div class="ai-chat-toolbar" id="ai-chat-toolbar" hidden>
+            <div class="ai-chat-progress" id="ai-chat-progress" hidden>
+              <div
+                class="ai-chat-progress-track"
+                role="progressbar"
+                aria-label="Estimate progress"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow="0"
+                id="ai-chat-progress-bar"
+              >
+                <div class="ai-chat-progress-fill" id="ai-chat-progress-fill"></div>
+              </div>
+              <span class="ai-chat-progress-label" id="ai-chat-progress-label"></span>
+            </div>
+            <button type="button" id="ai-chat-close" class="ai-chat-close" aria-label="Close chat" hidden>
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+            </button>
+          </div>
+          <div class="ai-chat-messages" id="ai-chat-messages" aria-live="polite">
+            <div class="ai-chat-row bot">
+              <div class="ai-chat-row-inner">
+                <div class="ai-chat-avatar" aria-hidden="true">PR</div>
+                <div class="ai-chat-text">
+                  Hi! I'm Premium Restoration's automated assistant (scripted replies — not a person). We work on
+                  bathroom restorations only. Ask me about bathroom work, prices, or how to get a quote.
+                </div>
+              </div>
+            </div>
+            <div class="ai-chat-row bot" id="ai-chat-quote-starter-row" hidden>
+              <div class="ai-chat-row-inner">
+                <div class="ai-chat-avatar" aria-hidden="true">PR</div>
+                <button type="button" id="ai-chat-quote-starter" class="ai-chat-suggestion">
+                  Get a bathroom price estimate →
+                </button>
+              </div>
+            </div>
+          </div>
+          <form class="ai-chat-input-bar" id="ai-chat-form">
+            <div class="ai-chat-input-wrap">
+              <label for="ai-chat-input" class="visually-hidden">Message the automated assistant</label>
+              <input
+                type="text"
+                id="ai-chat-input"
+                placeholder="Ask about your bathroom…"
+                autocomplete="off"
+                maxlength="300"
+              />
+            </div>
+            <button type="submit" class="ai-chat-send" id="ai-chat-send" aria-label="Send message">
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <line x1="12" y1="19" x2="12" y2="5"></line>
+                <polyline points="5 12 12 5 19 12"></polyline>
+              </svg>
+            </button>
+          </form>
+        </div>
+      </section>
 
-<section class="section">
-  <span class="eyebrow center">What We Do</span>
-  <h2 class="section-title">Bathroom Restoration Services</h2>
-  <p class="section-subtitle">We currently take on bathroom restorations only. We do not currently hold a contractor licence. Our online estimates do not include plumbing or electrical work. If your project needs any, it will add to the cost, and we'll tell you how it will be handled and priced before any work is agreed.</p>
-  <div class="grid">
-    <div class="card">
-      <span class="card-number">01</span>
-      <h3>Demolition &amp; Preparation</h3>
-      <p>Removing the old bathroom so the space is ready for new work.</p>
-    </div>
-    <div class="card">
-      <span class="card-number">02</span>
-      <h3>Fixtures &amp; Cabinets</h3>
-      <p>Installing toilets, sinks, showers, bathtubs, vanities, mirrors, doors, and cabinets. Toilets, sinks, showers, and bathtubs also need plumbing work, which costs extra and is not included in our online estimates; we'll tell you who will do it and how it will be priced before any work is agreed.</p>
-    </div>
-    <div class="card">
-      <span class="card-number">03</span>
-      <h3>Tile, Flooring &amp; Paint</h3>
-      <p>Wall and floor tile, bathroom flooring, and painting of walls and ceiling.</p>
-    </div>
-  </div>
-</section>
+      <section class="section" aria-labelledby="services-title">
+        <p class="eyebrow center">What We Do</p>
+        <h2 class="section-title" id="services-title">Bathroom Restoration Services</h2>
+        <p class="section-subtitle">
+          Everything a bathroom restoration needs, from tearing out the old room to the finishing touches, priced per
+          item.
+        </p>
+        <div class="grid">
+          <div class="card">
+            <span class="card-number">01</span>
+            <h3>Demolition &amp; Preparation</h3>
+            <p>Removing the old bathroom so the space is ready for new work.</p>
+          </div>
+          <div class="card">
+            <span class="card-number">02</span>
+            <h3>Fixtures &amp; Cabinets</h3>
+            <p>Installing toilets, sinks, showers, bathtubs, vanities, mirrors, doors, and cabinets.</p>
+          </div>
+          <div class="card">
+            <span class="card-number">03</span>
+            <h3>Tile, Flooring &amp; Paint</h3>
+            <p>Wall and floor tile, bathroom flooring, and painting of walls and ceiling.</p>
+          </div>
+        </div>
+        <aside class="scope-note" aria-labelledby="scope-note-title">
+          <h3 id="scope-note-title">Good to know before you ask for a price</h3>
+          <ul>
+            <li>We currently take on bathroom restorations only.</li>
+            <li>We do not currently hold a contractor licence.</li>
+            <li>
+              Plumbing and electrical work is not included in our online estimates. Toilets, sinks, showers, and
+              bathtubs also need plumbing work, which costs extra. If your project needs any plumbing or electrical
+              work, it will add to the cost, and we'll tell you who will do it and how it will be priced before any work
+              is agreed.
+            </li>
+          </ul>
+        </aside>
+      </section>
 
-<section class="section section-dark">
-  <span class="eyebrow center">How We Price</span>
-  <h2 class="section-title">Straightforward Labor Pricing</h2>
-  <p class="section-subtitle">Our labor prices are simple per-item rates. Materials, permits, and any applicable taxes are separate.</p>
-  <div class="grid">
-    <div class="card">
-      <span class="card-number">01</span>
-      <h3>$60 per Cabinet</h3>
-      <p>Labor to install each bathroom cabinet.</p>
-    </div>
-    <div class="card">
-      <span class="card-number">02</span>
-      <h3>$5 per Sq Ft of Flooring</h3>
-      <p>Labor for bathroom flooring, measured by the floor area of the room.</p>
-    </div>
-    <div class="card">
-      <span class="card-number">03</span>
-      <h3>Written Price First</h3>
-      <p>Online estimates are rough and non-binding, and list the assumptions they're based on. Your actual price is set in a written agreement after we see the job.</p>
-    </div>
-  </div>
-</section>
+      <section class="section section-dark" id="pricing" aria-labelledby="pricing-title">
+        <p class="eyebrow center">How We Price</p>
+        <h2 class="section-title" id="pricing-title">Straightforward Labor Pricing</h2>
+        <p class="section-subtitle">
+          Our labor prices are simple per-item rates. Materials, permits, and any applicable taxes are separate.
+        </p>
+        <div class="grid">
+          <div class="card">
+            <span class="card-number">01</span>
+            <h3><span data-price="Cabinet_Price">$60</span> per Cabinet</h3>
+            <p>Labor to install each bathroom cabinet.</p>
+          </div>
+          <div class="card">
+            <span class="card-number">02</span>
+            <h3><span data-price="Floor_Price_Per_SqFt">$5</span> per Sq Ft of Flooring</h3>
+            <p>Labor for bathroom flooring, measured by the floor area of the room.</p>
+          </div>
+          <div class="card">
+            <span class="card-number">03</span>
+            <h3>Written Price First</h3>
+            <p>
+              Online estimates are rough and non-binding, and list the assumptions they're based on. Your actual price
+              is set in a written agreement after we see the job.
+            </p>
+          </div>
+        </div>
+      </section>
 
-<section class="cta-band">
-  <span class="eyebrow center">Get Started</span>
-  <h2 class="section-title">Ready to Restore Your Bathroom?</h2>
-  <p class="section-subtitle">Tell us about your bathroom project, and we'll reply once we receive your email or call.</p>
-  <a href="contact.html" class="btn btn-primary">Get Started</a>
-</section>
+      <section class="cta-band">
+        <p class="eyebrow center">Get Started</p>
+        <h2 class="section-title">Ready to Restore Your Bathroom?</h2>
+        <p class="section-subtitle">
+          Tell us about your bathroom project, and we'll reply once we receive your request.
+        </p>
+        <a href="contact.html" class="btn btn-primary">Get Started</a>
+      </section>
+    </main>
 
-<footer class="site-footer">
-  <div class="footer-grid">
-    <div class="footer-col">
-      <p class="footer-brand">Premium Restoration</p>
-      <p style="max-width:260px; font-size: 0.9rem;">Bathroom restoration services.</p>
-      <p class="footer-identity">
-        Operated by [OWNER LEGAL NAME], an individual<br />
-        (not a registered company)<br />
-        [OWNER CONTACT ADDRESS]
-        <!-- There is currently no contractor licence. Add a licence line here only once a licence is
+    <!-- chrome:footer -->
+    <footer class="site-footer">
+      <div class="footer-grid">
+        <div class="footer-col">
+          <p class="footer-brand">Premium Restoration</p>
+          <p class="footer-tagline">Bathroom restoration services.</p>
+          <p class="footer-identity">
+            Operated by
+            <span data-show-if="owner.legalName" hidden><span data-fill="owner.legalName"></span>,</span>
+            an individual<br />
+            (not a registered company)
+            <span data-show-if="owner.contactAddress" hidden><br /><span data-fill="owner.contactAddress"></span></span>
+            <!-- There is currently no contractor licence. Add a licence line here only once a licence is
              actually issued, as <br />Contractor License # [CONTRACTOR LICENSE #] ([LICENSE CLASSIFICATION]) -->
-      </p>
-    </div>
-    <div class="footer-col">
-      <h4>Explore</h4>
-      <a href="index.html">Home</a>
-      <a href="gallery.html">Our Work</a>
-      <a href="about.html">About Us</a>
-      <a href="faq.html">FAQs</a>
-      <a href="contact.html">Get a Quote</a>
-    </div>
-    <div class="footer-col">
-      <h4>Contact</h4>
-      <a href="tel:+13853568733">(385) 356-8733</a>
-      <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
-    </div>
-    <div class="footer-col">
-      <h4>Legal</h4>
-      <a href="privacy.html">Privacy Notice</a>
-      <a href="terms.html">Terms of Use</a>
-      <a href="privacy.html#your-rights">Access or Delete My Data</a>
-    </div>
-  </div>
-  <div class="footer-bottom">
-    &copy; <span id="year"></span> Premium Restoration, operated by [OWNER LEGAL NAME].
-  </div>
-</footer>
+          </p>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Explore</h2>
+          <a href="index.html">Home</a>
+          <a href="index.html#pricing">How We Price</a>
+          <a href="about.html">About Us</a>
+          <a href="faq.html">FAQs</a>
+          <a href="contact.html">Get a Quote</a>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Contact</h2>
+          <a href="tel:+13853568733">(385) 356-8733</a>
+          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Legal</h2>
+          <a href="privacy.html">Privacy Notice</a>
+          <a href="terms.html">Terms of Use</a>
+          <a href="privacy.html#your-rights">Access or Delete My Data</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">
+          &copy; <span data-year>2026</span> Premium Restoration<span data-show-if="owner.legalName" hidden
+            >, operated by <span data-fill="owner.legalName"></span></span
+          >.
+        </p>
+        <div class="theme-switch" role="group" aria-label="Colour theme">
+          <span class="theme-switch-label" aria-hidden="true">Theme</span>
+          <button type="button" data-theme-choice="system" aria-pressed="true">System</button>
+          <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+          <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+        </div>
+      </div>
+    </footer>
+    <!-- /chrome:footer -->
 
-<script src="js/bathroom-pricing.js"></script>
-<script src="js/script.js"></script>
-<script>document.getElementById("year").textContent = new Date().getFullYear();</script>
-</body>
+    <script src="js/bathroom-pricing.js"></script>
+    <script src="js/chat-replies.js"></script>
+    <script src="js/site-config.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/estimate-pdf.js"></script>
+    <script src="js/script.js"></script>
+  </body>
 </html>
