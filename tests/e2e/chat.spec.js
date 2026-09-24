@@ -234,3 +234,157 @@ test.describe("estimator switch (site-config.json priceEstimator.enabled)", () =
     await expect(page.locator("#ai-chat-quote-starter")).toBeHidden();
   });
 });
+
+test.describe("chat layout and focus", () => {
+  test("on a wide screen, clicking the chat input keeps the chat part of the page", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/index.html");
+    await page.click("#ai-chat-input");
+    await expect(page.locator(".ai-chat-section")).not.toHaveClass(/is-fullscreen/);
+    await expect(page.locator(".site-header")).toBeVisible();
+    await sendChat(page, "What services do you offer?");
+    await expect(page.locator(".ai-chat-row.bot .ai-chat-text").last()).toContainText("bathroom restorations");
+    await expect(page.locator(".ai-chat-section")).not.toHaveClass(/is-fullscreen/);
+  });
+
+  test("on a phone the full-screen chat has a title, keeps Tab inside, and Escape returns focus", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/index.html");
+    await page.click("#ai-chat-input");
+    const section = page.locator(".ai-chat-section");
+    await expect(section).toHaveClass(/is-fullscreen/);
+    await expect(section).toHaveAttribute("role", "dialog");
+    await expect(page.locator("#ai-chat-fs-title")).toBeVisible();
+    await expect(page.locator("#ai-chat-fs-title")).toHaveText("Automated Assistant");
+    for (let i = 0; i < 10; i++) {
+      await page.keyboard.press("Tab");
+      expect(await page.evaluate(() => !!document.activeElement.closest(".ai-chat-section"))).toBe(true);
+    }
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press("Shift+Tab");
+      expect(await page.evaluate(() => !!document.activeElement.closest(".ai-chat-section"))).toBe(true);
+    }
+    await page.keyboard.press("Escape");
+    await expect(section).not.toHaveClass(/is-fullscreen/);
+    await expect(page.locator("#ai-chat-input")).toBeFocused();
+    // Closing doesn't reopen it straight away.
+    await expect(section).not.toHaveClass(/is-fullscreen/);
+  });
+
+  test("an estimate opens full screen on any screen, and closing it returns to the page", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/index.html");
+    await sendChat(page, "bathroom quote");
+    await page.locator('form[data-group="scope"]').waitFor();
+    await expect(page.locator(".ai-chat-section")).toHaveClass(/is-fullscreen/);
+    await expect(page.locator("#ai-chat-fs-title")).toBeVisible();
+    await page.click("#ai-chat-close");
+    await expect(page.locator(".ai-chat-section")).not.toHaveClass(/is-fullscreen/);
+    // The estimate carries on inline, with focus on its first answer.
+    await expect(page.locator('form[data-group="scope"] .ai-chat-choice').first()).toBeFocused();
+  });
+
+  test("only the latest estimate button is shown", async ({ page }) => {
+    await page.goto("/index.html");
+    const questions = ["how much for tile?", "What services do you offer?", "hello", "asdfgh", "cabinet price?"];
+    for (const [i, q] of questions.entries()) {
+      await sendChat(page, q);
+      // Wait for each reply before the next question.
+      await expect(page.locator(".ai-chat-row.bot .ai-chat-text")).toHaveCount(i + 2);
+    }
+    await expect(page.locator(".ai-chat-row.bot .ai-chat-text").last()).toContainText("$60 per cabinet");
+    await expect(page.locator(".ai-chat-suggestion")).toHaveCount(1);
+    await page.locator(".ai-chat-suggestion").click();
+    await expect(page.locator('form[data-group="scope"]')).toBeVisible();
+    await expect(page.locator(".ai-chat-suggestion")).toHaveCount(0);
+  });
+
+  test("bathroom questions that name another room get an answer, and emoji get a reply", async ({ page }) => {
+    await page.goto("/index.html");
+    const last = page.locator(".ai-chat-row.bot .ai-chat-text").last();
+    await sendChat(page, "Do you do basement bathrooms?");
+    await expect(last).toContainText("We do bathroom restorations");
+    await expect(last).not.toContainText("can't help with that");
+    await sendChat(page, "quote for my bathroom and kitchen");
+    await expect(last).toContainText("We can help with the bathroom");
+    await expect(last).toContainText("kitchen part");
+    await expect(page.locator(".ai-chat-suggestion")).toHaveCount(1);
+    await sendChat(page, "Do you do kitchens?");
+    await expect(last).toContainText("can't help with that");
+    await sendChat(page, "How long does a tile job take?");
+    await expect(last).toContainText("expected timeline");
+    await sendChat(page, "Is there a warranty on the tile?");
+    await expect(last).toContainText("standard warranty");
+    await sendChat(page, "😀👍");
+    await expect(last).toContainText("didn't understand");
+    await expect(page.locator("#ai-chat-typing-row")).toHaveCount(0);
+  });
+});
+
+test.describe("estimate Back and reload", () => {
+  test("Back returns to earlier steps with answers kept; choosing wall paint then asks for the height", async ({
+    page,
+  }) => {
+    await startEstimate(page);
+    await answerScope(page, NOTHING_BUT_FLOORING);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8 });
+    const fixtures = page.locator('form[data-group="fixtures"]');
+    await fixtures.locator('input[name="Cabinet_Quantity"]').fill("3");
+
+    await fixtures.getByRole("button", { name: "← Back" }).click();
+    const dims = page.locator('form[data-group="dimensions"]');
+    await expect(dims).toHaveCount(1);
+    await expect(dims.locator('input[name="Bathroom_Width_Ft"]')).toHaveValue("5");
+    await expect(page.locator("#ai-chat-progress-label")).toHaveText("33% complete");
+    await dims.getByRole("button", { name: "← Back" }).click();
+
+    const scope = page.locator('form[data-group="scope"]');
+    await expect(scope).toHaveCount(1);
+    await expect(scope.getByRole("button", { name: "Other flooring" })).toHaveAttribute("aria-pressed", "true");
+    await expect(scope.getByRole("button", { name: "← Back" })).toHaveCount(0);
+    await scope
+      .locator(".ai-chat-group-field", { hasText: "Walls?" })
+      .getByRole("button", { name: "Paint", exact: true })
+      .click();
+    await scope.getByRole("button", { name: /Continue/ }).click();
+
+    await expect(dims.locator('input[name="Bathroom_Height_Ft"]')).toBeVisible();
+    await expect(dims.locator('input[name="Bathroom_Width_Ft"]')).toHaveValue("5");
+    await expect(dims.locator('input[name="Bathroom_Length_Ft"]')).toHaveValue("8");
+    await dims.locator('input[name="Bathroom_Height_Ft"]').fill("8");
+    await dims.locator(".ai-chat-group-continue").click();
+    await expect(fixtures.locator('input[name="Cabinet_Quantity"]')).toHaveValue("3");
+    await fixtures.locator(".ai-chat-group-continue").click();
+    // $200 flooring + $180 cabinets + 208 sq ft of wall paint at $1.79 = $752.32
+    await expect(page.getByTestId("estimate-card").locator(".ai-chat-estimate-total-value")).toHaveText("$752.32");
+  });
+
+  test("a reload keeps an estimate in progress, then the finished estimate, in the same tab", async ({ page }) => {
+    await startEstimate(page);
+    await answerScope(page, NOTHING_BUT_FLOORING);
+    const dims = page.locator('form[data-group="dimensions"]');
+    await dims.locator('input[name="Bathroom_Width_Ft"]').fill("5");
+    await page.reload();
+    await expect(page.locator(".ai-chat-row.bot .ai-chat-text", { hasText: "Welcome back" })).toBeVisible();
+    await expect(dims.locator('input[name="Bathroom_Width_Ft"]')).toHaveValue("5");
+    await expect(page.locator("#ai-chat-progress-label")).toHaveText("33% complete");
+    // Picked up quietly: the page isn't taken over on load.
+    await expect(page.locator(".ai-chat-section")).not.toHaveClass(/is-fullscreen/);
+    await dims.locator('input[name="Bathroom_Length_Ft"]').fill("8");
+    await dims.locator(".ai-chat-group-continue").click();
+    await fillGroup(page, "fixtures", { Cabinet_Quantity: 3 });
+    await expect(page.getByTestId("estimate-card").locator(".ai-chat-estimate-total-value")).toHaveText("$380.00");
+
+    await page.reload();
+    const card = page.getByTestId("estimate-card");
+    await expect(card.locator(".ai-chat-estimate-total-value")).toHaveText("$380.00");
+    await expect(page.locator("#ai-chat-input")).toBeVisible();
+
+    // Cancel forgets it.
+    await sendChat(page, "bathroom quote");
+    await page.locator('form[data-group="scope"]').getByRole("button", { name: "Cancel" }).click();
+    await page.reload();
+    await expect(page.getByTestId("estimate-card")).toHaveCount(0);
+    await expect(page.locator('form[data-group="scope"]')).toHaveCount(0);
+  });
+});

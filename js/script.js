@@ -120,6 +120,8 @@ document.addEventListener("DOMContentLoaded", function () {
     var progressLabel = document.getElementById("ai-chat-progress-label");
     var starterRow = document.getElementById("ai-chat-quote-starter-row");
     var starter = document.getElementById("ai-chat-quote-starter");
+    var fsTitle = document.getElementById("ai-chat-fs-title");
+    var ESTIMATE_KEY = "pr_chat_estimate";
 
     function estimatorEnabled() {
       return !!(siteConfig && siteConfig.priceEstimator.enabled);
@@ -127,11 +129,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
     configReady.then(function () {
       if (starterRow) starterRow.hidden = !estimatorEnabled();
+      restoreEstimate();
     });
 
     // ---------- layout helpers ----------
     function updateToolbar() {
       if (toolbar) toolbar.hidden = progress.hidden && closeBtn.hidden;
+    }
+
+    function isFullscreen() {
+      return chatSection.classList.contains("is-fullscreen");
     }
 
     function scrollToEnd() {
@@ -169,16 +176,24 @@ document.addEventListener("DOMContentLoaded", function () {
       return parts.row;
     }
 
+    // Only the latest "estimate" button is kept, so they never pile up.
+    function removeOffers() {
+      Array.prototype.forEach.call(chatMessages.querySelectorAll(".ai-chat-offer-row"), function (row) {
+        row.remove();
+      });
+    }
+
     function appendEstimateOffer() {
       if (!estimatorEnabled() || quoteState) return;
+      removeOffers();
       var parts = botRow();
+      parts.row.classList.add("ai-chat-offer-row");
       var btn = document.createElement("button");
       btn.type = "button";
       btn.className = "ai-chat-suggestion";
       btn.textContent = "Get a bathroom price estimate →";
       btn.addEventListener("click", function () {
         parts.row.remove();
-        enterFullscreen();
         sendChatMessage("I'd like a bathroom price estimate");
       });
       parts.inner.appendChild(btn);
@@ -187,25 +202,116 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // ---------- fullscreen ----------
+    // On a phone the chat opens full screen as soon as the visitor starts
+    // typing; on any screen it opens full screen while an estimate is being
+    // worked out. Full screen behaves like a dialog: it has a title, the page
+    // behind it can't be reached with the keyboard, Escape or the X closes
+    // it, and focus goes back to where the visitor was.
+    var phoneQuery = window.matchMedia ? window.matchMedia("(max-width: 640px)") : null;
+    var returnFocus = null;
+    var inertElements = [];
+    var focusingQuietly = false;
+
+    function setBackgroundInert(on) {
+      inertElements.forEach(function (node) {
+        node.inert = false;
+        node.removeAttribute("aria-hidden");
+      });
+      inertElements = [];
+      if (!on) return;
+      for (var node = chatSection; node && node.parentNode && node !== document.body; node = node.parentNode) {
+        Array.prototype.forEach.call(node.parentNode.children, function (sibling) {
+          if (sibling === node || sibling.tagName === "SCRIPT" || sibling.inert) return;
+          sibling.inert = true;
+          sibling.setAttribute("aria-hidden", "true");
+          inertElements.push(sibling);
+        });
+      }
+    }
+
     function enterFullscreen() {
-      if (chatSection.classList.contains("is-fullscreen")) return;
+      if (isFullscreen()) return;
+      returnFocus = document.activeElement;
       chatSection.classList.add("is-fullscreen");
+      chatSection.setAttribute("role", "dialog");
+      chatSection.setAttribute("aria-modal", "true");
+      chatSection.setAttribute("aria-labelledby", "ai-chat-fs-title");
       document.body.classList.add("ai-chat-locked");
+      fsTitle.hidden = false;
       closeBtn.hidden = false;
+      setBackgroundInert(true);
       updateToolbar();
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
+    function focusQuietly(node) {
+      focusingQuietly = true;
+      node.focus({ preventScroll: true });
+      focusingQuietly = false;
+    }
+
     function exitFullscreen() {
+      if (!isFullscreen()) return;
       chatSection.classList.remove("is-fullscreen");
+      chatSection.removeAttribute("role");
+      chatSection.removeAttribute("aria-modal");
+      chatSection.setAttribute("aria-labelledby", "ai-chat-title");
       document.body.classList.remove("ai-chat-locked");
+      fsTitle.hidden = true;
       closeBtn.hidden = true;
+      setBackgroundInert(false);
       updateToolbar();
+      var target = returnFocus;
+      returnFocus = null;
+      var usable =
+        target &&
+        target !== document.body &&
+        document.contains(target) &&
+        !target.disabled &&
+        target.getClientRects().length > 0;
+      if (!usable) target = chatForm.hidden ? firstFocusableInChat() : chatInput;
+      if (target) focusQuietly(target);
+      if (target && target.scrollIntoView) target.scrollIntoView({ block: "nearest" });
+    }
+
+    function focusableInChat() {
+      return Array.prototype.filter.call(
+        chatSection.querySelectorAll("button, input, a[href], select, textarea, [tabindex]:not([tabindex='-1'])"),
+        function (node) {
+          return !node.disabled && node.getClientRects().length > 0;
+        },
+      );
+    }
+
+    function firstFocusableInChat() {
+      var active = chatMessages.querySelector(
+        ".ai-chat-group-form:not(.is-done) input, .ai-chat-group-form:not(.is-done) button",
+      );
+      return active || focusableInChat()[0] || null;
     }
 
     closeBtn.addEventListener("click", exitFullscreen);
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && chatSection.classList.contains("is-fullscreen")) exitFullscreen();
+      if (!isFullscreen()) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        exitFullscreen();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      // Keep keyboard focus inside the full-screen chat.
+      var items = focusableInChat();
+      if (!items.length) return;
+      var first = items[0];
+      var last = items[items.length - 1];
+      var inside = chatSection.contains(document.activeElement);
+      if (e.shiftKey && (document.activeElement === first || !inside)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !inside)) {
+        e.preventDefault();
+        first.focus();
+      }
     });
 
     // ---------- progress bar ----------
@@ -246,7 +352,7 @@ document.addEventListener("DOMContentLoaded", function () {
           intro:
             (needs.height
               ? "Now the room's size. The wall work you chose needs the ceiling height too."
-              : "Now the room's floor size.") + " Feet (5.5) or feet and inches (5' 6\") both work.",
+              : "Now the room's floor size.") + " Feet (5.5) or feet and inches (5'\u00a06\") both work.",
           fields: Pricing.DIMENSIONS.filter(function (d) {
             return d.key !== "Bathroom_Height_Ft" || needs.height;
           }).map(function (d) {
@@ -271,15 +377,72 @@ document.addEventListener("DOMContentLoaded", function () {
       return groups;
     }
 
+    // The estimate in progress (or the last finished one) is kept in this
+    // tab's sessionStorage, so a reload doesn't lose it. It never leaves the
+    // browser and is gone when the tab is closed.
+    var estimateCounter = 0;
+
+    function saveEstimate(state) {
+      try {
+        if (state) sessionStorage.setItem(ESTIMATE_KEY, JSON.stringify(state));
+        else sessionStorage.removeItem(ESTIMATE_KEY);
+      } catch (e) {
+        /* storage blocked: the estimate just isn't kept across reloads */
+      }
+    }
+
+    function readSavedEstimate() {
+      try {
+        var saved = JSON.parse(sessionStorage.getItem(ESTIMATE_KEY));
+        if (saved && typeof saved === "object" && saved.values && saved.scope) return saved;
+      } catch (e) {
+        /* nothing saved, or storage blocked */
+      }
+      return null;
+    }
+
+    function persistEstimate() {
+      if (!quoteState) return;
+      saveEstimate({ status: "active", index: quoteState.index, values: quoteState.values, scope: quoteState.scope });
+    }
+
+    function newQuoteState(values, scope, index) {
+      var groups = buildGroups(scope);
+      return {
+        id: ++estimateCounter,
+        groups: groups,
+        index: Math.max(0, Math.min(index || 0, groups.length - 1)),
+        values: values || {},
+        scope: scope || {},
+      };
+    }
+
+    function stepProgress() {
+      setProgress(Math.round((quoteState.index / quoteState.groups.length) * 100));
+    }
+
     function startEstimate() {
-      quoteState = { groups: buildGroups(null), index: 0, values: {}, scope: {} };
+      removeOffers();
+      quoteState = newQuoteState({}, null, 0);
       chatForm.hidden = true;
+      enterFullscreen();
       setProgress(0);
       appendGroupForm();
+      persistEstimate();
+    }
+
+    function removeStepRows(fromIndex) {
+      Array.prototype.forEach.call(
+        chatMessages.querySelectorAll('[data-estimate="' + quoteState.id + '"]'),
+        function (row) {
+          if (Number(row.getAttribute("data-step")) >= fromIndex) row.remove();
+        },
+      );
     }
 
     function cancelEstimate() {
       quoteState = null;
+      saveEstimate(null);
       hideProgress();
       chatForm.hidden = false;
       appendChatRow(
@@ -289,6 +452,16 @@ document.addEventListener("DOMContentLoaded", function () {
       chatInput.focus();
     }
 
+    // Back: show the previous step again with its answers filled in.
+    function goBack() {
+      if (!quoteState || quoteState.index === 0) return;
+      removeStepRows(quoteState.index - 1);
+      quoteState.index--;
+      stepProgress();
+      appendGroupForm();
+      persistEstimate();
+    }
+
     function advance() {
       if (quoteState.index === 0) {
         // The scope decides which measurements are asked for.
@@ -296,23 +469,48 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       quoteState.index++;
       if (quoteState.index < quoteState.groups.length) {
-        setProgress(Math.round((quoteState.index / quoteState.groups.length) * 100));
+        stepProgress();
         appendGroupForm();
+        persistEstimate();
         return;
       }
       setProgress(100);
       var state = quoteState;
       quoteState = null;
       chatForm.hidden = false;
+      saveEstimate({ status: "done", values: state.values, scope: state.scope });
       appendEstimateCard(state.values, state.scope);
       setTimeout(hideProgress, 1200);
     }
 
+    // After a reload: pick up the estimate where the visitor left it, or show
+    // the estimate they finished, without taking over the page.
+    function restoreEstimate() {
+      var saved = readSavedEstimate();
+      if (!saved || !estimatorEnabled() || quoteState) return;
+      if (saved.status === "done") {
+        if (!Pricing.validateJob(saved.values, saved.scope).valid) return saveEstimate(null);
+        appendChatRow("bot", "Here's the estimate you worked out earlier in this visit.");
+        appendEstimateCard(saved.values, saved.scope, { restored: true });
+        return;
+      }
+      if (saved.status !== "active") return;
+      removeOffers();
+      quoteState = newQuoteState(saved.values, saved.scope, saved.index);
+      chatForm.hidden = true;
+      appendChatRow("bot", "Welcome back — your estimate is just as you left it. Carry on below.");
+      stepProgress();
+      appendGroupForm({ restored: true });
+    }
+
     var fieldCounter = 0;
 
-    function appendGroupForm() {
+    function appendGroupForm(options) {
+      options = options || {};
       var group = quoteState.groups[quoteState.index];
       var parts = botRow();
+      parts.row.setAttribute("data-estimate", String(quoteState.id));
+      parts.row.setAttribute("data-step", String(quoteState.index));
       var content = document.createElement("div");
       content.className = "ai-chat-text";
 
@@ -351,14 +549,17 @@ document.addEventListener("DOMContentLoaded", function () {
           choiceWrap.setAttribute("role", "group");
           choiceWrap.setAttribute("aria-labelledby", fieldId + "-label");
           choiceWrap.setAttribute("aria-describedby", errorEl.id);
-          var chosen;
+          // An answer given before (Back, or after a reload) is shown again.
+          var chosen = field.options.filter(function (option) {
+            return option.value === quoteState.scope[field.key];
+          })[0];
           var buttons = [];
           field.options.forEach(function (option) {
             var btn = document.createElement("button");
             btn.type = "button";
-            btn.className = "ai-chat-choice";
+            btn.className = "ai-chat-choice" + (option === chosen ? " selected" : "");
             btn.textContent = option.label;
-            btn.setAttribute("aria-pressed", "false");
+            btn.setAttribute("aria-pressed", option === chosen ? "true" : "false");
             btn.addEventListener("click", function () {
               chosen = option;
               buttons.forEach(function (other) {
@@ -367,6 +568,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 other.setAttribute("aria-pressed", isThis ? "true" : "false");
               });
               showFieldError(field.key, null);
+              quoteState.scope[field.key] = option.value;
+              persistEstimate();
             });
             buttons.push(btn);
             choiceWrap.appendChild(btn);
@@ -385,11 +588,14 @@ document.addEventListener("DOMContentLoaded", function () {
           input.placeholder = field.placeholder || "0";
           input.id = fieldId;
           input.name = field.key;
+          input.value = quoteState.values[field.key] || "";
           input.setAttribute("aria-describedby", errorEl.id);
           labelEl.htmlFor = fieldId;
           fieldWrap.appendChild(input);
           input.addEventListener("input", function () {
             showFieldError(field.key, null);
+            quoteState.values[field.key] = input.value.trim();
+            persistEstimate();
           });
           fieldEls[field.key] = { wrap: fieldWrap, error: errorEl, focus: input, input: input };
           readers.push(function () {
@@ -417,6 +623,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
       var actionsWrap = document.createElement("div");
       actionsWrap.className = "ai-chat-group-actions";
+      if (quoteState.index > 0) {
+        var backBtn = document.createElement("button");
+        backBtn.type = "button";
+        backBtn.className = "ai-chat-group-back";
+        backBtn.textContent = "← Back";
+        backBtn.addEventListener("click", function () {
+          disableForm();
+          goBack();
+        });
+        actionsWrap.appendChild(backBtn);
+      }
       var cancelBtn = document.createElement("button");
       cancelBtn.type = "button";
       cancelBtn.className = "ai-chat-group-cancel";
@@ -435,6 +652,7 @@ document.addEventListener("DOMContentLoaded", function () {
       formEl.appendChild(actionsWrap);
 
       function disableForm() {
+        formEl.classList.add("is-done");
         Array.prototype.forEach.call(formEl.querySelectorAll("input, button"), function (el) {
           el.disabled = true;
         });
@@ -466,6 +684,7 @@ document.addEventListener("DOMContentLoaded", function () {
       parts.inner.appendChild(content);
       chatMessages.appendChild(parts.row);
       scrollToEnd();
+      if (options.restored) return; // don't move focus or scroll the page on load
       var first = formEl.querySelector("input, .ai-chat-choice");
       if (first) first.focus({ preventScroll: true });
     }
@@ -531,7 +750,8 @@ document.addEventListener("DOMContentLoaded", function () {
       return node;
     }
 
-    function appendEstimateCard(values, scope) {
+    function appendEstimateCard(values, scope, options) {
+      options = options || {};
       var result = Pricing.computePublicEstimate(values, scope);
       var fixtureCount = result.plumbingFixtureCount;
       var assumptions = allAssumptions(values, scope, result);
@@ -618,8 +838,9 @@ document.addEventListener("DOMContentLoaded", function () {
       content.appendChild(card);
       parts.inner.appendChild(content);
       chatMessages.appendChild(parts.row);
+      if (options.restored) return; // don't move focus or scroll the page on load
       scrollToEnd();
-      chatInput.focus({ preventScroll: true });
+      focusQuietly(chatInput);
     }
 
     function exportPdf(button, status, values, scope, result, assumptions) {
@@ -686,20 +907,22 @@ document.addEventListener("DOMContentLoaded", function () {
             var r = window.ChatReplies.reply(message, { estimatorEnabled: estimatorEnabled() });
             chatSend.disabled = false;
             if (r && r.action === "startEstimate") {
-              if (starterRow && starterRow.parentNode) starterRow.remove();
               startEstimate();
               return;
             }
             if (r && r.text) appendChatRow("bot", r.text);
             if (r && r.action === "offerEstimate") appendEstimateOffer();
-            chatInput.focus({ preventScroll: true });
+            focusQuietly(chatInput);
           },
           500 + Math.random() * 400,
         );
       });
     }
 
-    chatInput.addEventListener("focus", enterFullscreen);
+    chatInput.addEventListener("focus", function () {
+      // Phones only: on a wider screen the chat stays part of the page.
+      if (!focusingQuietly && phoneQuery && phoneQuery.matches) enterFullscreen();
+    });
     chatForm.addEventListener("submit", function (e) {
       e.preventDefault();
       var message = chatInput.value.trim();
@@ -710,7 +933,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (starter) {
       starter.addEventListener("click", function () {
-        enterFullscreen();
         if (starterRow) starterRow.remove();
         sendChatMessage("I'd like a bathroom price estimate");
       });
