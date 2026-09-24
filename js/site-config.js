@@ -30,7 +30,7 @@
 
   var DEFAULTS = {
     priceEstimator: { enabled: false },
-    leadForm: { endpoint: "", serviceName: "", servicePrivacyUrl: "" },
+    leadForm: { enabled: true, endpoint: "", serviceName: "", servicePrivacyUrl: "" },
     owner: { legalName: "", contactAddress: "" },
     privacy: { responsePeriod: "" },
     analytics: { enabled: false, provider: "", domain: "", scriptUrl: "", servicePrivacyUrl: "" },
@@ -88,6 +88,10 @@
       prices: pricesOk ? priceCheck.prices : null,
       priceProblems: priceCheck ? priceCheck.errors : [],
       leadForm: {
+        // false = "please call us" mode: the Get a Quote page shows the phone
+        // number and email instead of the form. Anything but false keeps the form.
+        enabled: lf.enabled !== false,
+        paused: lf.enabled === false,
         // Only an https:// address is used; anything else keeps the email-app form.
         endpoint: /^https:\/\/[^\s]+$/.test(endpoint) ? endpoint : "",
         serviceName: clean(lf.serviceName) || formServiceName(endpoint) || GENERIC_FORM_SERVICE,

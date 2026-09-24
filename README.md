@@ -5,7 +5,7 @@ The website for Premium Restoration, a bathroom-restoration business. Plain HTML
 It has three parts:
 
 - **Public pages** — home (with a scripted chat assistant that can give a rough bathroom labor estimate), About, FAQs, Get a Quote, Privacy Notice and Terms of Use.
-- **Settings file** — `site-config.json`: switch the price estimator on/off, connect a form service, switch on anonymous visitor counts, and fill in the owner's details, without touching code.
+- **Settings file** — `site-config.json`: change the published prices, switch the price estimator on/off, put the quote form into "please call us" mode, connect a form service, switch on anonymous visitor counts, and fill in the owner's details, without touching code.
 - **Admin quoting tool** — `/admin/`, a password-gated tool staff use to price bathroom jobs. Quotes are saved in the browser.
 
 ## Pages
@@ -45,6 +45,7 @@ The site says "Get a Quote" / "Request a Quote", not "Free Quote": nothing confi
 ├── scripts/sync-pages.mjs    copies the partials, published prices (from site-config.json) and contact details into every page
 ├── scripts/check-placeholders.mjs   fails if a [BRACKETED PLACEHOLDER] is visible
 ├── scripts/serve.mjs         local server that behaves like Vercel (404.html for unknown URLs)
+├── scripts/check-deploy.mjs  checks a deployed site serves exactly this checkout (npm run check:deploy -- <url>)
 ├── tests/unit/               Node unit tests (pricing, chat replies, settings file, page sync, contact details)
 ├── tests/fixtures/           test-prices.json: the fixed prices the tests use
 ├── tests/e2e/                Playwright browser tests
@@ -57,15 +58,30 @@ Everything the owner may want to change without a developer is in `site-config.j
 
 **How to change a setting (no code editing):**
 
-1. On GitHub, open the repository, click `site-config.json`, then the pencil ("Edit this file") icon.
-2. Change the value (keep the quotes and commas exactly as they are), then click **Commit changes** on the production branch.
-3. Vercel redeploys automatically, usually in under a minute. Visitors get the change the next time they load or refresh a page (the file is fetched fresh each time, not cached).
+1. On GitHub, open the repository, click `site-config.json`, then the pencil ("Edit this file") icon. (This works in a phone's browser too.)
+2. Change the value (keep the quotes, colons and commas exactly as they are; `true`, `false` and prices are typed without quotes), then click **Commit changes**. Commit to the production branch (normally `main`); if branch protection is on, see "While branch protection is on" below.
+3. Vercel redeploys automatically, usually in under a minute. Visitors get the change the next time they load or refresh a page: the pages fetch `site-config.json` fresh every time (never from a cache).
 
-If you can't see the change after two minutes, check the deployment on the Vercel dashboard (see "Deploying"). If the file ever can't be read (for example, a typo that breaks the JSON), pages fall back to safe defaults: **price estimator off**, email-app contact form, **visitor counts off**, and no owner details shown. The `npm test` checks (`tests/unit/site-config.test.js`) catch broken JSON, a non-`https` form endpoint, a form service with no name, and an unsupported analytics provider.
+If you can't see the change after two minutes, check the deployment on the Vercel dashboard (see "Deploying"). If the file ever can't be read (for example, a typo that breaks the JSON), pages fall back to safe defaults: **price estimator off**, the quote form on with the email-app route, **visitor counts off**, and no owner details shown. The `npm test` checks (`tests/unit/site-config.test.js`) catch broken JSON, a switch typed in quotes, unusable prices, a non-`https` form endpoint, a form service with no name, and an unsupported analytics provider — and CI runs them on every commit, so a mistake shows as a red cross on GitHub within a few minutes.
+
+### The two switches (turning things off quickly)
+
+| To…                                                                                                       | Set in `site-config.json`                | Effect on the next page load                                                                                                                                                                                                                          |
+| --------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| switch off the price estimator (e.g. a price is wrong)                                                    | `"priceEstimator": { "enabled": false }` | The "Get a bathroom price estimate" button disappears, "bathroom quote" no longer starts an estimate, and every price question in the chat gets "Call (385) 356-8733 or use the Contact page for a price." Page text such as "$60 per Cabinet" stays. |
+| put the quote form into "please call us" mode (e.g. you can't take on work, or requests are going astray) | `"leadForm": { "enabled": false, … }`    | The Get a Quote page shows "Please call us — we're not taking requests through this form right now" with the phone number and email, instead of the form. Nothing can be submitted.                                                                   |
+
+Set the value back to `true` to switch it on again. **How long it takes:** the time to edit and commit (a minute or two), plus Vercel's redeploy (usually under a minute), plus the visitor loading or refreshing a page — so a few minutes in all. A visitor who already has the page open keeps the old behaviour until they reload. If branch protection is on and you go through a pull request, add the time CI takes (about 3–5 minutes) — or use the bypass described below.
+
+**Not yet tried on production.** Both switches are covered by the browser tests (`tests/e2e/chat.spec.js` "estimator switch" and `tests/e2e/contact.spec.js` "quote form switch"), but they haven't been flipped on the live site, because this work had no access to production. Once this version is live, try each switch once: set it to `false`, commit, wait for the deployment to be "Ready", reload the home page / Get a Quote page to see the effect, then set it back to `true`. Record the date here: _Switches last tried on production: not yet._
+
+**Emergency alternative:** Vercel's **Instant Rollback** (see "Deploying") puts the whole site back to an earlier deployment in seconds, without GitHub — useful if a bad change broke the site itself.
 
 | Setting                       | What it does                                                                                                                                                                                                                                                                    |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `priceEstimator.enabled`      | `true` shows the "Get a bathroom price estimate" button and lets the chat give estimates and item prices. `false` hides the button, stops the "bathroom quote" trigger, and the chat answers any price question with "Call (385) 356-8733 or use the Contact page for a price." |
+| `prices.*`                    | The published labor prices in US dollars, as plain numbers (`"cabinetEach": 60`, `"paintingPerSqFt": 1.79`). See "Changing a published price" below.                                                                                                                            |
+| `leadForm.enabled`            | `true` (normal) shows the Get a Quote form. `false` = "please call us" mode (see "The two switches").                                                                                                                                                                           |
 | `leadForm.endpoint`           | Blank = the Get a Quote form opens the visitor's email app (current behaviour). An `https://` address of a form service (e.g. Formspree `https://formspree.io/f/xxxxxxx`) = the form sends the request directly (see "Contact / lead form").                                    |
 | `leadForm.serviceName`        | Name of that form service, shown on the form and in the Privacy Notice (e.g. `"Formspree"`). If left blank, Formspree, Getform, Basin, FormSubmit and Web3Forms are recognised from the endpoint; for any other service `npm test` fails until a name is set.                   |
 | `leadForm.servicePrivacyUrl`  | Optional `https://` link to the form service's privacy policy, linked from the Privacy Notice.                                                                                                                                                                                  |
@@ -77,6 +93,23 @@ If you can't see the change after two minutes, check the deployment on the Verce
 | `analytics.domain`            | Plausible only: the site's domain as registered in Plausible. Blank = the website's own domain.                                                                                                                                                                                 |
 | `analytics.scriptUrl`         | Optional: a different script address from the provider (e.g. the per-site script Plausible gives you). Blank = the provider's standard script.                                                                                                                                  |
 | `analytics.servicePrivacyUrl` | Optional `https://` link to the provider's privacy policy, linked from the Privacy Notice.                                                                                                                                                                                      |
+
+### Changing a published price
+
+1. Edit `site-config.json` on GitHub as above and change the number after the price's name, e.g. `"cabinetEach": 60` → `"cabinetEach": 65`. Use a plain number: no `$`, no quotes, cents after a dot (`1.79`).
+2. Commit. After the redeploy, the home page, FAQ, Terms, the chat's answers, the chat estimate, new admin quotes and the PDFs all use the new price (the bathtub price follows `showerEach`: always 30% less).
+3. Quotes already saved in the admin tool keep the prices they were saved with until they are edited and saved again. If you had set a different price for the same item under the admin's Business Prices, the dashboard shows the difference.
+4. Optional, for a developer: run `npm run pages` and commit, so the price text written into the page files matches too (visitors with JavaScript see the new price anyway).
+
+| Name                | Price                                                        | Name              | Price                                  |
+| ------------------- | ------------------------------------------------------------ | ----------------- | -------------------------------------- |
+| `demolitionPerSqFt` | Demolition, per sq ft of floor                               | `vanityEach`      | Vanity install, each                   |
+| `toiletEach`        | Toilet install, each (plumbing extra)                        | `cabinetEach`     | Cabinet install, each                  |
+| `sinkEach`          | Sink install, each (plumbing extra)                          | `mirrorEach`      | Standard mirror install, each          |
+| `showerEach`        | Shower install, each (plumbing extra); bathtubs are 30% less | `hugeMirrorEach`  | Huge/oversized mirror install, each    |
+| `showerDoorEach`    | Shower door install, each                                    | `showerShelfEach` | Built-in shower shelf, each            |
+| `entryDoorEach`     | Bathroom entry door install, each                            | `tilePerSqFt`     | Tile, per sq ft of floor or wall tiled |
+| `flooringPerSqFt`   | Flooring other than tile, per sq ft                          | `paintingPerSqFt` | Painting, per sq ft of wall or ceiling |
 
 ## Public chat assistant and price estimate
 
@@ -185,8 +218,11 @@ The form on `contact.html` checks name, a real phone number (10–15 digits) and
 
 1. Create a form at the service (e.g. formspree.io) with the business email as the recipient, and copy its endpoint (`https://formspree.io/f/…`).
 2. In `site-config.json`, set `leadForm.endpoint` to it, `leadForm.serviceName` to the service's name (e.g. `"Formspree"`) and `leadForm.servicePrivacyUrl` to its privacy policy URL. Run `npm test` (or let CI run it) — it fails if the endpoint isn't `https://` or the service isn't named.
-3. After Vercel redeploys, open the live Get a Quote page **on a computer with no email app set up**, send a test request, and check that the page says "Request sent" and the email arrives in the business inbox. Then check that the form text and the Privacy Notice name the service.
-4. Add the service's stored submissions to the monthly clean-up (above).
+3. Commit. After Vercel redeploys, open the live Get a Quote page **on a computer with no email app set up** (or in a private window, where no email app will open), fill in every field, send a test request, and check that the page says "Request sent" and the email arrives in the business inbox with every field. Then do the same starting from a chat estimate ("Contact Us About This →"), and check the estimate summary arrives too. Finally check that the form text ("How this form works") and the Privacy Notice name the service.
+4. Some services (Formspree included) ask you to confirm the first submission or the recipient address by email — do that, then send one more test.
+5. Add the service's stored submissions to the monthly clean-up (above).
+
+Until a service is connected, nothing reaches the business unless the visitor's own email app sends it, and the site can't tell whether it did. Connecting one needs the owner to create the service account; no code change is needed.
 
 ## Visitor counts (analytics)
 
@@ -241,6 +277,7 @@ npm run lint      # ESLint (zero warnings allowed)
 npm run format:check   # Prettier (npm run format to fix)
 npm run check:pages    # shared header/footer and contact details are in sync (notice if price text is older than site-config.json)
 npm run check:placeholders   # no [BRACKETED PLACEHOLDER] visible on any page
+npm run check:deploy -- <url>  # (not part of npm test) a deployed site serves exactly this checkout
 npm run test:unit      # pricing, chat-reply, settings-file (incl. prices), page-sync and contact-details unit tests (node --test)
 npm run test:e2e       # Playwright browser tests (Chromium)
 ```
@@ -249,19 +286,23 @@ The browser tests cover the chat estimate (including validation, feet and inches
 
 **CI:** `.github/workflows/ci.yml` runs all of the above on every push and pull request, as one check named **"Lint, format, page sync, placeholders, unit and browser tests"** (workflow "CI"). CI only reports; it does **not** stop a failing change being merged until branch protection is turned on for the production branch — a GitHub setting a repository admin changes (still to do, see "Owner inputs"):
 
-1. On GitHub: the repository → **Settings** → **Rules** → **Rulesets** → **New ruleset** → **New branch ruleset** (or, in the classic settings, **Settings** → **Branches** → **Add branch protection rule**).
-2. Target the production branch (the one set in Vercel → Settings → Git, normally `main`).
-3. Turn on **Require status checks to pass** (classic: "Require status checks to pass before merging"), add the check above (it appears in the search once CI has run at least once), and save.
-4. Check it: open a pull request that breaks a unit test; GitHub should show merging as blocked until the test passes.
+1. On GitHub, open the repository → **Settings** → (under "Code and automation") **Rules** → **Rulesets** → **New ruleset** → **New branch ruleset**. (Classic alternative: **Settings** → **Branches** → **Add classic branch protection rule**.)
+2. Give it a name (e.g. "Production needs CI"), set **Enforcement status** to **Active**.
+3. Under **Target branches** → **Add target** → **Include default branch** (or "Include by pattern" and type the production branch set in Vercel → Settings → Git, normally `main`).
+4. Tick **Require a pull request before merging** (so changes arrive as pull requests that CI checks) and **Require status checks to pass**; under the latter press **Add checks**, type `Lint, format`, and pick **"Lint, format, page sync, placeholders, unit and browser tests"** (it only appears once CI has run at least once). Press **Create**.
+5. Check it works: open a pull request that breaks a unit test (e.g. change an expected total in `tests/unit/pricing.test.js`); GitHub should show "Merging is blocked" until it passes. Close the pull request without merging.
 
-Once this is on, GitHub rejects commits to the production branch that haven't passed the check, so edit `site-config.json` on GitHub by choosing **"Create a new branch for this commit and start a pull request"**, wait for the check, then merge.
+Rulesets and branch protection are free for public repositories; a **private** repository needs a paid GitHub plan (Pro, Team or Enterprise) for them to be enforced.
+
+**While branch protection is on:** GitHub won't accept commits straight to the production branch, so when you edit `site-config.json` on GitHub choose **"Create a new branch for this commit and start a pull request"**, press **Create pull request**, wait for the green tick (about 3–5 minutes), then **Merge**. For the two emergency switches, the repository admin can instead add themselves under the ruleset's **Bypass list** ("Repository admin" role), which lets them commit straight to the production branch; CI still runs afterwards and shows a red cross if something is wrong.
 
 ## Deploying (Vercel)
 
 The site is deployed on Vercel from this GitHub repository as a static site: framework preset "Other", **no build command**, output directory = the repository root. Vercel serves `404.html` for unknown URLs automatically.
 
 - **Deploy:** push (or merge a pull request) to the production branch set in the Vercel project (Settings → Git). Vercel builds a production deployment within about a minute. Every other branch and pull request gets its own preview URL, which is a good place to check a change first.
-- **Check a deploy:** Vercel dashboard → the project → Deployments; the newest one should say "Ready".
+- **Check a deploy:** Vercel dashboard → the project → Deployments; the newest production one should say "Ready" and show the commit you expect. Then, from a checkout of that commit, run `npm run check:deploy -- https://premium-restoration.vercel.app`: it compares every page, script, stylesheet and `site-config.json` on the live site with the checkout and checks that removed pages (`gallery.html`) answer 404. "serves exactly this checkout" = the deploy is right; otherwise it lists what differs.
+- **Current state (September 24, 2026):** production is still on an older build — `npm run check:deploy` reports every file as different, `js/business-info.js` missing and `/gallery.html` still answering. This branch's work reaches production only once it is merged into the production branch (open a pull request from this branch, let CI pass, merge), after which Vercel deploys it; then run the check above.
 - **Roll back:** Vercel dashboard → Deployments → pick the last good deployment → "…" menu → **Instant Rollback** (or "Promote to Production"). Then fix the problem in the repo; the next push deploys normally.
 - **Settings changes** (`site-config.json`) deploy the same way — see "Site settings".
 

@@ -1230,6 +1230,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
       }
       configReady.then(function (config) {
+        if (config && config.leadForm.paused) return; // "please call us" mode: the form is hidden
         var endpoint = config && config.leadForm.endpoint;
         if (endpoint) sendToEndpoint(endpoint);
         else sendByEmailApp();

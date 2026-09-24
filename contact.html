@@ -61,9 +61,20 @@
       <section class="section">
         <div class="contact-wrap">
           <div class="contact-form-col">
+            <!-- Shown instead of the form when leadForm.enabled is false in site-config.json. -->
+            <div id="form-paused" class="form-status form-paused" data-show-if="leadForm.paused" hidden>
+              <h2 class="form-paused-title">Please call us</h2>
+              <p>
+                We're not taking requests through this form right now. Please call us at
+                <a href="tel:+13853568733" data-contact="phone">(385) 356-8733</a> or email
+                <a href="mailto:eduardo.moroni77@gmail.com" data-contact="email">eduardo.moroni77@gmail.com</a> about
+                your bathroom project.
+              </p>
+            </div>
+
             <div id="form-status" class="form-status" role="status" aria-live="polite" tabindex="-1" hidden></div>
 
-            <form id="lead-form" novalidate>
+            <form id="lead-form" novalidate data-show-unless="leadForm.paused">
               <p id="estimate-prefill-note" class="form-prefill-note" hidden>
                 We've added your estimate to the project details below. Edit it as you like before sending.
               </p>

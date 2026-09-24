@@ -1685,6 +1685,19 @@ textarea {
   color: var(--color-ink);
 }
 
+.form-paused {
+  border-color: var(--color-accent);
+}
+
+.form-paused-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-lg);
+}
+
+.form-paused p {
+  margin: 0;
+}
+
 .form-status.is-success {
   border-color: var(--color-success);
 }

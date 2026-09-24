@@ -41,6 +41,34 @@ test.describe("contact form without a form endpoint (email app)", () => {
   });
 });
 
+test.describe("quote form switch (site-config.json leadForm.enabled)", () => {
+  test("off: the Get a Quote page asks visitors to call instead of showing the form", async ({ page }) => {
+    await useConfig(page, { leadForm: { enabled: false } });
+    await page.goto("/contact.html");
+    await expect(page.locator("html")).toHaveAttribute("data-config", "loaded");
+    const paused = page.locator("#form-paused");
+    await expect(paused).toBeVisible();
+    await expect(paused).toContainText("We're not taking requests through this form right now");
+    await expect(paused.getByRole("link", { name: "(385) 356-8733" })).toHaveAttribute("href", "tel:+13853568733");
+    await expect(page.locator("#lead-form")).toBeHidden();
+  });
+
+  test("on (the default): the form is shown and the call-us note is not", async ({ page }) => {
+    await page.goto("/contact.html");
+    await expect(page.locator("html")).toHaveAttribute("data-config", "loaded");
+    await expect(page.locator("#lead-form")).toBeVisible();
+    await expect(page.locator("#form-paused")).toBeHidden();
+  });
+
+  test("if the settings can't be loaded, the form stays available", async ({ page }) => {
+    await page.route("**/site-config.json", (route) => route.fulfill({ status: 500, body: "" }));
+    await page.goto("/contact.html");
+    await expect(page.locator("html")).toHaveAttribute("data-config", "defaults");
+    await expect(page.locator("#lead-form")).toBeVisible();
+    await expect(page.locator("#form-paused")).toBeHidden();
+  });
+});
+
 test.describe("contact form field limits", () => {
   test("short fields have sensible maximum lengths and the message has a visible counter and limit", async ({
     page,

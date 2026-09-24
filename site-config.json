@@ -21,6 +21,7 @@
     "paintingPerSqFt": 1.79
   },
   "leadForm": {
+    "enabled": true,
     "endpoint": "",
     "serviceName": "",
     "servicePrivacyUrl": ""

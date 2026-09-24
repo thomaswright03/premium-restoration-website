@@ -115,3 +115,16 @@ test("if visitor counts are switched on in site-config.json, the provider is one
     'analytics.provider must be "vercel" or "plausible" when analytics.enabled is true',
   );
 });
+
+test("both switches in site-config.json are true or false (no quotes), so flipping them always works", () => {
+  const raw = JSON.parse(fs.readFileSync(FILE, "utf8"));
+  assert.equal(typeof raw.priceEstimator.enabled, "boolean", "priceEstimator.enabled must be true or false");
+  assert.equal(typeof raw.leadForm.enabled, "boolean", "leadForm.enabled must be true or false");
+});
+
+test("leadForm.enabled: false puts the quote form into 'please call us' mode; anything else keeps the form", () => {
+  assert.equal(SiteConfig.normalize({ leadForm: { enabled: false } }).leadForm.paused, true);
+  assert.equal(SiteConfig.normalize({ leadForm: { enabled: true } }).leadForm.paused, false);
+  assert.equal(SiteConfig.normalize({}).leadForm.paused, false);
+  assert.equal(SiteConfig.normalize(SiteConfig.DEFAULTS).leadForm.paused, false);
+});
