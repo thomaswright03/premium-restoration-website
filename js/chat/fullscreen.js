@@ -40,10 +40,12 @@
     }
   }
 
-  function enterFullscreen() {
+  // opener: the control that asked for full screen, to get focus back when
+  // it closes (by default whatever has focus now).
+  function enterFullscreen(opener) {
     if (isFullscreen()) return;
     var section = C.els.section;
-    returnFocus = document.activeElement;
+    returnFocus = opener || document.activeElement;
     section.classList.add("is-fullscreen");
     section.setAttribute("role", "dialog");
     section.setAttribute("aria-modal", "true");

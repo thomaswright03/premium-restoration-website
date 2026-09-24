@@ -111,25 +111,51 @@
   }
 
   // Only the latest "estimate" button is kept, so they never pile up.
-  function removeOffers() {
+  // keep: a row to leave in place (the button that started the estimate).
+  function removeOffers(keep) {
     Array.prototype.forEach.call(C.els.messages.querySelectorAll(".ai-chat-offer-row"), function (row) {
-      row.remove();
+      if (row !== keep) row.remove();
     });
+  }
+
+  var estimatePending = false;
+
+  // The "Get a bathroom price estimate" button (and the one on the page to
+  // start with). While an estimate is being worked out it reads "Continue my
+  // estimate" and reopens it full screen, so closing full screen can put
+  // focus back on the button that opened it.
+  function onEstimateButton(btn) {
+    if (C.state.quoteState) {
+      C.resumeEstimate(btn);
+      return;
+    }
+    if (estimatePending) return;
+    estimatePending = true;
+    C.sendChatMessage("I'd like a bathroom price estimate", { opener: btn });
+  }
+
+  function estimateStarted() {
+    estimatePending = false;
+  }
+
+  // A chat row holding one estimate button. Returns the button.
+  function estimateButtonRow(label) {
+    var parts = botRow();
+    parts.row.classList.add("ai-chat-offer-row");
+    var btn = el("button", "ai-chat-suggestion", label);
+    btn.type = "button";
+    btn.addEventListener("click", function () {
+      onEstimateButton(btn);
+    });
+    parts.inner.appendChild(btn);
+    C.els.messages.appendChild(parts.row);
+    return btn;
   }
 
   function appendEstimateOffer() {
     if (!estimatorEnabled() || C.state.quoteState) return;
     removeOffers();
-    var parts = botRow();
-    parts.row.classList.add("ai-chat-offer-row");
-    var btn = el("button", "ai-chat-suggestion", "Get a bathroom price estimate →");
-    btn.type = "button";
-    btn.addEventListener("click", function () {
-      parts.row.remove();
-      C.sendChatMessage("I'd like a bathroom price estimate");
-    });
-    parts.inner.appendChild(btn);
-    C.els.messages.appendChild(parts.row);
+    estimateButtonRow("Get a bathroom price estimate\u00a0→");
     scrollToEnd();
   }
 
@@ -145,4 +171,7 @@
   C.appendChatRow = appendChatRow;
   C.removeOffers = removeOffers;
   C.appendEstimateOffer = appendEstimateOffer;
+  C.onEstimateButton = onEstimateButton;
+  C.estimateStarted = estimateStarted;
+  C.estimateButtonRow = estimateButtonRow;
 })((window.PRChat = window.PRChat || { state: {} }));

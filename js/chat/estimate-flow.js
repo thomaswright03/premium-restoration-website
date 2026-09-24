@@ -88,11 +88,34 @@
   }
 
   // ---------- steps ----------
-  function startEstimate() {
-    C.removeOffers();
+  // The button that started the estimate (or a new one, when it was asked
+  // for by typing) stays in the chat as "Continue my estimate": it reopens
+  // the estimate full screen, and focus returns to it when full screen is
+  // closed. It goes when the estimate is finished or cancelled.
+  function continueButton(opener) {
+    var btn = opener && document.contains(opener) ? opener : C.estimateButtonRow("");
+    C.removeOffers(btn.closest(".ai-chat-offer-row"));
+    btn.textContent = "Continue my estimate\u00a0→";
+    btn.setAttribute("data-role", "continue-estimate");
+    return btn;
+  }
+
+  // Reopens the estimate being worked out full screen, on its current step.
+  function resumeEstimate(opener) {
+    C.enterFullscreen(opener);
+    var current = C.els.messages.querySelector(
+      ".ai-chat-group-form:not(.is-done) input, .ai-chat-group-form:not(.is-done) .ai-chat-choice",
+    );
+    if (current) current.focus({ preventScroll: true });
+  }
+
+  function startEstimate(opener) {
+    var btn = continueButton(opener);
     C.state.quoteState = newQuoteState({}, null, 0);
     C.els.form.hidden = true;
-    C.enterFullscreen();
+    // Started from a button: closing full screen goes back to it. Started by
+    // typing: the chat box is hidden, so focus goes to the current step.
+    C.enterFullscreen(opener ? btn : undefined);
     setProgress(0);
     C.appendGroupForm();
     C.persistEstimate();
@@ -108,6 +131,7 @@
 
   function cancelEstimate() {
     C.state.quoteState = null;
+    C.removeOffers();
     C.saveEstimate(null);
     hideProgress();
     C.els.form.hidden = false;
@@ -142,6 +166,7 @@
     }
     setProgress(100);
     C.state.quoteState = null;
+    C.removeOffers();
     C.els.form.hidden = false;
     C.saveEstimate({ status: "done", values: q.values, scope: q.scope });
     C.track("ESTIMATE_COMPLETED");
@@ -162,16 +187,17 @@
       return;
     }
     if (saved.status !== "active") return;
-    C.removeOffers();
     C.state.quoteState = newQuoteState(saved.values, saved.scope, saved.index);
     C.els.form.hidden = true;
     C.appendChatRow("bot", "Welcome back — your estimate is just as you left it. Carry on below.");
+    continueButton(null);
     stepProgress();
     C.appendGroupForm({ restored: true });
   }
 
   // Used by the other parts of the chat.
   C.startEstimate = startEstimate;
+  C.resumeEstimate = resumeEstimate;
   C.cancelEstimate = cancelEstimate;
   C.goBack = goBack;
   C.advance = advance;

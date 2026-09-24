@@ -22,7 +22,10 @@
 
   // Shows the visitor's message, then (after a short "typing" pause) the
   // scripted reply, an estimate button, or the estimate itself.
-  function sendChatMessage(message) {
+  // options.opener: the button that asked for the estimate (focus returns
+  // to it when full screen is closed).
+  function sendChatMessage(message, options) {
+    options = options || {};
     if (!message) return;
     C.appendChatRow("user", message);
     C.els.send.disabled = true;
@@ -36,8 +39,9 @@
             leadFormEnabled: C.leadFormEnabled(),
           });
           C.els.send.disabled = false;
+          C.estimateStarted();
           if (r && r.action === "startEstimate") {
-            C.startEstimate();
+            C.startEstimate(options.opener);
             return;
           }
           if (r && r.text) C.appendChatRow("bot", r.text);
@@ -72,8 +76,7 @@
     });
     if (C.els.starter) {
       C.els.starter.addEventListener("click", function () {
-        if (C.els.starterRow) C.els.starterRow.remove();
-        sendChatMessage("I'd like a bathroom price estimate");
+        C.onEstimateButton(C.els.starter);
       });
     }
   }

@@ -22,8 +22,9 @@ test.describe("chat estimate", () => {
     const width = await progress.evaluate((el) => el.getBoundingClientRect().width);
     expect(width).toBeLessThanOrEqual(760);
 
-    // The whole suggestion row (avatar included) goes away once used.
-    await expect(page.locator("#ai-chat-quote-starter-row")).toHaveCount(0);
+    // While the estimate is worked out, the button that started it reads "Continue my estimate".
+    await expect(page.locator(".ai-chat-suggestion")).toHaveCount(1);
+    await expect(page.locator("#ai-chat-quote-starter")).toHaveText("Continue my estimate →");
   });
 
   test("5 x 8 x 8 room, other flooring and 3 cabinets comes to $380.00, and the PDF exports", async ({ page }) => {
@@ -435,6 +436,38 @@ test.describe("chat layout and focus", () => {
     await expect(page.locator(".ai-chat-suggestion")).toHaveCount(1);
     await page.locator(".ai-chat-suggestion").click();
     await expect(page.locator('form[data-group="scope"]')).toBeVisible();
+    await expect(page.locator(".ai-chat-suggestion")).toHaveCount(1);
+    await expect(page.locator(".ai-chat-suggestion")).toHaveText("Continue my estimate →");
+  });
+
+  test("closing full screen returns focus to the button that opened the estimate", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/index.html");
+    const starter = page.locator("#ai-chat-quote-starter");
+    await expect(starter).toBeVisible();
+    await starter.focus();
+    await page.keyboard.press("Enter");
+    const section = page.locator(".ai-chat-section");
+    await expect(page.locator('form[data-group="scope"]')).toBeVisible();
+    await expect(section).toHaveClass(/is-fullscreen/);
+    await expect(page.locator('form[data-group="scope"] .ai-chat-choice').first()).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(section).not.toHaveClass(/is-fullscreen/);
+    await expect(starter).toBeFocused();
+    await expect(starter).toHaveText("Continue my estimate →");
+    // The same button reopens the estimate where it was, and focus comes back to it again.
+    await page.keyboard.press("Enter");
+    await expect(section).toHaveClass(/is-fullscreen/);
+    await expect(page.locator('form[data-group="scope"] .ai-chat-choice').first()).toBeFocused();
+    await expect(page.locator('form[data-group="scope"]')).toHaveCount(1);
+    await page.click("#ai-chat-close");
+    await expect(starter).toBeFocused();
+    // Once the estimate is finished the button goes.
+    await starter.click();
+    await answerScope(page, NOTHING_BUT_FLOORING);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8 });
+    await fillGroup(page, "fixtures", {});
+    await expect(page.getByTestId("estimate-card")).toBeVisible();
     await expect(page.locator(".ai-chat-suggestion")).toHaveCount(0);
   });
 
