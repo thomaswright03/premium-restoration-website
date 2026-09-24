@@ -5,7 +5,15 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const ROOT = path.join(__dirname, "..", "..");
-const BASE_CONFIG = JSON.parse(fs.readFileSync(path.join(ROOT, "site-config.json"), "utf8"));
+// The server gives the pages tests/fixtures/test-prices.json as their prices
+// (see playwright.config.js), and so does this copy.
+const TEST_PRICES = JSON.parse(fs.readFileSync(path.join(ROOT, "tests/fixtures/test-prices.json"), "utf8"));
+const BASE_CONFIG = Object.assign(JSON.parse(fs.readFileSync(path.join(ROOT, "site-config.json"), "utf8")), {
+  prices: TEST_PRICES,
+});
+// Expectations computed in the tests use the same prices.
+const Pricing = require("../../js/bathroom-pricing.js");
+Pricing.setPublishedPrices(Pricing.validatePublishedPrices(TEST_PRICES).prices);
 
 // Serve a modified site-config.json for this page only.
 async function useConfig(page, overrides) {
@@ -97,6 +105,7 @@ module.exports = {
   answerDialog,
   ROOT,
   BASE_CONFIG,
+  TEST_PRICES,
   useConfig,
   sendChat,
   startEstimate,

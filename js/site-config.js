@@ -11,6 +11,10 @@
 // value never shows a placeholder. If the settings file can't be loaded, the
 // safe defaults below apply (price estimator off, email-app lead form).
 //
+// It also hands the published prices ("prices") to js/bathroom-pricing.js
+// and writes them into the page text, so the owner changes a price in one
+// place. Missing or invalid prices keep the price estimator off.
+//
 // Other scripts use: SiteConfig.ready.then(function (config) { ... })
 //
 // normalize() also loads in Node, so the unit tests can check the committed
@@ -18,6 +22,11 @@
 
 (function () {
   "use strict";
+
+  var isNode = typeof module === "object" && module.exports && typeof require === "function";
+  // Published prices are checked with js/bathroom-pricing.js (loaded before
+  // this script on every page that shows or uses a price).
+  var Pricing = isNode ? require("./bathroom-pricing.js") : window.BathroomPricing || null;
 
   var DEFAULTS = {
     priceEstimator: { enabled: false },
@@ -69,9 +78,15 @@
     var knownProvider = Object.prototype.hasOwnProperty.call(ANALYTICS_PROVIDERS, provider);
     var scriptUrl = clean(an.scriptUrl);
     var endpoint = clean(lf.endpoint);
+    var priceCheck = Pricing ? Pricing.validatePublishedPrices(raw.prices) : null;
+    var pricesOk = !!(priceCheck && priceCheck.valid);
     return {
       loaded: true,
-      priceEstimator: { enabled: pe.enabled === true },
+      // The estimator needs valid published prices: without them it stays
+      // off, so a wrong price is never shown.
+      priceEstimator: { enabled: pe.enabled === true && pricesOk },
+      prices: pricesOk ? priceCheck.prices : null,
+      priceProblems: priceCheck ? priceCheck.errors : [],
       leadForm: {
         // Only an https:// address is used; anything else keeps the email-app form.
         endpoint: /^https:\/\/[^\s]+$/.test(endpoint) ? endpoint : "",
@@ -92,7 +107,7 @@
     };
   }
 
-  if (typeof module === "object" && module.exports) {
+  if (isNode) {
     module.exports = {
       DEFAULTS: DEFAULTS,
       ANALYTICS_PROVIDERS: ANALYTICS_PROVIDERS,
@@ -111,6 +126,15 @@
 
   function apply(config, scope) {
     scope = scope || document;
+    // Published prices in page text: <span data-price="Cabinet_Price">$60</span>.
+    // The files carry the prices as of the last `npm run pages`; this makes
+    // sure visitors see the prices in site-config.json right now.
+    if (Pricing && config.prices) {
+      Array.prototype.forEach.call(scope.querySelectorAll("[data-price]"), function (el) {
+        var value = Pricing.DEFAULT_PRICES[el.getAttribute("data-price")];
+        if (typeof value === "number" && isFinite(value)) el.textContent = Pricing.shortMoney(value);
+      });
+    }
     Array.prototype.forEach.call(scope.querySelectorAll("[data-fill]"), function (el) {
       el.textContent = lookup(config, el.getAttribute("data-fill"));
     });
@@ -151,6 +175,10 @@
 
   var ready = Promise.all([loaded, domReady]).then(function (results) {
     var config = results[0];
+    if (Pricing && config.prices) Pricing.setPublishedPrices(config.prices);
+    if (Pricing && config.loaded && config.priceProblems.length && window.console) {
+      console.warn("site-config.json prices can't be used, so the estimator is off: " + config.priceProblems.join(" "));
+    }
     apply(config);
     document.documentElement.setAttribute("data-config", config.loaded ? "loaded" : "defaults");
     return config;

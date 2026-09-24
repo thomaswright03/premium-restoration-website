@@ -1,7 +1,24 @@
 {
-  "_help": "Site settings. Edit, commit and push; Vercel redeploys in about a minute and visitors get the change on their next page load. See README.md 'Site settings'.",
+  "_help": "Site settings. Edit on GitHub and commit; Vercel redeploys in about a minute and visitors get the change on their next page load. See README.md 'Site settings' for what each setting does and how to switch things off quickly.",
   "priceEstimator": {
     "enabled": true
+  },
+  "prices": {
+    "_help": "Published labor prices in US dollars: numbers only, no quotes or $ sign (e.g. 60 or 1.79). The bathtub price is always 30% less than showerEach. Every page, the chat, the estimate and admin quotes use these.",
+    "demolitionPerSqFt": 37.5,
+    "toiletEach": 200,
+    "sinkEach": 200,
+    "showerEach": 500,
+    "showerDoorEach": 300,
+    "entryDoorEach": 200,
+    "vanityEach": 150,
+    "cabinetEach": 60,
+    "mirrorEach": 100,
+    "hugeMirrorEach": 300,
+    "showerShelfEach": 125,
+    "tilePerSqFt": 4,
+    "flooringPerSqFt": 5,
+    "paintingPerSqFt": 1.79
   },
   "leadForm": {
     "endpoint": "",

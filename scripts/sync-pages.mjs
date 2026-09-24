@@ -3,7 +3,7 @@
 //   <!-- chrome:head -->   … <!-- /chrome:head -->     from scripts/partials/head.html
 //   <!-- chrome:header --> … <!-- /chrome:header -->   from scripts/partials/header.html
 //   <!-- chrome:footer --> … <!-- /chrome:footer -->   from scripts/partials/footer.html
-//   <span data-price="Cabinet_Price">$60</span>        from DEFAULT_PRICES in js/bathroom-pricing.js
+//   <span data-price="Cabinet_Price">$60</span>        from "prices" in site-config.json (via js/bathroom-pricing.js)
 //   <a data-contact="phone" href="tel:…">…</a>         from js/business-info.js (phone or email;
 //   <span data-contact="email">…</span>                 a mailto link keeps its ?subject=…)
 //
@@ -13,6 +13,13 @@
 //
 // The pages are committed already filled in, so the site needs no build step:
 // this only has to be run after editing a partial or a price.
+//
+// Prices are special: the owner changes them in site-config.json, and every
+// page also fills its price text from that file when it loads (js/site-config.js),
+// so visitors see a new price straight away even before this script is run.
+// So in --check mode, pages whose only difference is price text are reported
+// as a notice ("run npm run pages to refresh the text in the files", which
+// matters only for visitors without JavaScript), not as a failure.
 //
 //   node scripts/sync-pages.mjs          rewrite the pages
 //   node scripts/sync-pages.mjs --check  exit 1 if any page is out of date (CI)
@@ -42,6 +49,21 @@ export const PAGES = [
 ];
 
 const BLOCKS = ["head", "header", "footer"];
+
+if (!Pricing.hasPublishedPrices()) {
+  const raw = JSON.parse(await readFile(join(root, "site-config.json"), "utf8"));
+  const problems = Pricing.validatePublishedPrices(raw.prices).errors;
+  throw new Error("site-config.json prices can't be used:\n  " + problems.join("\n  "));
+}
+
+// The page with every price text blanked and whitespace collapsed, to tell a
+// price-only difference from any other.
+export function withoutPriceText(html) {
+  return html
+    .replace(/(<span[^>]*\bdata-price="\w+"[^>]*>)[^<]*(<\/span>)/g, "$1$2")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 async function partial(name) {
   return readFile(join(root, "scripts/partials", name + ".html"), "utf8");
@@ -104,6 +126,7 @@ export function strayContacts(html) {
 async function main() {
   const check = process.argv.includes("--check");
   const stale = [];
+  const priceOnly = [];
   for (const page of PAGES) {
     const path = join(root, page.file);
     const source = await readFile(path, "utf8");
@@ -114,16 +137,33 @@ async function main() {
       process.exitCode = 1;
     }
     if (output !== source) {
-      stale.push(page.file);
+      if (check && withoutPriceText(output) === withoutPriceText(source)) priceOnly.push(page.file);
+      else stale.push(page.file);
       if (!check) await writeFile(path, output);
     }
   }
+  if (check && priceOnly.length) {
+    console.warn(
+      "Notice: the price text written in these files is older than the prices in site-config.json:\n  " +
+        priceOnly.join("\n  ") +
+        "\nVisitors already see the new prices (pages fill them in when they load). " +
+        "Run `npm run pages` and commit to refresh the files for visitors without JavaScript.",
+    );
+  }
   if (check && stale.length) {
-    console.error("These pages are out of date with scripts/partials or DEFAULT_PRICES:\n  " + stale.join("\n  "));
+    console.error("These pages are out of date with scripts/partials or js/business-info.js:\n  " + stale.join("\n  "));
     console.error("Run: npm run pages");
     process.exit(1);
   }
-  console.log(check ? "Pages are up to date." : stale.length ? "Updated: " + stale.join(", ") : "No changes.");
+  console.log(
+    check
+      ? priceOnly.length
+        ? "Pages are up to date apart from the price text above."
+        : "Pages are up to date."
+      : stale.length
+        ? "Updated: " + stale.join(", ")
+        : "No changes.",
+  );
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

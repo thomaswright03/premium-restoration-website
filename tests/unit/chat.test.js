@@ -2,6 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+require("./test-prices.js");
 const Chat = require("../../js/chat-replies.js");
 
 const ON = { estimatorEnabled: true };
@@ -138,4 +139,16 @@ test("emoji-only messages get the did-not-understand reply with the estimator of
 test("matching is whole-word: 'fire' does not match 'fireplace' as damage, 'work' does not trigger photos", () => {
   assert.doesNotMatch(Chat.reply("fireplaces", ON).text, /water, fire, smoke/);
   assert.doesNotMatch(Chat.reply("what work do you do", ON).text, /photos/);
+});
+
+test("chat price answers follow the published prices in the settings", () => {
+  const Pricing = require("../../js/bathroom-pricing.js");
+  const good = require("../fixtures/test-prices.json");
+  try {
+    Pricing.setPublishedPrices(Pricing.validatePublishedPrices(Object.assign({}, good, { cabinetEach: 75 })).prices);
+    assert.match(Chat.reply("cabinet price?", ON).text, /\$75 per cabinet/);
+  } finally {
+    Pricing.setPublishedPrices(Pricing.validatePublishedPrices(good).prices);
+  }
+  assert.match(Chat.reply("cabinet price?", ON).text, /\$60 per cabinet/);
 });

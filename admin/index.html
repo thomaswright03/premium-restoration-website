@@ -223,9 +223,12 @@
           them. These are labor prices only; materials are never included.
         </p>
         <p class="admin-muted rates-intro">
-          The public website shows its own published prices (for example $60 per cabinet and $5 per sq ft of flooring).
-          If you change a price here that the website also shows, ask your web developer to update the website prices
-          too, or quotes won't match what the website advertises. The dashboard warns you when they differ.
+          The public website shows its own published prices (for example <span data-price="Cabinet_Price">$60</span> per
+          cabinet and <span data-price="Floor_Price_Per_SqFt">$5</span> per sq ft of flooring), set in the site's
+          settings file, site-config.json. A price changed here is used only for quotes made in this browser. To change
+          what the website shows, change it in site-config.json instead (README “Site settings”: edit the file on GitHub
+          and commit); the website, the chat and new quotes then all use the new price. The dashboard warns you when a
+          price here differs from the website's.
         </p>
         <div id="rates-sections"></div>
         <div class="admin-form-actions">

@@ -9,11 +9,46 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const SiteConfig = require("../../js/site-config.js");
+const Pricing = require("../../js/bathroom-pricing.js");
 
 const FILE = path.join(__dirname, "..", "..", "site-config.json");
 
 test("site-config.json is valid JSON", () => {
   assert.doesNotThrow(() => JSON.parse(fs.readFileSync(FILE, "utf8")));
+});
+
+test("the published prices in site-config.json are all there and usable", () => {
+  const raw = JSON.parse(fs.readFileSync(FILE, "utf8"));
+  const check = Pricing.validatePublishedPrices(raw.prices);
+  assert.deepEqual(check.errors, [], "Fix these in site-config.json: " + check.errors.join(" "));
+  // The pages, chat and estimate read exactly these.
+  for (const p of Pricing.PUBLISHED_PRICES) assert.equal(Pricing.DEFAULT_PRICES[p.key], raw.prices[p.setting]);
+});
+
+test("every published price is in the settings file and the test prices, with the same names", () => {
+  const settings = Object.keys(JSON.parse(fs.readFileSync(FILE, "utf8")).prices).filter((k) => k[0] !== "_");
+  const fixture = Object.keys(require("../fixtures/test-prices.json")).filter((k) => k[0] !== "_");
+  const expected = Pricing.PUBLISHED_PRICES.map((p) => p.setting);
+  assert.deepEqual(settings, expected);
+  assert.deepEqual(fixture, expected);
+});
+
+test("missing or invalid prices keep the estimator off instead of showing a wrong price", () => {
+  const raw = JSON.parse(fs.readFileSync(FILE, "utf8"));
+  const ok = SiteConfig.normalize(Object.assign({}, raw, { priceEstimator: { enabled: true } }));
+  assert.equal(ok.priceEstimator.enabled, true);
+  assert.equal(ok.prices.Cabinet_Price, raw.prices.cabinetEach);
+  const broken = SiteConfig.normalize(
+    Object.assign({}, raw, {
+      priceEstimator: { enabled: true },
+      prices: Object.assign({}, raw.prices, { cabinetEach: "sixty" }),
+    }),
+  );
+  assert.equal(broken.priceEstimator.enabled, false);
+  assert.equal(broken.prices, null);
+  assert.match(broken.priceProblems.join(" "), /cabinetEach must be a number/);
+  const none = SiteConfig.normalize(Object.assign({}, raw, { prices: undefined }));
+  assert.equal(none.priceEstimator.enabled, false);
 });
 
 test("a connected form service is named, so the form text and Privacy Notice name it", () => {

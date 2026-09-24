@@ -31,7 +31,7 @@ The site says "Get a Quote" / "Request a Quote", not "Free Quote": nothing confi
 ├── css/style.css             design tokens (colours incl. dark theme, type and spacing scales) + public styles
 ├── css/admin.css             admin tool styles (uses the same tokens)
 ├── js/business-info.js       THE phone number, email address and "operated by" line (shared)
-├── js/bathroom-pricing.js    prices + THE bathroom calculation, validation and estimate text (shared)
+├── js/bathroom-pricing.js    THE bathroom calculation, validation and estimate text (shared); unpublished admin prices
 ├── js/chat-replies.js        scripted chat answers (pure function, unit-tested)
 ├── js/site-config.js         loads site-config.json and shows/hides owner details on the page
 ├── js/analytics.js           optional anonymous visitor counts (off unless switched on)
@@ -42,10 +42,11 @@ The site says "Get a Quote" / "Request a Quote", not "Free Quote": nothing confi
 ├── js/vendor/                jsPDF 4.2.1 (MIT, self-hosted) + its licence
 ├── fonts/                    self-hosted Inter + Playfair Display, with OFL licence texts
 ├── scripts/partials/         the ONE copy of the shared <head> bits, header/nav and footer
-├── scripts/sync-pages.mjs    copies the partials, published prices and contact details into every page
+├── scripts/sync-pages.mjs    copies the partials, published prices (from site-config.json) and contact details into every page
 ├── scripts/check-placeholders.mjs   fails if a [BRACKETED PLACEHOLDER] is visible
 ├── scripts/serve.mjs         local server that behaves like Vercel (404.html for unknown URLs)
-├── tests/unit/               Node unit tests (pricing, chat replies, settings file, contact details)
+├── tests/unit/               Node unit tests (pricing, chat replies, settings file, page sync, contact details)
+├── tests/fixtures/           test-prices.json: the fixed prices the tests use
 ├── tests/e2e/                Playwright browser tests
 └── .github/workflows/ci.yml  runs every check on each push and pull request
 ```
@@ -92,19 +93,19 @@ The chat on the home page is front-end only — no AI, no backend, no API key. R
 - **Legal wording kept**: plumbing and electrical work is never priced publicly and is always described as not included and adding to the cost; toilets, sinks, showers and bathtubs need plumbing; no tax line (Utah generally treats labor on real property as not taxable — get tax advice before adding one); not a quote, offer or contract. The full disclaimer is on the card and in the PDF.
 - **PDF**: built by `js/estimate-pdf.js` with jsPDF, which is **self-hosted** in `js/vendor/` (MIT licence, licence text alongside) and loaded only when someone exports. It is not an npm dependency: to update it, replace `js/vendor/jspdf.umd.min.js` with the `dist/jspdf.umd.min.js` file of the new release (and its licence), then run `npm test`. Pages are added as needed and every page has a footer with the date, phone, email, business name and page number.
 
-The public estimate always uses the published `DEFAULT_PRICES` in `js/bathroom-pricing.js`; it ignores prices saved in a browser under Business Prices, so every visitor sees the same figures. This publishes your real bathroom prices to anyone (including competitors); switch it off with `priceEstimator.enabled` if you'd rather not.
+The public estimate always uses the published prices from `site-config.json`; it ignores prices saved in a browser under Business Prices, so every visitor sees the same figures. This publishes your real bathroom prices to anyone (including competitors); switch it off with `priceEstimator.enabled` if you'd rather not.
 
 ## One calculation, one set of prices
 
-`js/bathroom-pricing.js` holds the prices (`DEFAULT_PRICES`) **and** the only bathroom calculation (`computeEstimate`). Both the chat estimate and the admin tool call it, so for the same room, work and fixtures the admin total equals the public estimate; the admin tool can add plumbing points, the two plumbing surcharges, electrical points and tax. A unit test checks this across a table of jobs.
+`js/bathroom-pricing.js` holds the only bathroom calculation (`computeEstimate`). Both the chat estimate and the admin tool call it, so for the same room, work and fixtures the admin total equals the public estimate; the admin tool can add plumbing points, the two plumbing surcharges, electrical points and tax. A unit test checks this across a table of jobs.
 
-Published prices in page text (e.g. "$60 per Cabinet", "$5 per sq ft") are written as `<span data-price="Cabinet_Price">$60</span>` and filled from `DEFAULT_PRICES` by `npm run pages`. Chat price answers read `DEFAULT_PRICES` directly. So to change a published price:
+**The published prices live in `site-config.json`** (`prices`), so the owner can change them without a developer — see "Changing a published price" under "Site settings". When a page loads, `js/site-config.js` checks them and hands them to `js/bathroom-pricing.js` (`setPublishedPrices`), and fills every price in the page text (written as `<span data-price="Cabinet_Price">$60</span>`). The chat's price answers, the estimate, the admin quotes, the admin "differs from the website" warning and both PDFs all read those same prices. The bathtub price isn't set: it is always 30% less than `showerEach`. Plumbing, the two plumbing surcharges, electrical and the tax rate are never published; their defaults stay in `js/bathroom-pricing.js` and can be changed per browser under Business Prices.
 
-1. Change it in `DEFAULT_PRICES` (`js/bathroom-pricing.js`).
-2. Run `npm run pages` and commit the result.
-3. Update the "owner-stated published prices" unit test if the owner really changed the price.
+**If the prices can't be used** (a price missing, typed in quotes or with a `$`, 0 or less, over 10,000, more than 2 decimal places, or a misspelt name), the price estimator switches itself off and the chat says "call for a price" rather than show a wrong figure, the page text keeps the prices last written into the files, and the admin tool says it can't price quotes until the file is fixed (saved quotes and backups still work). `npm test` (`tests/unit/site-config.test.js`) names the exact problem.
 
-If step 2 is forgotten, CI fails ("pages are out of date"); the unit tests also fail if the cabinet ($60) or flooring ($5/sq ft) price changes without the test being updated.
+**The price text in the page files** is refreshed by `npm run pages` (for visitors without JavaScript and for search engines that don't run it). Visitors with JavaScript see the prices in `site-config.json` straight away even before that is run, so `npm run check:pages` (and CI) only prints a notice when the files' price text is older than the settings, instead of failing.
+
+**Tests use their own prices**: `tests/fixtures/test-prices.json` (the owner-stated prices of September 2026, e.g. $60 per cabinet and $5 per sq ft of flooring). The unit tests load them, and `npm run test:e2e` serves them in place of the owner's (`SITE_CONFIG_PRICES` in `playwright.config.js` and `scripts/serve.mjs`). So the owner changing a price never breaks a test, and the tests still check every calculation against known figures. A browser test (`tests/e2e/prices.spec.js`) changes the cabinet price in the settings only and checks the home page, FAQ, Terms, chat, estimate and admin quote all follow.
 
 ## Shared header, footer and head
 
@@ -238,13 +239,13 @@ Development tools need Node 20+ and `npm install`.
 npm test          # everything below, in order
 npm run lint      # ESLint (zero warnings allowed)
 npm run format:check   # Prettier (npm run format to fix)
-npm run check:pages    # shared header/footer and published prices are in sync
+npm run check:pages    # shared header/footer and contact details are in sync (notice if price text is older than site-config.json)
 npm run check:placeholders   # no [BRACKETED PLACEHOLDER] visible on any page
-npm run test:unit      # pricing, chat-reply, settings-file and contact-details unit tests (node --test)
+npm run test:unit      # pricing, chat-reply, settings-file (incl. prices), page-sync and contact-details unit tests (node --test)
 npm run test:e2e       # Playwright browser tests (Chromium)
 ```
 
-The browser tests cover the chat estimate (including validation, feet and inches, Back, reload, the PDF, and the card opening on its total at phone and desktop sizes), the chat's full-screen/focus behaviour and replies, the estimator switch, the contact form in both modes (including the email-app fallback), visitor counts on and off, the admin tool (one-screen quote with customer details, save/edit/delete, double save, reload, per-quote drafts across two tabs, the unsaved-changes prompts, the error summary counting down, styled dialogs, job booked and retention, messages, old quotes, storage failure, phone layout), admin backups (never-backed-up and overdue warnings, the backup date, one-step restore after the browser's storage is cleared, Business Prices carried to a new browser, and each answer from the browser about keeping data), both PDFs' business line, every page at 375/390/768/1280px (no sideways scroll, no placeholders, no console errors or missing files), prices in page text, the 404 page, favicon, focus rings, tap-target sizes, and colour contrast in light and dark themes (axe-core). First-time Playwright setup on a new machine: `npx playwright install chromium`.
+The browser tests cover the chat estimate (including validation, feet and inches, Back, reload, the PDF, and the card opening on its total at phone and desktop sizes), the chat's full-screen/focus behaviour and replies, the estimator switch, the contact form in both modes (including the email-app fallback), visitor counts on and off, the admin tool (one-screen quote with customer details, save/edit/delete, double save, reload, per-quote drafts across two tabs, the unsaved-changes prompts, the error summary counting down, styled dialogs, job booked and retention, messages, old quotes, storage failure, phone layout), admin backups (never-backed-up and overdue warnings, the backup date, one-step restore after the browser's storage is cleared, Business Prices carried to a new browser, and each answer from the browser about keeping data), both PDFs' business line, a price changed in the settings reaching every page, the chat, the estimate and admin quotes (and invalid prices switching the estimator off), every page at 375/390/768/1280px (no sideways scroll, no placeholders, no console errors or missing files), prices in page text, the 404 page, favicon, focus rings, tap-target sizes, and colour contrast in light and dark themes (axe-core). First-time Playwright setup on a new machine: `npx playwright install chromium`.
 
 **CI:** `.github/workflows/ci.yml` runs all of the above on every push and pull request, as one check named **"Lint, format, page sync, placeholders, unit and browser tests"** (workflow "CI"). CI only reports; it does **not** stop a failing change being merged until branch protection is turned on for the production branch — a GitHub setting a repository admin changes (still to do, see "Owner inputs"):
 
@@ -279,14 +280,14 @@ These are decisions or facts only the owner can supply. Until then, the site lea
 - **Governing state** for the Terms → then un-comment the clause in `terms.html`.
 - **A durable, shared store for admin quotes**: quotes are kept only in the browser that created them (see "Backups and moving to another device"). For quotes to survive on their own and be shared between devices, the owner needs to choose and create an account with a hosted database or back-end service (for example Supabase, Firebase or a Vercel storage product), which also brings real server-side log-in. That account, its cost and where customer data is stored are the owner's decisions; once chosen, the admin tool's storage functions in `js/admin.js` can be moved onto it, and the Privacy Notice updated to name it. Until then, export a backup at the end of every working day.
 - **Form service**: whether to use one (e.g. Formspree) and its endpoint → `leadForm.*`, then the go-live checklist in "Contact / lead form" (a real test request must arrive in the business inbox). Until then, the form uses the visitor's email app, and the site can't tell whether a request was sent.
-- **Tile floor rate**: the owner said "$5 per square foot for flooring". The site charges $5/sq ft for **other flooring** but prices a **tile floor** at the tile rate, **$4/sq ft** (`Tile_Price_Per_SqFt`), in the chat estimate, chat answers, admin quotes and PDFs. Confirm in writing which is right. If tile floors should be $5/sq ft, the floor-tile line in `computeEstimate()` (`js/bathroom-pricing.js`) must use the flooring rate, the chat's flooring/tile answers and the "Surfaces" note in the admin must say so, and the pricing unit tests must be updated to pin the confirmed rate. No price has been changed until then.
+- **Tile floor rate**: the owner said "$5 per square foot for flooring". The site charges $5/sq ft for **other flooring** but prices a **tile floor** at the tile rate, **$4/sq ft** (`prices.tilePerSqFt` in `site-config.json`), in the chat estimate, chat answers, admin quotes and PDFs. Confirm in writing which is right. If tile floors should be $5/sq ft, that is a change to the calculation, not just a price: the floor-tile line in `computeEstimate()` (`js/bathroom-pricing.js`) must use the flooring rate (changing `tilePerSqFt` would also change wall tile), the chat's flooring/tile answers and the "Surfaces" note in the admin must say so, and the pricing unit tests must be updated to pin the confirmed rate. No price has been changed until then.
 - **Visitor counts**: whether to switch on anonymous counts, and with which provider (Vercel Web Analytics or Plausible) → `analytics.*` (see "Visitor counts").
 - **Spanish / French**: whether customers need these languages. If yes, full translations of the pages, chat, estimate card and PDF (with a language switcher) are a separate piece of work; if English only, record that decision here.
 - **Plumbing and licence position**: how plumbing/electrical work is handled (in-house with a licence, a named licensed subcontractor, or not at all), on legal advice — then update the wording (see "Licence line").
 - **Photos** of completed projects, with each client's written permission (or properly licensed images captioned as illustrative), for the home and About pages; see "Photos".
 - **Free quotes**: confirm whether quotes are always free before any page says "free".
 - **Tax**: a tax adviser's confirmation before any tax is added to quotes.
-- **Prices other than $60/cabinet and $5/sq ft of flooring**: confirm the remaining published rates (demolition, tile, paint, fixtures) are current.
+- **Prices other than $60/cabinet and $5/sq ft of flooring**: confirm the remaining published rates (demolition, tile, paint, fixtures) are current. Any change is made in `site-config.json` → `prices` (see "Site settings").
 - **Estimator on or off**: confirm the owner is happy publishing live prices through the chat (`priceEstimator.enabled`).
 - **GitHub branch protection** requiring the CI check before merging (repository admin; steps under "Tests and checks").
 

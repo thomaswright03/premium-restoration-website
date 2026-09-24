@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const P = require("../../js/bathroom-pricing.js");
+const { Pricing: P } = require("./test-prices.js");
 
 const NOTHING = { demolition: false, floorFinish: "none", walls: "none", paintCeiling: false };
 const ROOM_5x8x8 = { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 };
@@ -11,9 +11,46 @@ function line(result, key) {
   return result.lines.find((l) => l.key === key);
 }
 
-test("owner-stated published prices: $60 per cabinet, $5 per sq ft of flooring", () => {
+test("the test prices are the owner-stated prices: $60 per cabinet, $5 per sq ft of flooring", () => {
   assert.equal(P.DEFAULT_PRICES.Cabinet_Price, 60);
   assert.equal(P.DEFAULT_PRICES.Floor_Price_Per_SqFt, 5);
+});
+
+test("published prices are checked: numbers only, more than 0, cents at most, no unknown names", () => {
+  const good = require("../fixtures/test-prices.json");
+  assert.equal(P.validatePublishedPrices(good).valid, true);
+  const bad = (change) => P.validatePublishedPrices(Object.assign({}, good, change)).errors.join(" ");
+  assert.match(bad({ cabinetEach: "60" }), /cabinetEach must be a number without quotes or a \$ sign/);
+  assert.match(bad({ cabinetEach: "$60" }), /cabinetEach must be a number/);
+  assert.match(bad({ cabinetEach: 0 }), /cabinetEach must be more than 0/);
+  assert.match(bad({ cabinetEach: -5 }), /cabinetEach must be more than 0/);
+  assert.match(bad({ cabinetEach: 60000 }), /no more than 10000/);
+  assert.match(bad({ paintingPerSqFt: 1.795 }), /at most 2 decimal places/);
+  assert.match(bad({ cabinetEsch: 60 }), /cabinetEsch isn't a price the site knows/);
+  const missing = Object.assign({}, good);
+  delete missing.tilePerSqFt;
+  assert.match(P.validatePublishedPrices(missing).errors.join(" "), /tilePerSqFt is missing/);
+  assert.equal(P.validatePublishedPrices(undefined).valid, false);
+  assert.equal(P.validatePublishedPrices(Object.assign({}, good, { _note: "comments are fine" })).valid, true);
+});
+
+test("a price changed in the settings reaches the public estimate, admin quotes and the bathtub rule together", () => {
+  const good = require("../fixtures/test-prices.json");
+  const values = Object.assign({ Cabinet_Quantity: 3, Bathtub_Quantity: 1 }, ROOM_5x8x8);
+  const scope = Object.assign({}, NOTHING, { floorFinish: "flooring" });
+  try {
+    P.setPublishedPrices(
+      P.validatePublishedPrices(Object.assign({}, good, { cabinetEach: 75, showerEach: 600 })).prices,
+    );
+    const pub = P.computePublicEstimate(values, scope);
+    assert.equal(line(pub, "Cabinet_Quantity").cost, 225);
+    assert.equal(line(pub, "Bathtub_Quantity").cost, 420);
+    const admin = P.computeEstimate(values, scope, { includeTrade: true, prices: P.getPrices() });
+    assert.equal(admin.subtotal - line(admin, "plumbing").cost, pub.subtotal);
+  } finally {
+    P.setPublishedPrices(P.validatePublishedPrices(good).prices);
+  }
+  assert.equal(P.DEFAULT_PRICES.Cabinet_Price, 60);
 });
 
 test("bathtub price is always 70% of the shower price", () => {

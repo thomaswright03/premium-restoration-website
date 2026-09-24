@@ -13,13 +13,31 @@
 //
 // Labor only. Materials, permits, and profit margin are never included.
 //
+// The PUBLISHED prices (the ones the website shows) are not in this file:
+// the owner sets them in site-config.json ("prices"), and js/site-config.js
+// passes them to setPublishedPrices() when a page loads. Until then (or if
+// they are missing or invalid) hasPublishedPrices() is false, and the site
+// switches the estimator off rather than show a wrong price. Plumbing,
+// electrical, the surcharges and tax are never published; their defaults
+// are below and the admin tool can change them under Business Prices.
+//
 // Loads as a plain browser script (window.BathroomPricing) and as a Node
-// module (for the unit tests).
+// module (for the unit tests and scripts/sync-pages.mjs), which reads
+// site-config.json itself.
 
 (function (root, factory) {
   "use strict";
+  var node = typeof module === "object" && module.exports && typeof require === "function";
   var api = factory();
-  if (typeof module === "object" && module.exports) {
+  if (node) {
+    try {
+      var path = require("path");
+      var raw = JSON.parse(require("fs").readFileSync(path.join(__dirname, "..", "site-config.json"), "utf8"));
+      var check = api.validatePublishedPrices(raw.prices);
+      if (check.valid) api.setPublishedPrices(check.prices);
+    } catch (e) {
+      /* unreadable settings: hasPublishedPrices() stays false; the unit tests say why */
+    }
     module.exports = api;
   } else {
     root.BathroomPricing = api;
@@ -35,25 +53,51 @@
   // review instead of being silently re-priced.
   var CALC_VERSION = 2;
 
+  // The prices the website publishes, as named in site-config.json
+  // ("setting") and in the code ("key"). The bathtub price isn't set: it is
+  // always 30% less than the shower price.
+  var PUBLISHED_PRICES = [
+    { setting: "demolitionPerSqFt", key: "Demo_Price_Per_SqFt" },
+    { setting: "toiletEach", key: "Toilet_Price" },
+    { setting: "sinkEach", key: "Sink_Price" },
+    { setting: "showerEach", key: "Shower_Price" },
+    { setting: "showerDoorEach", key: "Shower_Door_Price" },
+    { setting: "entryDoorEach", key: "Door_Price" },
+    { setting: "vanityEach", key: "Vanity_Price" },
+    { setting: "cabinetEach", key: "Cabinet_Price" },
+    { setting: "mirrorEach", key: "Mirror_Price" },
+    { setting: "hugeMirrorEach", key: "Mirror_Huge_Price" },
+    { setting: "showerShelfEach", key: "Shower_Shelf_Price" },
+    { setting: "tilePerSqFt", key: "Tile_Price_Per_SqFt" },
+    { setting: "flooringPerSqFt", key: "Floor_Price_Per_SqFt" },
+    { setting: "paintingPerSqFt", key: "Painting_Price_Per_SqFt" },
+  ];
+
+  // Highest price accepted from the settings file: a guard against a typo
+  // such as 60000 for 60.00.
+  var MAX_PUBLISHED_PRICE = 10000;
+
+  // Every price the calculation uses. The published ones are null until
+  // setPublishedPrices() fills them in from site-config.json.
   var DEFAULT_PRICES = {
-    Demo_Price_Per_SqFt: 37.5,
+    Demo_Price_Per_SqFt: null,
 
-    Toilet_Price: 200,
-    Sink_Price: 200,
-    Shower_Price: 500,
-    Shower_Door_Price: 300,
-    Door_Price: 200,
-    Vanity_Price: 150,
-    Cabinet_Price: 60,
-    Mirror_Price: 100,
-    Mirror_Huge_Price: 300,
-    Shower_Shelf_Price: 125,
+    Toilet_Price: null,
+    Sink_Price: null,
+    Shower_Price: null,
+    Shower_Door_Price: null,
+    Door_Price: null,
+    Vanity_Price: null,
+    Cabinet_Price: null,
+    Mirror_Price: null,
+    Mirror_Huge_Price: null,
+    Shower_Shelf_Price: null,
 
-    Tile_Price_Per_SqFt: 4,
-    // Owner-confirmed: $5 per sq ft of bathroom floor.
-    Floor_Price_Per_SqFt: 5,
-    Painting_Price_Per_SqFt: 1.79,
+    Tile_Price_Per_SqFt: null,
+    Floor_Price_Per_SqFt: null,
+    Painting_Price_Per_SqFt: null,
 
+    // Never published (admin quotes only).
     Plumbing_Price_Per_Point: 300,
     No_Stack_Surcharge_Price: 1000,
     Bad_Valve_Surcharge_Price: 400,
@@ -65,6 +109,54 @@
     // has been set deliberately under Business Prices.
     Labor_Tax_Rate_Percent: 0,
   };
+
+  var publishedLoaded = false;
+
+  // Checks the "prices" section of site-config.json. Returns
+  // { valid, prices: { <code key>: number } | null, errors: [plain-English problems] }.
+  function validatePublishedPrices(raw) {
+    var errors = [];
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return { valid: false, prices: null, errors: ['site-config.json has no "prices" section.'] };
+    }
+    var known = {};
+    var prices = {};
+    PUBLISHED_PRICES.forEach(function (p) {
+      known[p.setting] = true;
+      var v = raw[p.setting];
+      if (v === undefined) {
+        errors.push("prices." + p.setting + " is missing.");
+      } else if (typeof v !== "number" || !isFinite(v)) {
+        errors.push("prices." + p.setting + " must be a number without quotes or a $ sign (e.g. 60 or 1.79).");
+      } else if (v <= 0 || v > MAX_PUBLISHED_PRICE) {
+        errors.push("prices." + p.setting + " must be more than 0 and no more than " + MAX_PUBLISHED_PRICE + ".");
+      } else if (Math.abs(v * 100 - Math.round(v * 100)) > 1e-6) {
+        errors.push("prices." + p.setting + " can have at most 2 decimal places (cents).");
+      } else {
+        prices[p.key] = v;
+      }
+    });
+    Object.keys(raw).forEach(function (name) {
+      if (!known[name] && name.charAt(0) !== "_") {
+        errors.push("prices." + name + " isn't a price the site knows — check the spelling.");
+      }
+    });
+    return { valid: errors.length === 0, prices: errors.length ? null : prices, errors: errors };
+  }
+
+  // Fills in the published prices (keyed by code key, as returned by
+  // validatePublishedPrices). DEFAULT_PRICES is changed in place, so every
+  // script holding it sees the new prices.
+  function setPublishedPrices(prices) {
+    PUBLISHED_PRICES.forEach(function (p) {
+      DEFAULT_PRICES[p.key] = Number(prices[p.key]);
+    });
+    publishedLoaded = true;
+  }
+
+  function hasPublishedPrices() {
+    return publishedLoaded;
+  }
 
   var PRICE_LABELS = {
     Demo_Price_Per_SqFt: "Demolition (per sq ft of bathroom floor)",
@@ -242,7 +334,8 @@
   }
 
   // Merges any prices saved from the admin "Business Prices" screen over the
-  // defaults (admin only — the public estimate always uses DEFAULT_PRICES).
+  // defaults (admin only — the public estimate always uses DEFAULT_PRICES,
+  // i.e. the published prices from site-config.json).
   function getPrices() {
     var prices = Object.assign({}, DEFAULT_PRICES);
     try {
@@ -574,6 +667,11 @@
     CALC_VERSION: CALC_VERSION,
     RATES_KEY: RATES_KEY,
     DEFAULT_PRICES: DEFAULT_PRICES,
+    PUBLISHED_PRICES: PUBLISHED_PRICES,
+    MAX_PUBLISHED_PRICE: MAX_PUBLISHED_PRICE,
+    validatePublishedPrices: validatePublishedPrices,
+    setPublishedPrices: setPublishedPrices,
+    hasPublishedPrices: hasPublishedPrices,
     PRICE_LABELS: PRICE_LABELS,
     UNPUBLISHED_PRICE_KEYS: UNPUBLISHED_PRICE_KEYS,
     FIXTURES: FIXTURES,

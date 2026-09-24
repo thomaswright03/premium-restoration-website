@@ -229,6 +229,19 @@
     document.getElementById("persist-retry-btn").hidden = persistence !== "not-persisted";
   }
 
+  // The published prices come from site-config.json. Without them a quote
+  // can't be priced, so creating, editing, PDFs and Business Prices wait.
+  var PRICES_MISSING =
+    "The website's prices couldn't be loaded from site-config.json, so quotes can't be priced right now. Reload the page. " +
+    "If this keeps happening, the prices in site-config.json need fixing (see README “Site settings”). Your saved quotes, " +
+    "Export Backup and Restore from Backup still work.";
+
+  function pricesReady() {
+    if (Pricing.hasPublishedPrices()) return true;
+    alertError(PRICES_MISSING);
+    return false;
+  }
+
   // ------------------------------------------------------------------
   // Messages
   // ------------------------------------------------------------------
@@ -424,12 +437,16 @@
     if (leavingEditor) clearDraft();
     if (leavingPrices) ratesBaseline = null;
 
+    if ((route === "details" || route === "prices") && !Pricing.hasPublishedPrices()) {
+      route = "dashboard";
+      history.replaceState(null, "", "#/dashboard");
+    }
     if (route === "details" && !draft) {
       route = "dashboard";
       history.replaceState(null, "", "#/dashboard");
     }
 
-    alertError("");
+    alertError(Pricing.hasPublishedPrices() ? "" : PRICES_MISSING);
     if (toastRoute && toastRoute !== route) hideToast();
     currentRoute = route;
     if (route === "dashboard" && !persistenceAsked) {
@@ -782,7 +799,7 @@
     var p = document.createElement("p");
     p.textContent =
       "These Business Prices differ from the prices on the public website, so quotes won't match what the website advertises. " +
-      "Set them back, or ask your web developer to update the website prices.";
+      "Set them back here, or change the website's prices in site-config.json (README “Site settings”).";
     box.appendChild(p);
     var ul = document.createElement("ul");
     drift.forEach(function (d) {
@@ -839,6 +856,7 @@
   }
 
   function resumeDraft(id) {
+    if (!pricesReady()) return;
     var stored = readDraft(id);
     if (!stored) return renderDashboard();
     draft = stored;
@@ -1003,6 +1021,7 @@
   // Opening a quote carries on with its unsaved changes if there are any;
   // unsaved changes to other quotes are kept (each quote has its own draft).
   function openQuoteForEdit(id) {
+    if (!pricesReady()) return;
     var quote = getQuotes().filter(function (q) {
       return q.id === id;
     })[0];
@@ -1171,6 +1190,7 @@
   // Customer-ready PDF of a saved quote (same style as the public estimate)
   // ------------------------------------------------------------------
   function downloadQuotePdf(quote, button) {
+    if (!pricesReady()) return;
     var bathroom = quote.data.bathroom;
     var label = button.textContent;
     button.disabled = true;
@@ -1889,6 +1909,7 @@
   // Wire up
   // ------------------------------------------------------------------
   function startNewQuote() {
+    if (!pricesReady()) return;
     draft = newDraft();
     persistDraft();
     navigate("details");
@@ -1908,7 +1929,9 @@
         setAuthed(true);
         error.hidden = true;
         input.value = "";
-        render(routeFromHash());
+        configReady.then(function () {
+          render(routeFromHash());
+        });
       } else {
         error.hidden = false;
       }
@@ -1919,6 +1942,7 @@
     });
     document.getElementById("create-quote-btn").addEventListener("click", startNewQuote);
     document.getElementById("open-rates-btn").addEventListener("click", function () {
+      if (!pricesReady()) return;
       navigate("prices");
     });
     document.getElementById("export-quotes-btn").addEventListener("click", exportQuotes);
@@ -1975,10 +1999,13 @@
       render(routeFromHash());
     });
 
-    var route = routeFromHash();
-    if (draft && (route === "new" || route === "details") && isAuthed() && hasUnsavedDraft(draft)) {
-      toast("Restored your unsaved changes to " + describeDraft(draft) + ".", "details");
-    }
-    render(route);
+    // The published prices arrive with site-config.json: render once it has loaded.
+    configReady.then(function () {
+      var route = routeFromHash();
+      if (draft && (route === "new" || route === "details") && isAuthed() && hasUnsavedDraft(draft)) {
+        toast("Restored your unsaved changes to " + describeDraft(draft) + ".", "details");
+      }
+      render(route);
+    });
   });
 })();

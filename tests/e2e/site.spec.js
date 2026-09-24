@@ -2,8 +2,8 @@
 
 const { test, expect } = require("@playwright/test");
 const AxeBuilder = require("@axe-core/playwright").default;
-const Pricing = require("../../js/bathroom-pricing.js");
 const { useConfig } = require("./helpers");
+const Pricing = require("../../js/bathroom-pricing.js");
 
 const PUBLIC_PAGES = ["index.html", "about.html", "faq.html", "contact.html", "privacy.html", "terms.html", "404.html"];
 const PLACEHOLDER = /\[[A-Z][A-Z0-9 #/-]*[A-Z#]\]/;
