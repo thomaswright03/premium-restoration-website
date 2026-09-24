@@ -40,10 +40,11 @@
     <button id="open-rates-btn" class="btn btn-outline-dark" type="button">Business Prices</button>
   </div>
 
+  <div id="price-drift-notice" class="admin-notice-slot" hidden></div>
   <div id="retention-bar" class="retention-bar" hidden></div>
   <div id="quote-list" class="quote-list"></div>
   <p id="quote-list-empty" class="admin-muted" hidden>No quotes yet. Click "Create New Quote" to get started.</p>
-  <p class="admin-muted">Data handling: quotes contain homeowners' property addresses and are saved only in this browser. Delete quotes that didn't lead to work after about a month (30 days; the public Privacy Notice says enquiries are kept for about a month), and delete a quote promptly if the homeowner asks (see the public Privacy Notice). Tax on labor: the tax rate defaults to 0% &mdash; only change it under Business Prices once a tax adviser confirms tax applies.</p>
+  <p class="admin-muted">Data handling: quotes contain homeowners' property addresses and are saved only in this browser. Delete quotes that didn't lead to work after about a month (30 days; the public Privacy Notice says enquiries are kept for about a month), and delete a quote promptly if the homeowner asks (see the public Privacy Notice). The clean-up record above is kept only in this browser, so also note each clean-up in the business's own records. Tax on labor: the tax rate defaults to 0% &mdash; only change it under Business Prices once a tax adviser confirms tax applies.</p>
 </section>
 
 <!-- STEP 1: ADDRESS + CATEGORIES -->
@@ -126,6 +127,11 @@
       A flat $ price per unit for each item — not hours x rate. Set them once
       here — every bathroom quote reuses them automatically. These are labor
       prices only; materials are never included.
+    </p>
+    <p class="admin-muted rates-intro">
+      The public website always shows its own published prices (for example $60 per cabinet and $5 per sq ft of
+      flooring). If you change a price here that the website also shows, update the website too, or quotes will not
+      match what it advertises. The dashboard warns you when they differ.
     </p>
     <div id="rates-sections"></div>
     <div class="admin-form-actions">

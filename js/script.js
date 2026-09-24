@@ -674,7 +674,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   var CHAT_RESPONSES = [
     { keywords: ["plumb", "electric", "wiring", "outlet", "pipe", "valve", "drain"],
-      reply: "Our online estimates don't include plumbing or electrical work, and toilets, sinks, showers, and bathtubs also need plumbing work, so expect it to add to the cost. Tell us about your project on the Contact page and we'll tell you how that work will be handled and priced before any work is agreed." },
+      reply: "Our online estimates don't include plumbing or electrical work, and toilets, sinks, showers, and bathtubs also need plumbing work, so expect it to add to the cost. We do not currently hold a contractor licence. Tell us about your project on the Contact page and we'll tell you who will do that work and how it will be priced before any work is agreed." },
     { keywords: ["quote", "price", "cost", "estimate"],
       reply: "We only take on bathroom restorations. If it's a bathroom, say “bathroom quote” and I can give you a rough, non-binding labor estimate right now, or tell us about it on the Contact page." },
     { keywords: ["bathroom"],
@@ -711,7 +711,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // person or an AI.
   var IDENTITY_QUESTION = /\b(human|real person|a person|robot|bot|ai|chatgpt|automated|are you real)\b/;
   var IDENTITY_REPLY =
-    "I'm an automated assistant with scripted replies — not a person, and not AI. Nothing you type here is sent to or read by our team. To reach a person, call (385) 356-8733 or email eduardo.moroni77@gmail.com.";
+    "I'm an automated assistant with scripted replies — not a person, and not AI. Nothing you type here is sent to or read by us. To reach a person, call (385) 356-8733 or email eduardo.moroni77@gmail.com.";
 
   function getBotReply(message) {
     var lower = message.toLowerCase();

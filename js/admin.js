@@ -19,6 +19,31 @@
   // days and offers a one-click purge (only for quotes that didn't lead to work).
   var QUOTE_RETENTION_DAYS = 30;
 
+  // Dated record of retention clean-ups done in this browser (dates and
+  // counts only, no personal data), so there is evidence the monthly routine
+  // in README.md actually runs. Purges are logged automatically; the monthly
+  // email / phone / quotes clean-up is logged with "Record Monthly Clean-Up".
+  var RETENTION_LOG_KEY = "pr_retention_log";
+
+  // Job-value checkpoints raised by the legal review (Utah Code 58-55-305(1)(h),
+  // jurisdiction inferred, not confirmed): the small-project exemption from
+  // contractor licensing covers only projects under $7,000 including labor
+  // AND materials, and needs an insurance affirmation above $3,000. There is
+  // currently no contractor licence. These only show a warning on the quote;
+  // they never change a price. Change them only on a lawyer's advice.
+  var JOB_VALUE_CHECKPOINTS = { affirmation: 3000, exemptionCap: 7000 };
+
+  // Prices the public website publishes (home page, FAQ, Terms, chat
+  // estimate), which always use BathroomPricing.DEFAULT_PRICES. Plumbing,
+  // electrical and tax are not published, so they are left out.
+  var UNPUBLISHED_PRICE_KEYS = [
+    "Plumbing_Price_Per_Point",
+    "No_Stack_Surcharge_Price",
+    "Bad_Valve_Surcharge_Price",
+    "Electrical_Price_Per_Point",
+    "Labor_Tax_Rate_Percent",
+  ];
+
   var CATEGORY_LABELS = {
     exterior: "Exterior",
     kitchen: "Kitchen",
@@ -110,6 +135,33 @@
     "E. Electrical": "Charged per point of electrical entry — lamps, outlets, fans, fan switches, light switches, and an electric toilet each count as one point.",
   };
 
+  // Shown in the quote form. There is currently no contractor licence; the
+  // legal review asks who may lawfully do this work (see README "Licence line").
+  var LICENCE_SECTION_NOTES = {
+    "B. Fixtures": "No contractor licence is currently held. Toilets, sinks, showers and bathtubs also need plumbing work: agree who will do it with the customer before any work is agreed.",
+    "D. Plumbing": "No contractor licence is currently held. Get legal advice on who may do plumbing work before quoting it, and tell the customer who will do it before any work is agreed.",
+    "E. Electrical": "No contractor licence is currently held. Get legal advice on who may do electrical work before quoting it, and tell the customer who will do it before any work is agreed.",
+  };
+
+  // Warning text for the quote total, based on labor alone (materials are
+  // never included here but count toward the checkpoints). Never changes a price.
+  function jobValueWarning(laborSubtotal) {
+    var cap = JOB_VALUE_CHECKPOINTS.exemptionCap;
+    var affirmation = JOB_VALUE_CHECKPOINTS.affirmation;
+    if (laborSubtotal >= cap) {
+      return "Labor alone is " + money(laborSubtotal) + ", at or above " + money(cap) + ". The legal review noted that the small-project " +
+        "exemption from contractor licensing (Utah, if Utah law applies) covers only projects under " + money(cap) +
+        " including materials. Get legal advice before quoting this job.";
+    }
+    if (laborSubtotal >= affirmation) {
+      return "Labor alone is " + money(laborSubtotal) + ", at or above " + money(affirmation) + ", before materials. The legal review noted " +
+        "that above " + money(affirmation) + " (labor plus materials) the small-project exemption needs an insurance affirmation filed, and " +
+        "that it ends at " + money(cap) + ". Get legal advice before quoting this job.";
+    }
+    return "Labor only. Add the cost of materials before comparing this job with the " + money(affirmation) + " and " +
+      money(cap) + " checkpoints the legal review flagged (see README \u201cLicence line\u201d).";
+  }
+
   // The line-item list itself (which fields exist, and their formulas) also
   // lives in js/bathroom-pricing.js — see the comment above.
   var BATHROOM_LINE_ITEMS = BathroomPricing.BATHROOM_LINE_ITEMS;
@@ -151,6 +203,52 @@
 
   function saveRates(prices) {
     localStorage.setItem(RATES_KEY, JSON.stringify({ prices: prices }));
+  }
+
+  function getRetentionLog() {
+    try {
+      return JSON.parse(localStorage.getItem(RETENTION_LOG_KEY)) || [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function addRetentionLogEntry(type, deletedCount) {
+    var log = getRetentionLog();
+    log.push({ date: new Date().toISOString(), type: type, deleted: deletedCount });
+    localStorage.setItem(RETENTION_LOG_KEY, JSON.stringify(log));
+  }
+
+  // Business prices saved in this browser that differ from the prices the
+  // public website shows. Returns [{ key, label, saved, published }].
+  function getPublishedPriceDrift() {
+    var prices = getRates().prices;
+    return Object.keys(DEFAULT_PRICES).filter(function (key) {
+      return UNPUBLISHED_PRICE_KEYS.indexOf(key) === -1 && Number(prices[key]) !== Number(DEFAULT_PRICES[key]);
+    }).map(function (key) {
+      return { key: key, label: PRICE_LABELS[key] || key, saved: prices[key], published: DEFAULT_PRICES[key] };
+    });
+  }
+
+  // Warning element listing any drift, or null when prices match the website.
+  function buildPriceDriftNotice() {
+    var drift = getPublishedPriceDrift();
+    if (!drift.length) return null;
+    var box = document.createElement("div");
+    box.className = "admin-warning";
+    var p = document.createElement("p");
+    p.textContent =
+      "These Business Prices differ from the prices published on the public website, so quotes will not match what the website advertises. " +
+      "Either set them back, or update the website's prices too (DEFAULT_PRICES in js/bathroom-pricing.js and the page text; see README).";
+    box.appendChild(p);
+    var ul = document.createElement("ul");
+    drift.forEach(function (d) {
+      var li = document.createElement("li");
+      li.textContent = d.label + ": " + money(d.saved) + " here, " + money(d.published) + " on the website";
+      ul.appendChild(li);
+    });
+    box.appendChild(ul);
+    return box;
   }
 
   function formatDate(iso) {
@@ -296,31 +394,64 @@
     if (!bar) return;
     var expired = quotes.filter(isPastRetention);
     bar.innerHTML = "";
-    bar.hidden = expired.length === 0;
-    if (!expired.length) return;
+    bar.hidden = false;
 
+    var textWrap = document.createElement("div");
     var text = document.createElement("p");
-    text.textContent =
-      expired.length + (expired.length === 1 ? " quote has" : " quotes have") +
-      " not been updated in over " + QUOTE_RETENTION_DAYS + " days. Delete any that didn't lead to work.";
-    bar.appendChild(text);
+    text.textContent = expired.length
+      ? expired.length + (expired.length === 1 ? " quote has" : " quotes have") +
+        " not been updated in over " + QUOTE_RETENTION_DAYS + " days. Delete any that didn't lead to work."
+      : "No quotes in this browser are past the " + QUOTE_RETENTION_DAYS + "-day retention period.";
+    textWrap.appendChild(text);
 
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "btn btn-outline-dark";
-    btn.textContent = "Delete Quotes Past Retention";
-    btn.addEventListener("click", function () {
-      if (!confirm("Delete " + expired.length + " quote(s) not updated in over " + QUOTE_RETENTION_DAYS +
-        " days? Only continue if none of them led to work. This cannot be undone.")) return;
-      var expiredIds = expired.map(function (q) {
-        return q.id;
+    var log = getRetentionLog();
+    var lastCleanUp = log.filter(function (e) { return e.type === "monthly-clean-up"; }).pop();
+    var lastPurge = log.filter(function (e) { return e.type === "quote-purge"; }).pop();
+    var logText = document.createElement("p");
+    logText.className = "retention-log";
+    logText.textContent =
+      "Last monthly clean-up recorded in this browser: " + (lastCleanUp ? formatDate(lastCleanUp.date) : "none") +
+      ". Last quote purge: " + (lastPurge ? formatDate(lastPurge.date) + " (" + lastPurge.deleted + " deleted)" : "none") + ".";
+    textWrap.appendChild(logText);
+    bar.appendChild(textWrap);
+
+    var actions = document.createElement("div");
+    actions.className = "retention-actions";
+
+    if (expired.length) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-outline-dark";
+      btn.textContent = "Delete Quotes Past Retention";
+      btn.addEventListener("click", function () {
+        if (!confirm("Delete " + expired.length + " quote(s) not updated in over " + QUOTE_RETENTION_DAYS +
+          " days? Only continue if none of them led to work. This cannot be undone.")) return;
+        var expiredIds = expired.map(function (q) {
+          return q.id;
+        });
+        saveQuotes(getQuotes().filter(function (q) {
+          return expiredIds.indexOf(q.id) === -1;
+        }));
+        addRetentionLogEntry("quote-purge", expiredIds.length);
+        renderDashboard();
       });
-      saveQuotes(getQuotes().filter(function (q) {
-        return expiredIds.indexOf(q.id) === -1;
-      }));
+      actions.appendChild(btn);
+    }
+
+    var recordBtn = document.createElement("button");
+    recordBtn.type = "button";
+    recordBtn.className = "btn btn-outline-dark";
+    recordBtn.textContent = "Record Monthly Clean-Up";
+    recordBtn.addEventListener("click", function () {
+      if (!confirm("Record today's date as a completed monthly clean-up? Only continue once you have deleted, " +
+        "everywhere they are kept (email, voicemail and texts, and quotes in every browser that holds them), " +
+        "enquiries that didn't lead to work and are about a month old.")) return;
+      addRetentionLogEntry("monthly-clean-up", null);
       renderDashboard();
     });
-    bar.appendChild(btn);
+    actions.appendChild(recordBtn);
+
+    bar.appendChild(actions);
   }
 
   // ---------- dashboard ----------
@@ -332,6 +463,13 @@
     var empty = document.getElementById("quote-list-empty");
     list.innerHTML = "";
     renderRetentionBar(quotes);
+    var driftSlot = document.getElementById("price-drift-notice");
+    if (driftSlot) {
+      driftSlot.innerHTML = "";
+      var driftNotice = buildPriceDriftNotice();
+      driftSlot.hidden = !driftNotice;
+      if (driftNotice) driftSlot.appendChild(driftNotice);
+    }
 
     if (quotes.length === 0) {
       empty.hidden = false;
@@ -747,6 +885,9 @@
     var renderedVars = {};
     var lineItemEls = [];
 
+    var calcDriftNotice = buildPriceDriftNotice();
+    if (calcDriftNotice) wrap.appendChild(calcDriftNotice);
+
     wrap.appendChild(renderBathroomDimensions(jobValues, renderedVars));
 
     BATHROOM_SECTION_ORDER.forEach(function (sectionName) {
@@ -757,6 +898,13 @@
       title.className = "bathroom-subsection-title";
       title.textContent = sectionName;
       subsection.appendChild(title);
+
+      if (LICENCE_SECTION_NOTES[sectionName]) {
+        var licenceNote = document.createElement("p");
+        licenceNote.className = "admin-warning-inline";
+        licenceNote.textContent = LICENCE_SECTION_NOTES[sectionName];
+        subsection.appendChild(licenceNote);
+      }
 
       BATHROOM_LINE_ITEMS.filter(function (i) {
         return i.section === sectionName;
@@ -781,6 +929,11 @@
       '</div>';
     wrap.appendChild(banner);
 
+    var jobValueNote = document.createElement("p");
+    jobValueNote.className = "admin-warning-inline";
+    jobValueNote.setAttribute("role", "status");
+    wrap.appendChild(jobValueNote);
+
     var subtotalEl = banner.querySelector('[data-role="subtotal"]');
     var taxLabelEl = banner.querySelector('[data-role="tax-label"]');
     var taxEl = banner.querySelector('[data-role="tax"]');
@@ -800,6 +953,7 @@
       taxLabelEl.textContent = "Tax (" + taxRatePercent + "%)";
       taxEl.textContent = money(taxAmount);
       priceEl.textContent = money(subtotal + taxAmount);
+      jobValueNote.textContent = jobValueWarning(subtotal);
     }
 
     lineItemEls.forEach(function (entry) {
