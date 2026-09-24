@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Admin | Premium Restoration</title>
 <meta name="robots" content="noindex, nofollow" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="../css/style.css" />
 <link rel="stylesheet" href="../css/admin.css" />
 </head>
@@ -43,9 +40,10 @@
     <button id="open-rates-btn" class="btn btn-outline-dark" type="button">Business Prices</button>
   </div>
 
+  <div id="retention-bar" class="retention-bar" hidden></div>
   <div id="quote-list" class="quote-list"></div>
   <p id="quote-list-empty" class="admin-muted" hidden>No quotes yet. Click "Create New Quote" to get started.</p>
-  <p class="admin-muted">Data handling: quotes contain homeowners' property addresses and are saved only in this browser. Delete quotes that didn't lead to work after [RETENTION PERIOD], and delete a quote promptly if the homeowner asks (see the public Privacy Notice). Tax on labor: confirm with a tax adviser before quoting any tax line to a customer.</p>
+  <p class="admin-muted">Data handling: quotes contain homeowners' property addresses and are saved only in this browser. Delete quotes that didn't lead to work after [RETENTION PERIOD], and delete a quote promptly if the homeowner asks (see the public Privacy Notice). Tax on labor: the tax rate defaults to 0% &mdash; only change it under Business Prices once a tax adviser confirms tax applies.</p>
 </section>
 
 <!-- STEP 1: ADDRESS + CATEGORIES -->

@@ -160,6 +160,35 @@
   border-radius: 20px;
 }
 
+.quote-retention-chip {
+  border-color: var(--color-accent);
+  color: var(--color-accent-dark);
+}
+
+.retention-bar {
+  max-width: 860px;
+  margin: 0 auto 20px;
+  padding: 16px 22px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.retention-bar[hidden] {
+  display: none;
+}
+
+.retention-bar p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-ink-soft);
+}
+
 .quote-card-actions {
   display: flex;
   gap: 10px;

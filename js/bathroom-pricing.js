@@ -40,7 +40,11 @@
 
     Electrical_Price_Per_Point: 100,
 
-    Tax_Rate_Percent: 7.45,
+    // Labor on real property may not be taxable. Defaults to 0% so no tax
+    // line is added to a quote unless a tax adviser has confirmed it
+    // applies and the rate has been set deliberately under Business Prices.
+    // (Renamed from Tax_Rate_Percent so an old saved 7.45% is not reused.)
+    Labor_Tax_Rate_Percent: 0,
   };
 
   var PRICE_LABELS = {
@@ -67,7 +71,7 @@
 
     Electrical_Price_Per_Point: "Electrical price (per point of entry — lamps, outlets, fans, fan switches, light switches, electric toilet)",
 
-    Tax_Rate_Percent: "Sales tax rate (%)",
+    Labor_Tax_Rate_Percent: "Tax rate on labor (%) — leave at 0 unless a tax adviser confirms tax applies",
   };
 
   // Bathtub price isn't set directly — it's always 30% less than the
@@ -218,7 +222,7 @@
       lineResults.push({ section: item.section, label: item.label, cost: cost });
       subtotal += cost;
     });
-    var taxRatePercent = prices.Tax_Rate_Percent || 0;
+    var taxRatePercent = prices.Labor_Tax_Rate_Percent || 0;
     var taxAmount = subtotal * (taxRatePercent / 100);
     return {
       lineResults: lineResults,
@@ -227,6 +231,76 @@
       taxAmount: taxAmount,
       total: subtotal + taxAmount,
     };
+  }
+
+
+  // Public (chat) estimate. Unlike the admin calculator, it prices ONLY the
+  // work the visitor explicitly chose, never assumes demolition, tile,
+  // flooring or paint, and never includes plumbing or electrical work. Every
+  // line carries its quantity x rate so the assumptions can be shown.
+  //
+  // scope: { demolition: bool, floorFinish: "tile" | "flooring" | "none",
+  //          wallTile: bool, paintWalls: bool, paintCeiling: bool }
+  var PUBLIC_FIXTURE_SECTION = "B. Fixtures";
+
+  function computePublicEstimate(rawValues, scope, prices) {
+    prices = prices || getPrices();
+    scope = scope || {};
+    var jobValues = deriveDimensions(Object.assign({}, rawValues));
+    var floorSqFt = jobValues.Bathroom_SqFt;
+    var wallSqFt = jobValues.Wall_SqFt;
+    var lineResults = [];
+
+    function addLine(label, qty, unit, rate) {
+      var cost = qty * rate;
+      if (cost <= 0) return;
+      lineResults.push({
+        label: label,
+        cost: cost,
+        detail: formatQty(qty) + " " + unit + " × " + money(rate),
+      });
+    }
+
+    if (scope.demolition) {
+      addLine("Demolition", floorSqFt, "sq ft of floor", prices.Demo_Price_Per_SqFt || 0);
+    }
+
+    BATHROOM_LINE_ITEMS.forEach(function (item) {
+      if (item.section !== PUBLIC_FIXTURE_SECTION || item.pattern !== "flat") return;
+      var qty = parseFloat(jobValues[item.qtyVar]) || 0;
+      var rate = item.derivedPrice ? item.derivedPrice(prices) : prices[item.priceKey] || 0;
+      addLine(item.label, qty, qty === 1 ? "unit" : "units", rate);
+    });
+
+    if (scope.floorFinish === "tile") {
+      addLine("Floor tile", floorSqFt, "sq ft", prices.Tile_Price_Per_SqFt || 0);
+    } else if (scope.floorFinish === "flooring") {
+      addLine("Flooring", floorSqFt, "sq ft", prices.Floor_Price_Per_SqFt || 0);
+    }
+    if (scope.wallTile) {
+      addLine("Wall tile", wallSqFt, "sq ft", prices.Tile_Price_Per_SqFt || 0);
+    }
+    if (scope.paintWalls) {
+      addLine("Painting (walls)", wallSqFt, "sq ft", prices.Painting_Price_Per_SqFt || 0);
+    }
+    if (scope.paintCeiling) {
+      addLine("Painting (ceiling)", floorSqFt, "sq ft", prices.Painting_Price_Per_SqFt || 0);
+    }
+
+    var subtotal = lineResults.reduce(function (sum, r) {
+      return sum + r.cost;
+    }, 0);
+
+    return {
+      lineResults: lineResults,
+      subtotal: subtotal,
+      floorSqFt: floorSqFt,
+      wallSqFt: wallSqFt,
+    };
+  }
+
+  function formatQty(n) {
+    return (Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
   }
 
   global.BathroomPricing = {
@@ -239,5 +313,7 @@
     deriveDimensions: deriveDimensions,
     computeLineItemCost: computeLineItemCost,
     computeBathroomTotal: computeBathroomTotal,
+    computePublicEstimate: computePublicEstimate,
+    formatQty: formatQty,
   };
 })(window);
