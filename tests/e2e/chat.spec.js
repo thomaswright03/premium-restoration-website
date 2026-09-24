@@ -165,6 +165,48 @@ test.describe("chat estimate", () => {
     await expect(card.locator(".ai-chat-estimate-total-value")).toHaveText("$1,850.00");
   });
 
+  for (const size of [
+    { width: 375, height: 740 },
+    { width: 1280, height: 900 },
+  ]) {
+    test(`at ${size.width}x${size.height} the finished card shows its heading and total, with focus on the total`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(size);
+      await startEstimate(page);
+      // Everything chosen: the longest card there is.
+      await answerScope(page, { demolition: "Yes", floorFinish: "Tile", walls: "Paint", paintCeiling: "Yes" });
+      await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 9, Bathroom_Length_Ft: 12, Bathroom_Height_Ft: 9 });
+      const counts = {};
+      for (const key of ["Toilet_Quantity", "Sink_Quantity", "Shower_Quantity", "Vanity_Quantity", "Mirror_Quantity"]) {
+        counts[key] = 1;
+      }
+      await fillGroup(page, "fixtures", counts);
+      const card = page.getByTestId("estimate-card");
+      const total = card.locator(".ai-chat-estimate-total");
+      await expect(total).toBeFocused();
+      await expect(total).toHaveAttribute("aria-label", /^Estimated Labor Total, before plumbing: \$[\d,]+\.\d\d$/);
+      // Both inside the window and inside the chat's scrolling area, without scrolling.
+      const inView = async (locator) => {
+        const box = await locator.boundingBox();
+        const area = await page.locator("#ai-chat-messages").boundingBox();
+        return (
+          box.y >= Math.max(0, area.y) - 1 && box.y + box.height <= Math.min(size.height, area.y + area.height) + 1
+        );
+      };
+      expect(await inView(card.locator(".ai-chat-estimate-header h3"))).toBe(true);
+      expect(await inView(total)).toBe(true);
+
+      // "Contact Us About This →" keeps its arrow on the same line.
+      const lines = await card.locator(".ai-chat-estimate-cta").evaluate((a) => {
+        const range = document.createRange();
+        range.selectNodeContents(a);
+        return new Set(Array.from(range.getClientRects()).map((r) => Math.round(r.top))).size;
+      });
+      expect(lines).toBe(1);
+    });
+  }
+
   test("every work question must be answered", async ({ page }) => {
     await startEstimate(page);
     const form = page.locator('form[data-group="scope"]');

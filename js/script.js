@@ -60,7 +60,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // Scroll-reveal (skipped when the visitor prefers reduced motion).
   var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var revealTargets = document.querySelectorAll(
-    ".card, .value-item, .faq-item, .about-photo, .about-copy, .contact-info-card, #lead-form, .scope-note",
+    ".card, .value-item, .faq-item, .about-copy, .contact-info-card, #lead-form, .scope-note",
   );
   if (!reduceMotion && "IntersectionObserver" in window) {
     var observer = new IntersectionObserver(
@@ -196,7 +196,7 @@ document.addEventListener("DOMContentLoaded", function () {
       var btn = document.createElement("button");
       btn.type = "button";
       btn.className = "ai-chat-suggestion";
-      btn.textContent = "Get a bathroom price estimate →";
+      btn.textContent = "Get a bathroom price estimate\u00a0→";
       btn.addEventListener("click", function () {
         parts.row.remove();
         sendChatMessage("I'd like a bathroom price estimate");
@@ -653,7 +653,7 @@ document.addEventListener("DOMContentLoaded", function () {
       continueBtn.type = "submit";
       continueBtn.className = "ai-chat-group-continue";
       var isLast = quoteState.index === quoteState.groups.length - 1 && group.id !== "scope";
-      continueBtn.textContent = isLast ? "Get My Estimate →" : "Continue →";
+      continueBtn.textContent = isLast ? "Get My Estimate\u00a0→" : "Continue\u00a0→";
       actionsWrap.appendChild(cancelBtn);
       actionsWrap.appendChild(continueBtn);
       formEl.appendChild(actionsWrap);
@@ -774,6 +774,18 @@ document.addEventListener("DOMContentLoaded", function () {
       head.appendChild(el("p", "ai-chat-estimate-lede", "Rough, non-binding labor estimate — details below."));
       card.appendChild(head);
 
+      // The total comes straight after the heading, so both are on screen
+      // when the card appears; the itemised lines follow.
+      var totalWrap = el("div", "ai-chat-estimate-total");
+      totalWrap.setAttribute("tabindex", "-1");
+      totalWrap.setAttribute("role", "group");
+      totalWrap.setAttribute("aria-label", totalLabel(fixtureCount) + ": " + Pricing.money(result.subtotal));
+      totalWrap.appendChild(el("span", "ai-chat-estimate-total-label", totalLabel(fixtureCount)));
+      totalWrap.appendChild(el("span", "ai-chat-estimate-total-value", Pricing.money(result.subtotal)));
+      card.appendChild(totalWrap);
+
+      if (fixtureCount > 0) card.appendChild(el("p", "ai-chat-estimate-total-note", plumbingTotalNote(fixtureCount)));
+
       var lines = el("div", "ai-chat-estimate-lines");
       result.lines.forEach(function (r) {
         var line = el("div", "ai-chat-estimate-line");
@@ -800,13 +812,6 @@ document.addEventListener("DOMContentLoaded", function () {
       });
       card.appendChild(excluded);
 
-      var totalWrap = el("div", "ai-chat-estimate-total");
-      totalWrap.appendChild(el("span", "ai-chat-estimate-total-label", totalLabel(fixtureCount)));
-      totalWrap.appendChild(el("span", "ai-chat-estimate-total-value", Pricing.money(result.subtotal)));
-      card.appendChild(totalWrap);
-
-      if (fixtureCount > 0) card.appendChild(el("p", "ai-chat-estimate-total-note", plumbingTotalNote(fixtureCount)));
-
       card.appendChild(el("p", "ai-chat-estimate-disclaimer", ESTIMATE_DISCLAIMER));
 
       var assumptionsWrap = el("div", "ai-chat-estimate-assumptions");
@@ -829,7 +834,7 @@ document.addEventListener("DOMContentLoaded", function () {
       });
       actions.appendChild(exportBtn);
 
-      var cta = el("a", "ai-chat-estimate-cta", "Contact Us About This →");
+      var cta = el("a", "ai-chat-estimate-cta", "Contact Us About This\u00a0→");
       cta.href = "contact.html?from=estimate";
       cta.addEventListener("click", function () {
         try {
@@ -846,8 +851,18 @@ document.addEventListener("DOMContentLoaded", function () {
       parts.inner.appendChild(content);
       chatMessages.appendChild(parts.row);
       if (options.restored) return; // don't move focus or scroll the page on load
-      scrollToEnd();
-      focusQuietly(chatInput);
+      showCardTop(parts.row);
+      // Screen readers hear the total first; Tab then moves on to the card's buttons.
+      focusQuietly(totalWrap);
+    }
+
+    // Scrolls the chat so the top of a new estimate card (its heading and
+    // total) is in view, rather than the end of the card.
+    function showCardTop(row) {
+      var gap = 12;
+      var offset = row.getBoundingClientRect().top - chatMessages.getBoundingClientRect().top;
+      chatMessages.scrollTop = Math.max(0, chatMessages.scrollTop + offset - gap);
+      if (!isFullscreen() && row.scrollIntoView) row.scrollIntoView({ block: "start" });
     }
 
     function exportPdf(button, status, values, scope, result, assumptions) {

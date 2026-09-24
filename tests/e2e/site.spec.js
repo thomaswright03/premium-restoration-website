@@ -77,6 +77,22 @@ test.describe("every public page", () => {
     }
   });
 
+  test("no page shows a box standing in for a photo, and any image has alt text", async ({ page }) => {
+    for (const file of PUBLIC_PAGES) {
+      await page.goto("/" + file);
+      await expect(
+        page.locator(".about-photo, [class*='placeholder-photo'], [class*='photo-placeholder']"),
+      ).toHaveCount(0);
+      const missingAlt = await page.locator("img").evaluateAll((imgs) => imgs.filter((i) => !i.alt).length);
+      expect(missingAlt, file).toBe(0);
+    }
+    // The About copy uses the space instead: one readable column, no empty half.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/about.html");
+    const copy = await page.locator(".about-copy").boundingBox();
+    expect(copy.width).toBeGreaterThan(500);
+  });
+
   test("unknown URLs get the styled 404 page with Home and Get a Quote", async ({ page }) => {
     const res = await page.goto("/deep/missing/page.html");
     expect(res.status()).toBe(404);
