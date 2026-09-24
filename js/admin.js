@@ -13,11 +13,11 @@
   var QUOTES_KEY = "pr_quotes";
   var RATES_KEY = "pr_business_rates";
 
-  // Retention for quotes that didn't lead to work, in days. Leave as null
-  // until the business has chosen its [RETENTION PERIOD] (it must match the
-  // public Privacy Notice). Once set, the dashboard flags quotes not
-  // updated within that many days and offers a one-click purge.
-  var QUOTE_RETENTION_DAYS = null;
+  // Retention for quotes that didn't lead to work, in days. The owner keeps
+  // enquiries for about a month, and the public Privacy Notice says so; keep
+  // the two in step. The dashboard flags quotes not updated within that many
+  // days and offers a one-click purge (only for quotes that didn't lead to work).
+  var QUOTE_RETENTION_DAYS = 30;
 
   var CATEGORY_LABELS = {
     exterior: "Exterior",

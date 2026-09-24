@@ -842,6 +842,13 @@ body.ai-chat-locked {
   color: var(--color-accent-bright);
 }
 
+.ai-chat-estimate-total-note {
+  margin: 10px 0 0;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--color-ink-soft);
+}
+
 .ai-chat-estimate-actions {
   display: flex;
   flex-wrap: wrap;
