@@ -207,6 +207,23 @@ test.describe("chat estimate", () => {
     });
   }
 
+  test("no work chosen: no $0.00 card, a plain message, and the visitor stays on the step", async ({ page }) => {
+    await startEstimate(page);
+    await answerScope(page, { demolition: "No", floorFinish: "None", walls: "Neither", paintCeiling: "No" });
+    // Nothing needs measuring, so the fixture counts come next.
+    await fillGroup(page, "fixtures", { Toilet_Quantity: "0" });
+    const form = page.locator('form[data-group="fixtures"]').last();
+    await expect(form.locator(".ai-chat-group-error")).toHaveText(
+      "There's nothing to price yet: enter how many of at least one item above, or go ← Back and choose some work.",
+    );
+    await expect(page.getByTestId("estimate-card")).toHaveCount(0);
+    await expect(form.locator('input[name="Toilet_Quantity"]')).toBeFocused();
+    await expect(form.locator('input[name="Toilet_Quantity"]')).toBeEnabled();
+    // Entering one item gives an estimate.
+    await fillGroup(page, "fixtures", { Toilet_Quantity: "0", Cabinet_Quantity: "1" });
+    await expect(page.getByTestId("estimate-card").locator(".ai-chat-estimate-total-value")).toHaveText("$60.00");
+  });
+
   test("every work question must be answered", async ({ page }) => {
     await startEstimate(page);
     const form = page.locator('form[data-group="scope"]');

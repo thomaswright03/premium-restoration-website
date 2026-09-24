@@ -282,6 +282,35 @@ test("validation: dimensions are not required when no area work is chosen", () =
   assert.equal(P.validateJob({ Cabinet_Quantity: 2 }, NOTHING).valid, true);
 });
 
+test("validation: an estimate or quote with no work chosen is refused, never priced at $0.00", () => {
+  const none = { demolition: false, floorFinish: "none", walls: "none", paintCeiling: false };
+  const zero = { Toilet_Quantity: "0", Cabinet_Quantity: "" };
+  // Step by step the chat doesn't ask for it until the fixtures are in.
+  assert.equal(P.validateJob(zero, none).valid, true);
+  const pub = P.validateJob(zero, none, { requireWork: true });
+  assert.equal(pub.valid, false);
+  assert.match(pub.errors.work, /nothing to price yet.*at least one item.*Back and choose some work/i);
+  assert.equal(P.validateJob({ Cabinet_Quantity: "1" }, none, { requireWork: true }).valid, true);
+  assert.equal(
+    P.validateJob({}, Object.assign({}, none, { paintCeiling: true }), { requireWork: true }).errors.work,
+    undefined,
+  );
+  // Admin quotes: surcharges and electrical points count as work.
+  const admin = P.validateJob(zero, none, { requireWork: true, includeTrade: true });
+  assert.match(admin.errors.work, /Nothing to price yet: choose some work.*electrical point/);
+  assert.equal(P.validateJob({ Electrical_Points: "2" }, none, { requireWork: true, includeTrade: true }).valid, true);
+  assert.equal(
+    P.validateJob({ No_Stack_Surcharge_Included: true }, none, { requireWork: true, includeTrade: true }).valid,
+    true,
+  );
+  // Only the public check ignores the trade-only items.
+  assert.equal(P.validateJob({ Electrical_Points: "2" }, none, { requireWork: true }).valid, false);
+  // Field problems come first; the "nothing to price" message waits until they are fixed.
+  const bad = P.validateJob({ Cabinet_Quantity: "x" }, none, { requireWork: true });
+  assert.equal(bad.errors.work, undefined);
+  assert.ok(bad.errors.Cabinet_Quantity);
+});
+
 test("validation: every work question must be answered", () => {
   const v = P.validateJob({}, { demolition: true });
   assert.ok(v.errors.floorFinish);

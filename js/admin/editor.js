@@ -227,9 +227,16 @@
     return "Fix the " + (count === 1 ? "highlighted answer" : count + " highlighted answers") + " before saving.";
   }
 
+  // "Nothing to price yet" goes as soon as some work is chosen.
   function refreshErrorSummary() {
     var box = document.getElementById("quote-error");
-    if (box.hidden || box.getAttribute("data-kind") !== "validation") return;
+    if (box.hidden) return;
+    var kind = box.getAttribute("data-kind");
+    if (kind === "work") {
+      if (A.Pricing.hasChosenWork(A.state.draft.values, A.state.draft.scope, true)) box.hidden = true;
+      return;
+    }
+    if (kind !== "validation") return;
     var count = document.querySelectorAll("#screen-quote .has-error").length;
     if (count) box.textContent = errorSummaryText(count);
     else box.hidden = true;
@@ -480,13 +487,18 @@
     if (saving || !A.state.draft) return;
     var errorBox = document.getElementById("quote-error");
     var firstHeaderProblem = validateQuoteHeader();
-    var validation = A.Pricing.validateJob(A.state.draft.values, A.state.draft.scope, { includeTrade: true });
+    // A quote with no work chosen is refused rather than saved at $0.00.
+    var validation = A.Pricing.validateJob(A.state.draft.values, A.state.draft.scope, {
+      includeTrade: true,
+      requireWork: true,
+    });
     Object.keys(calc.errorEls).forEach(function (key) {
       setFieldError(key, validation.errors[key] || null);
     });
     if (firstHeaderProblem || !validation.valid) {
-      errorBox.textContent = errorSummaryText(document.querySelectorAll("#screen-quote .has-error").length);
-      errorBox.setAttribute("data-kind", "validation");
+      var highlighted = document.querySelectorAll("#screen-quote .has-error").length;
+      errorBox.textContent = highlighted ? errorSummaryText(highlighted) : validation.errors.work;
+      errorBox.setAttribute("data-kind", highlighted ? "validation" : "work");
       errorBox.hidden = false;
       if (firstHeaderProblem) {
         document.getElementById(firstHeaderProblem).focus();
@@ -495,7 +507,9 @@
       var firstKey = Object.keys(calc.errorEls).filter(function (k) {
         return validation.errors[k];
       })[0];
-      var first = firstKey && calc.errorEls[firstKey].row.querySelector("input");
+      var first = firstKey
+        ? calc.errorEls[firstKey].row.querySelector("input")
+        : document.querySelector("#quote-sections .calc-choices input");
       if (first) first.focus();
       return;
     }

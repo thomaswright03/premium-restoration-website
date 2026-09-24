@@ -155,7 +155,8 @@
     var saved = C.readSavedEstimate();
     if (!saved || !C.estimatorEnabled() || C.state.quoteState) return;
     if (saved.status === "done") {
-      if (!window.BathroomPricing.validateJob(saved.values, saved.scope).valid) return C.saveEstimate(null);
+      var check = window.BathroomPricing.validateJob(saved.values, saved.scope, { requireWork: true });
+      if (!check.valid) return C.saveEstimate(null);
       C.appendChatRow("bot", "Here's the estimate you worked out earlier in this visit.");
       C.appendEstimateCard(saved.values, saved.scope, { restored: true });
       return;

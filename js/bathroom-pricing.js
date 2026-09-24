@@ -367,9 +367,38 @@
     return { floorArea: floorArea, height: walls };
   }
 
+  // Whether anything priced has been chosen: some work, a fixture, or (with
+  // includeTrade, admin only) a plumbing surcharge or electrical point. It
+  // looks at what was chosen, not at prices, so a price of 0 doesn't matter.
+  function hasChosenWork(values, scope, includeTrade) {
+    values = values || {};
+    scope = scope || {};
+    var needs = scopeNeeds(scope);
+    if (needs.floorArea) return true;
+    var fixture = FIXTURES.some(function (f) {
+      return (parseNumber(values[f.key]) || 0) > 0;
+    });
+    if (fixture || !includeTrade) return fixture;
+    return (
+      (parseNumber(values.Electrical_Points) || 0) > 0 ||
+      values.No_Stack_Surcharge_Included === true ||
+      values.Bad_Valve_Surcharge_Included === true
+    );
+  }
+
+  var NO_WORK_MESSAGE = {
+    public:
+      "There's nothing to price yet: enter how many of at least one item above, or go ← Back and choose some work.",
+    admin:
+      "Nothing to price yet: choose some work, or enter at least one fixture, plumbing surcharge or electrical point, before saving.",
+  };
+
   // Field-level validation shared by the public chat and the admin quote.
   // Returns { valid, errors: { fieldKey: message } }.
   // options.includeTrade also checks the admin-only electrical points.
+  // options.requireWork (once every answer is in): at least one priced item
+  // must be chosen, so an estimate or quote can never come to $0.00; the
+  // problem is reported as errors.work.
   function validateJob(values, scope, options) {
     values = values || {};
     scope = scope || {};
@@ -419,6 +448,10 @@
       ) {
         errors.Electrical_Points = "Enter a whole number from 0 to " + MAX_ELECTRICAL_POINTS + ".";
       }
+    }
+
+    if (options.requireWork && !Object.keys(errors).length && !hasChosenWork(values, scope, options.includeTrade)) {
+      errors.work = options.includeTrade ? NO_WORK_MESSAGE.admin : NO_WORK_MESSAGE.public;
     }
 
     return { valid: Object.keys(errors).length === 0, errors: errors };
@@ -672,6 +705,7 @@
     fixtureRate: fixtureRate,
     areas: areas,
     scopeNeeds: scopeNeeds,
+    hasChosenWork: hasChosenWork,
     validateJob: validateJob,
     computeEstimate: computeEstimate,
     computePublicEstimate: computePublicEstimate,

@@ -262,6 +262,25 @@ test.describe("admin bathroom quote", () => {
     expect(await quotesInStorage(page)).toHaveLength(0);
   });
 
+  test("a quote with no work chosen is refused, not saved at $0.00", async ({ page }) => {
+    await loginAdmin(page);
+    await fillAdminQuote(page, {
+      address: "7 Nothing St",
+      scope: { demolition: "No", floorFinish: "None", walls: "Neither", paintCeiling: "No" },
+    });
+    await page.click("#save-quote-btn");
+    const summary = page.locator("#quote-error");
+    await expect(summary).toHaveText(
+      "Nothing to price yet: choose some work, or enter at least one fixture, plumbing surcharge or electrical point, before saving.",
+    );
+    expect(await quotesInStorage(page)).toHaveLength(0);
+    // An electrical point is work: the message goes and the quote saves.
+    await page.fill('input[name="Electrical_Points"]', "1");
+    await expect(summary).toBeHidden();
+    await page.click("#save-quote-btn");
+    await expect(page.locator(".quote-card", { hasText: "7 Nothing St" })).toContainText("$100.00");
+  });
+
   test("an old saved quote is flagged for review and keeps its old total until re-saved", async ({ page }) => {
     await page.goto("/admin/");
     await page.evaluate(() => {

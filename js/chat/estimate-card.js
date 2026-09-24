@@ -102,12 +102,6 @@
       line.appendChild(C.el("span", "ai-chat-estimate-amount", money(r.cost)));
       lines.appendChild(line);
     });
-    if (!result.lines.length) {
-      var empty = C.el("div", "ai-chat-estimate-line");
-      empty.appendChild(C.el("span", null, "No priced work selected"));
-      empty.appendChild(C.el("span", "ai-chat-estimate-amount", money(0)));
-      lines.appendChild(empty);
-    }
     return lines;
   }
 

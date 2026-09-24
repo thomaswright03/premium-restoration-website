@@ -120,23 +120,28 @@
   }
 
   // Checks this step's answers; shows field messages and returns false if
-  // any need fixing.
+  // any need fixing. The last step (fixture counts) also needs at least one
+  // priced item overall, so an estimate never comes to $0.00: the visitor is
+  // told plainly and stays on that step.
   function checkStep(group, ctx, summaryError) {
     ctx.readers.forEach(function (read) {
       read();
     });
     var q = C.state.quoteState;
-    var result = window.BathroomPricing.validateJob(q.values, q.scope);
+    var result = window.BathroomPricing.validateJob(q.values, q.scope, { requireWork: group.id === "fixtures" });
     var firstBad = null;
     group.fields.forEach(function (field) {
       var message = result.errors[field.key] || null;
       ctx.showFieldError(field.key, message);
       if (message && !firstBad) firstBad = field.key;
     });
-    summaryError.hidden = !firstBad;
-    summaryError.textContent = firstBad ? "Please fix the highlighted answers above." : "";
+    var problem = firstBad ? "Please fix the highlighted answers above." : result.errors.work || "";
+    summaryError.hidden = !problem;
+    summaryError.textContent = problem;
+    summaryError.setAttribute("data-problem", firstBad ? "fields" : problem ? "no-work" : "");
     if (firstBad) ctx.fieldEls[firstBad].focus.focus();
-    return !firstBad;
+    else if (problem) ctx.fieldEls[group.fields[0].key].focus.focus();
+    return !problem;
   }
 
   // Adds the current step's form to the chat.
