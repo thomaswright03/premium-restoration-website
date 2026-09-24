@@ -53,7 +53,7 @@ test.describe("switched on (Plausible)", () => {
     );
   });
 
-  test("counts an estimate started and completed, Contact Us About This, and a sent request", async ({
+  test("counts an estimate started and completed, Get a Quote from it, and a sent request", async ({
     page,
     context,
   }) => {
@@ -68,14 +68,14 @@ test.describe("switched on (Plausible)", () => {
     await page.route(ENDPOINT, (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' }),
     );
-    await page.getByRole("link", { name: "Contact Us About This →" }).click();
-    await expect.poll(() => counted(page)).toEqual(["Contact Us About This"]);
+    await page.getByRole("link", { name: "Get a Quote →" }).click();
+    await expect.poll(() => counted(page)).toEqual(["Get a Quote from estimate"]);
     await page.fill("#name", "Test Person");
     await page.fill("#phone", "(385) 555-0100");
     await page.fill("#email", "test@example.com");
     await page.click("#lead-submit");
     await expect(page.locator("#form-status")).toContainText("Request sent.");
-    await expect.poll(() => counted(page)).toEqual(["Contact Us About This", "Quote request sent"]);
+    await expect.poll(() => counted(page)).toEqual(["Get a Quote from estimate", "Quote request sent"]);
     // Names only: nothing the visitor typed, and no cookies.
     expect(JSON.stringify(await counted(page))).not.toMatch(/Test Person|example\.com|555/);
     expect(await context.cookies()).toEqual([]);

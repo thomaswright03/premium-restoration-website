@@ -95,6 +95,61 @@ const CASES = [
   ["water heater replacement", null, /don't take on water heater.*plumbing/, /didn't understand/],
   ["Can you replace my tankless water heater?", null, /don't take on water heater/, null],
   ["my bathroom and the water heater", "offerEstimate", /can't quote the water heater part/, null],
+  // Common questions answered directly or with an honest "please ask us" (round 4, #6).
+  [
+    "How much to refinish my bathtub",
+    null,
+    /don't have an online price for refinishing.*\(385\) 356-8733/,
+    /Bathtub installation|\$350/,
+  ],
+  ["Can you reglaze our tub?", null, /refinishing, reglazing/, /\$350/],
+  ["Do you have insurance?", null, /doesn't give details about insurance.*\(385\) 356-8733/, /contractor licence/],
+  ["Are you insured?", null, /doesn't give details about insurance/, /contractor licence/],
+  ["Are you licensed and insured?", null, /do not currently hold a contractor licence.*insurance/, null],
+  [
+    "Can you install a heated floor?",
+    "offerEstimate",
+    /heated floor needs electrical work, which isn't included.*adds to the cost.*\$5 per sq ft for flooring/,
+    null,
+  ],
+  [
+    "Is the estimate free?",
+    "offerEstimate",
+    /costs nothing.*doesn't say whether a visit or a written quote is free/,
+    null,
+  ],
+  ["Do you charge for a quote?", "offerEstimate", /doesn't say whether a visit or a written quote is free/, null],
+  ["Can you install a freestanding tub?", "offerEstimate", /Bathtub installation is \$350/, /free/],
+  ["Do you do laundry rooms?", null, /only take on bathroom restorations.*can't help with that/, /We do bathroom/],
+  ["Can you redo my laundry room and bathroom?", "offerEstimate", /can't quote the laundry room part/, null],
+  [
+    "Do you do commercial bathrooms?",
+    null,
+    /doesn't say whether we take on commercial bathrooms.*\(385\) 356-8733/,
+    null,
+  ],
+  ["Can you redo the restroom in our restaurant?", null, /commercial bathrooms/, null],
+  [
+    "Do you replace windows in the bathroom?",
+    null,
+    /don't have an online price for windows.*ask whether we can include it/,
+    /We do bathroom restorations/,
+  ],
+  ["What's the total for a 5x8 bathroom", "startEstimate", null, null],
+  ["I have a 6 by 9 bathroom", "startEstimate", null, null],
+  ["How much to install a countertop", null, /don't have an online price for countertop/, null],
+  ["How much for a vanity and a vanity top?", "offerEstimate", /online price for vanity top.*\$150 per vanity/, null],
+  ["Can I pay with credit card?", null, /doesn't list the payment methods we accept.*\(385\) 356-8733/, null],
+  ["Do you take cash?", null, /payment methods/, null],
+  ["How much of a deposit do you need?", null, /deposit or financing terms/, /Tile is/],
+  ["How much will I pay for tile?", "offerEstimate", /Tile is \$4 per sq ft/, /payment methods/],
+  ["Can you check my shower?", "offerEstimate", /Shower installation/, /payment methods/],
+  [
+    "How do I get a quote?",
+    "offerEstimate",
+    /send us a request on the Get a Quote page or call \(385\) 356-8733/,
+    null,
+  ],
   // Every message gets a reply, even emoji only.
   ["😀👍", "offerEstimate", /didn't understand.*\(385\) 356-8733/, null],
   ["🛁🚿", "offerEstimate", /didn't understand/, null],
@@ -118,11 +173,49 @@ test("with the estimator switched off, price questions get the call-us reply and
   for (const q of ["bathroom quote", "how much for tile?", "Can I get an estimate?", "cabinet price?"]) {
     const r = Chat.reply(q, OFF);
     assert.equal(r.action, null, q);
-    assert.equal(r.text, "Call (385) 356-8733 or use the Contact page for a price.", q);
+    assert.equal(r.text, "Call (385) 356-8733 or use the Get a Quote page for a price.", q);
   }
   const fallback = Chat.reply("asdfgh", OFF);
   assert.equal(fallback.action, null);
   assert.match(fallback.text, /\(385\) 356-8733/);
+});
+
+test("with the estimator off, nothing invites a price question or an estimate", () => {
+  for (const q of [
+    "hello",
+    "Do you do kitchens?",
+    "There's mold behind my shower",
+    "asdfgh",
+    "Is the estimate free?",
+  ]) {
+    const r = Chat.reply(q, OFF);
+    assert.equal(r.action, null, q);
+    assert.doesNotMatch(r.text, /bathroom quote|rough estimate|prices|costs nothing/, q);
+  }
+  assert.doesNotMatch(Chat.reply("Can you install a heated floor?", OFF).text, /\$/);
+});
+
+test("with the quote form switched off, no reply sends the visitor to the Get a Quote page", () => {
+  const PAUSED = { estimatorEnabled: true, leadFormEnabled: false };
+  const questions = [
+    "How do I get a quote?",
+    "What is your phone number?",
+    "Do you do electrical work?",
+    "can you come tomorrow",
+    "How long does a bathroom take?",
+    "Where are you located?",
+    "When are you open?",
+    "asdfgh",
+    "water heater replacement",
+  ];
+  for (const q of questions) {
+    const r = Chat.reply(q, PAUSED);
+    assert.doesNotMatch(r.text, /Get a Quote page|Contact page|the form/, q);
+    assert.match(r.text, /\(385\) 356-8733/, q);
+  }
+  assert.match(Chat.reply("How do I get a quote?", PAUSED).text, /not taking requests through the website form/);
+  const off = Chat.reply("how much for a cabinet", { estimatorEnabled: false, leadFormEnabled: false });
+  assert.equal(off.text, "Call (385) 356-8733 or email eduardo.moroni77@gmail.com for a price.");
 });
 
 test("a mixed request with the estimator off still names the bathroom and gives the phone number", () => {

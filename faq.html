@@ -90,14 +90,19 @@
           <div class="faq-answer">
             <div class="faq-answer-inner">
               <p>
-                Our labor is priced per item. For example, cabinet installation is
-                <span data-price="Cabinet_Price">$60</span> per cabinet and bathroom flooring is
-                <span data-price="Floor_Price_Per_SqFt">$5</span> per sq ft. Materials, permits, and any applicable
-                taxes are separate.
+                Our labor is priced per item.
+                <span data-show-if="priceEstimator.enabled"
+                  >For example, cabinet installation is <span data-price="Cabinet_Price">$60</span> per cabinet and
+                  bathroom flooring is <span data-price="Floor_Price_Per_SqFt">$5</span> per sq ft.</span
+                >
+                Materials, permits, and any applicable taxes are separate.
                 <span data-show-if="priceEstimator.enabled" hidden
                   >The chat on our home page can give you a rough, non-binding labor estimate;</span
                 >
-                <span data-show-unless="priceEstimator.enabled">For a price, call us or use the Contact page;</span>
+                <span data-show-unless="priceEstimator.enabled"
+                  >For a price, call us<span data-show-unless="leadForm.paused"> or use the Get a Quote page</span
+                  >;</span
+                >
                 your actual price is confirmed with you after we see the job.
               </p>
             </div>
@@ -232,7 +237,7 @@
       <section class="cta-band">
         <p class="eyebrow center">Still Curious?</p>
         <h2 class="section-title">Still Have Questions?</h2>
-        <a href="contact.html" class="btn btn-primary">Contact Us</a>
+        <a href="contact.html" class="btn btn-primary">Get a Quote</a>
       </section>
     </main>
 

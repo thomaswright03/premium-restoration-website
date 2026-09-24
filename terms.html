@@ -89,9 +89,14 @@
         <h2>Prices and online estimates</h2>
         <ul>
           <li>
-            Our published labor prices include <span data-price="Cabinet_Price">$60</span> per cabinet and
-            <span data-price="Floor_Price_Per_SqFt">$5</span> per sq ft of bathroom flooring. Prices may change; the
-            price that applies to your job is the one in your written agreement with us.
+            <span data-show-if="priceEstimator.enabled"
+              >Our published labor prices include <span data-price="Cabinet_Price">$60</span> per cabinet and
+              <span data-price="Floor_Price_Per_SqFt">$5</span> per sq ft of bathroom flooring.</span
+            >
+            <span data-show-unless="priceEstimator.enabled" hidden
+              >Our labor is priced per item; ask us for current prices.</span
+            >
+            Prices may change; the price that applies to your job is the one in your written agreement with us.
           </li>
           <li>
             Estimates from the chat assistant on our home page, including any PDF you export, are automated, rough, and

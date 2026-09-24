@@ -197,7 +197,7 @@ test.describe("chat estimate", () => {
       expect(await inView(card.locator(".ai-chat-estimate-header h3"))).toBe(true);
       expect(await inView(total)).toBe(true);
 
-      // "Contact Us About This →" keeps its arrow on the same line.
+      // "Get a Quote →" keeps its arrow on the same line.
       const lines = await card.locator(".ai-chat-estimate-cta").evaluate((a) => {
         const range = document.createRange();
         range.selectNodeContents(a);
@@ -214,12 +214,12 @@ test.describe("chat estimate", () => {
     await expect(form.locator(".ai-chat-field-error:visible")).toHaveCount(4);
   });
 
-  test("Contact Us About This carries the estimate into the contact form and the email", async ({ page }) => {
+  test("Get a Quote on the estimate carries it into the contact form and the email", async ({ page }) => {
     await startEstimate(page);
     await answerScope(page, NOTHING_BUT_FLOORING);
     await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8 });
     await fillGroup(page, "fixtures", { Cabinet_Quantity: 3 });
-    await page.getByRole("link", { name: "Contact Us About This →" }).click();
+    await page.getByRole("link", { name: "Get a Quote →" }).click();
     await expect(page).toHaveURL(/contact\.html\?from=estimate/);
     const message = page.locator("#message");
     await expect(message).toHaveValue(/5 ft wide × 8 ft long/);
@@ -245,6 +245,23 @@ test.describe("chat estimate", () => {
     await sendChat(page, "Do you do fireplaces?");
     await expect(page.locator(".ai-chat-row.bot .ai-chat-text").last()).toContainText("only take on bathroom");
   });
+
+  test("questions the website can't answer get an honest 'please ask us', never an invented fact", async ({ page }) => {
+    await page.goto("/index.html");
+    const last = () => page.locator(".ai-chat-row.bot .ai-chat-text").last();
+    await sendChat(page, "Do you have insurance?");
+    await expect(last()).toContainText("doesn't give details about insurance");
+    await sendChat(page, "Can I pay with credit card?");
+    await expect(last()).toContainText("doesn't list the payment methods we accept");
+    await sendChat(page, "How much to refinish my bathtub");
+    await expect(last()).toContainText("don't have an online price for refinishing");
+    await expect(last()).not.toContainText("$350");
+    await sendChat(page, "Is the estimate free?");
+    await expect(last()).toContainText("doesn't say whether a visit or a written quote is free");
+    await expect(page.locator('form[data-group="scope"]')).toHaveCount(0);
+    await sendChat(page, "What's the total for a 5x8 bathroom");
+    await expect(page.locator('form[data-group="scope"]')).toBeVisible();
+  });
 });
 
 test.describe("estimator switch (site-config.json priceEstimator.enabled)", () => {
@@ -255,10 +272,34 @@ test.describe("estimator switch (site-config.json priceEstimator.enabled)", () =
     await expect(page.locator("#ai-chat-quote-starter")).toBeHidden();
     await sendChat(page, "bathroom quote");
     await expect(page.locator(".ai-chat-row.bot .ai-chat-text").last()).toHaveText(
-      "Call (385) 356-8733 or use the Contact page for a price.",
+      "Call (385) 356-8733 or use the Get a Quote page for a price.",
     );
     await expect(page.locator('form[data-group="scope"]')).toHaveCount(0);
     await expect(page.locator(".ai-chat-suggestion:visible")).toHaveCount(0);
+    // The page and the greeting say the same: no figures, no invitation to ask prices.
+    await expect(page.locator("#pricing")).not.toContainText("$", { useInnerText: true });
+    await expect(page.locator("#pricing")).toContainText("Call (385) 356-8733 for the current price.", {
+      useInnerText: true,
+    });
+    await expect(page.locator("#ai-chat-messages .ai-chat-text").first()).toHaveText(
+      /Ask me about bathroom work or how to get a quote\./,
+      { useInnerText: true },
+    );
+    await sendChat(page, "how much for a cabinet");
+    await expect(page.locator(".ai-chat-row.bot .ai-chat-text").last()).toHaveText(
+      "Call (385) 356-8733 or use the Get a Quote page for a price.",
+    );
+    await page.goto("/faq.html");
+    await page.getByRole("button", { name: "How much does it cost?" }).click();
+    await expect(page.locator("main")).not.toContainText("$60", { useInnerText: true });
+    await expect(page.locator("main")).toContainText("For a price, call us or use the Get a Quote page;", {
+      useInnerText: true,
+    });
+    await page.goto("/terms.html");
+    await expect(page.locator("main")).not.toContainText("$60", { useInnerText: true });
+    await expect(page.locator("main")).toContainText("Our labor is priced per item; ask us for current prices.", {
+      useInnerText: true,
+    });
   });
 
   test("on: the estimate button and the 'bathroom quote' trigger work", async ({ page }) => {
@@ -269,11 +310,50 @@ test.describe("estimator switch (site-config.json priceEstimator.enabled)", () =
     await expect(page.locator('form[data-group="scope"]')).toBeVisible();
   });
 
-  test("if the settings file can't be loaded, the estimator stays off", async ({ page }) => {
+  test("if the settings file can't be loaded, the estimator stays off and no page shows a price", async ({ page }) => {
     await page.route("**/site-config.json", (route) => route.fulfill({ status: 500, body: "" }));
     await page.goto("/index.html");
     await expect(page.locator("html")).toHaveAttribute("data-config", "defaults");
     await expect(page.locator("#ai-chat-quote-starter")).toBeHidden();
+    // Page, greeting and chat agree: call for a price.
+    await expect(page.locator("#pricing")).not.toContainText("$", { useInnerText: true });
+    await expect(page.locator("#pricing")).toContainText("Call (385) 356-8733 for the current price.", {
+      useInnerText: true,
+    });
+    await expect(page.locator("#ai-chat-messages .ai-chat-text").first()).not.toContainText("prices", {
+      useInnerText: true,
+    });
+    await sendChat(page, "how much for a cabinet");
+    await expect(page.locator(".ai-chat-row.bot .ai-chat-text").last()).toHaveText(
+      "Call (385) 356-8733 or use the Get a Quote page for a price.",
+    );
+    await page.goto("/faq.html");
+    await page.getByRole("button", { name: "How much does it cost?" }).click();
+    await expect(page.locator("main")).toContainText("Our labor is priced per item.", { useInnerText: true });
+    await expect(page.locator("main")).not.toContainText("$60", { useInnerText: true });
+  });
+
+  test("with the quote form in 'please call us' mode, the chat and home page never point to the form", async ({
+    page,
+  }) => {
+    await useConfig(page, { leadForm: { enabled: false } });
+    await page.goto("/index.html");
+    await expect(page.locator("html")).toHaveAttribute("data-config", "loaded");
+    await expect(page.locator(".cta-band")).toContainText("We're not taking requests through the website right now");
+    await sendChat(page, "how do I get a quote");
+    const last = page.locator(".ai-chat-row.bot .ai-chat-text").last();
+    await expect(last).toContainText("For a quote, call (385) 356-8733 or email");
+    await expect(last).not.toContainText("Get a Quote page");
+    await sendChat(page, "how much for a cabinet");
+    await expect(page.locator(".ai-chat-row.bot .ai-chat-text").last()).toContainText("$60 per cabinet");
+    // A finished estimate offers the phone number instead of the form.
+    await page.locator(".ai-chat-suggestion").last().click();
+    await answerScope(page, NOTHING_BUT_FLOORING);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8 });
+    await fillGroup(page, "fixtures", {});
+    const cta = page.getByTestId("estimate-card").locator(".ai-chat-estimate-cta");
+    await expect(cta).toHaveText("Call (385) 356-8733 →");
+    await expect(cta).toHaveAttribute("href", "tel:+13853568733");
   });
 });
 

@@ -31,7 +31,10 @@
       setTimeout(
         function () {
           typingRow.remove();
-          var r = window.ChatReplies.reply(message, { estimatorEnabled: C.estimatorEnabled() });
+          var r = window.ChatReplies.reply(message, {
+            estimatorEnabled: C.estimatorEnabled(),
+            leadFormEnabled: C.leadFormEnabled(),
+          });
           C.els.send.disabled = false;
           if (r && r.action === "startEstimate") {
             C.startEstimate();

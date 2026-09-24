@@ -93,6 +93,18 @@ test.describe("every public page", () => {
     expect(copy.width).toBeGreaterThan(500);
   });
 
+  test("every link to the Get a Quote page is labelled Get a Quote", async ({ page }) => {
+    const labels = new Set();
+    for (const file of PUBLIC_PAGES) {
+      await page.goto("/" + file);
+      for (const text of await page.locator('a[href*="contact.html"]').allTextContents()) {
+        labels.add(text.replace(/\s+/g, " ").replace(/ ?→$/, "").trim());
+      }
+    }
+    // (The estimate card's "Get a Quote →" is checked in chat.spec.js.)
+    expect([...labels]).toEqual(["Get a Quote"]);
+  });
+
   test("unknown URLs get the styled 404 page with Home and Get a Quote", async ({ page }) => {
     const res = await page.goto("/deep/missing/page.html");
     expect(res.status()).toBe(404);

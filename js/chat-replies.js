@@ -1,7 +1,7 @@
 // Premium Restoration — scripted chat replies (no AI, no backend).
 //
-// Pure function: reply(message, { estimatorEnabled }) returns
-//   { text, action }  where action is one of
+// Pure function: reply(message, { estimatorEnabled, leadFormEnabled })
+// returns { text, action }  where action is one of
 //   "startEstimate"  — start the guided bathroom estimate (no text shown)
 //   "offerEstimate"  — show the text, then an "estimate" button
 //   null             — just show the text
@@ -9,6 +9,10 @@
 // Matching is on whole words only (so "work" never matches "fireplace"-style
 // substrings, and "fire" does not match "fireplaces"). Prices come from
 // js/bathroom-pricing.js, the same published prices the estimate uses.
+//
+// Never state a business fact the site doesn't already state (insurance,
+// payment methods, service area, free quotes...): answer "please ask us"
+// with the phone number instead.
 //
 // Loads as a plain browser script (window.ChatReplies) and as a Node module.
 
@@ -25,7 +29,6 @@
   var PRICES = Pricing.DEFAULT_PRICES;
   var $ = Pricing.shortMoney;
 
-  var CALL_FOR_PRICE = "Call " + PHONE + " or use the Contact page for a price.";
   var ESTIMATE_OFFER = "For a rough estimate of your whole job, tap the button below or say “bathroom quote”.";
   var PLUMBING_EXTRA =
     "Installing it also needs plumbing work, which isn't included in our online prices and will add to the cost.";
@@ -205,9 +208,6 @@
 
   var DAMAGE =
     "\\b(water|fire|smoke|storm|flood|hail|wind|mold|mould)\\s+damage(d)?\\b|\\bflood(ed|ing|s)?\\b|\\bmou?ld(y)?\\b|\\bmildew\\b|\\bsewage\\b|\\basbestos\\b|\\b(damage|disaster)\\s+restoration\\b|\\bburst\\s+pipes?\\b";
-  var DAMAGE_REPLY =
-    "Sorry, we don't take on damage restoration (such as water, fire, smoke or mold damage), so we can't help with that. " +
-    "We only do bathroom restorations — for a bathroom project without damage, say “bathroom quote” and I can give you a rough estimate.";
 
   // Words that mean a bathroom. A message that is about a bathroom is never
   // turned away, even if it also names another room.
@@ -218,13 +218,11 @@
     "\\b(kitchens?|exteriors?|roof(s|ing)?|siding|stucco|decks?|fences?|gutters?|fireplaces?|chimneys?|driveways?|patios?|landscaping|pools?|hvac|furnaces?|water heaters?|hot water heaters?|hot water tanks?|tankless water heaters?|boilers?|whole (home|house)|entire (home|house)|full (home|house)|remodel my (home|house))\\b";
   // Other rooms. On their own they are declined, but they can also say
   // where a bathroom is ("basement bathroom", "bathroom in the garage").
-  var OTHER_ROOMS = "\\b(basements?|garages?|bedrooms?|living rooms?)\\b";
-  var ROOM_WORDS = "(basements?|garages?|bedrooms?|master bedrooms?|living rooms?|pool house|pool)";
+  var OTHER_ROOMS =
+    "\\b(basements?|garages?|bedrooms?|living rooms?|laundry rooms?|laundry|utility rooms?|mud ?rooms?|attics?)\\b";
+  var ROOM_WORDS =
+    "(basements?|garages?|bedrooms?|master bedrooms?|living rooms?|pool house|pool|laundry rooms?|laundry|utility rooms?|attics?)";
   var BATHROOM_WORDS = "(bathrooms?|baths?|restrooms?|washrooms?|powder rooms?|ensuites?|en suites?)";
-
-  var NOT_BATHROOM_REPLY =
-    "Sorry, we currently only take on bathroom restorations — not kitchens, exteriors, roofing, other rooms, or damage restoration — so we can't help with that. " +
-    "For a bathroom project, say “bathroom quote” and I can give you a rough estimate.";
 
   // The non-bathroom work or rooms a message names, ignoring room words that
   // only say where the bathroom is.
@@ -245,6 +243,7 @@
     var found = [];
     [OTHER_WORK, OTHER_ROOMS].forEach(function (pattern) {
       (rest.match(new RegExp(pattern, "g")) || []).forEach(function (word) {
+        word = word.trim();
         if (found.indexOf(word) === -1) found.push(word);
       });
     });
@@ -256,32 +255,32 @@
     return words.slice(0, -1).join(", ") + " and " + words[words.length - 1];
   }
 
-  function mixedReply(others, estimator) {
-    var text =
-      "We can help with the bathroom, but we only take on bathroom restorations, so we can't quote the " +
-      listWords(others) +
-      " part.";
-    if (!estimator) {
-      return { text: text + " For a price on the bathroom, call " + PHONE + " or use the Contact page.", action: null };
-    }
-    return {
-      text: text + " For a rough estimate of the bathroom, tap the button below or say “bathroom quote”.",
-      action: "offerEstimate",
-    };
-  }
+  // Bathrooms in shops, offices, restaurants and other businesses: the
+  // website doesn't say whether these are taken on.
+  var COMMERCIAL =
+    "\\bcommercial\\b|\\b(office|restaurant|store|shop|retail|business|hotel|motel|gym|school|church|public)s? (bathrooms?|restrooms?|washrooms?)\\b|\\b(bathrooms?|restrooms?|washrooms?) (in|at|for) (an? |our |my |the )?(office|restaurant|store|shop|business|hotel|motel|gym|school|church)s?\\b";
 
   var FIXTURE_WORDS =
     "\\b(faucets?|taps?|toilets?|sinks?|showers?|tubs?|bathtubs?|pipes?|drains?|valves?|showerheads?)\\b";
   var PROBLEM_WORDS = "\\b(leak(s|y|ing|ed)?|drip(s|py|ping)?|clogged|blocked|running|broken|cracked|not working)\\b";
-  var FIXTURE_PROBLEM_REPLY =
-    "A leaking or broken faucet, toilet, sink, tub or shower is plumbing work. We can replace bathroom fixtures as part of a bathroom restoration, " +
-    "but plumbing isn't included in our online prices and adds to the cost, and we do not currently hold a contractor licence. " +
-    "Call " +
-    PHONE +
-    " to talk it through — we'll tell you who would do the plumbing and how it would be priced before any work is agreed. " +
-    "(We don't take on water-damage restoration.)";
 
   var PRICE_WORDS = "\\b(price|prices|pricing|cost|costs|charge|charges|rate|rates|how much|fee|fees)\\b|\\$";
+  // "What's the total for a 5x8 bathroom?": a size or a total also asks for the estimate.
+  var TOTAL_WORDS = "\\b(total|altogether|all in)\\b";
+  var ROOM_SIZE = "\\b\\d+ ?(x|by) ?\\d+\\b";
+
+  // Refinishing (reglazing, resurfacing) isn't one of the published items:
+  // never answer it with an installation price.
+  var REFINISH =
+    "\\b(refinish(es|ed|ing)?|re finish(ing)?|reglaz(e|es|ed|ing)|re glaz(e|ing)|resurfac(e|es|ed|ing)|re surfac(e|ing)|re ?enamel(l?ing)?|recoat(ing)?|re coat(ing)?)\\b";
+
+  // Heated floors: the floor is priced as usual; the heating is electrical work.
+  var HEATED_FLOOR =
+    "\\b(heated|radiant|underfloor|under floor|in floor|infloor|warm) (floors?|flooring|tiles?|heating)\\b|\\bfloor (heat|heating|heater|warming)\\b";
+
+  // Items with no published price. Never priced or estimated here.
+  var UNPRICED =
+    "\\b(windows?|skylights?|counter ?tops?|counters?|vanity tops?|grab bars?|towel (bars?|racks?|rails?)|toilet paper holders?|accessories|drywall|sheetrock|baseboards?|trim|mouldings?|moldings?)\\b";
 
   // Published per-item prices. Checked in this order so "shower door" wins
   // over "shower" and "floor tile" counts as tile.
@@ -416,171 +415,324 @@
 
   var TRADE =
     "\\b(plumb(ing|er|ers)?|electric(al|ian|ians)?|wiring|outlets?|pipes?|valves?|drains?|faucets?|lights?|lighting|fans?|switch(es)?)\\b";
-  var TRADE_REPLY =
-    "Our online prices and estimates don't include plumbing or electrical work, and toilets, sinks, showers, and bathtubs also need plumbing work, so expect it to add to the cost. " +
-    "We do not currently hold a contractor licence. Tell us about your project on the Contact page and we'll tell you who will do that work and how it will be priced before any work is agreed.";
-
   var ESTIMATE = "\\b(estimate|estimates|quote|quotes|quotation|ballpark)\\b";
+  // "How do I get a quote?": how to ask for a real quote.
+  var QUOTE_HOWTO =
+    "\\bhow (do|can|would|should|to) (i |we )?(get|request|ask for|book|arrange|go about getting) (a |an |my |the )?(written )?(quote|quotation|price)\\b";
+  // "Is the estimate free?", "Do you charge for a quote?"
+  var FREE =
+    "\\b(free|free of charge|no charge|for nothing)\\b.*\\b(estimates?|quotes?|quotation|consultation|visit|assessment|it|this|chat)\\b|\\b(estimates?|quotes?|quotation|consultation|visit|assessment|it|this|chat)\\b.*\\b(free|free of charge|no charge)\\b|\\b(charge|cost|pay)( you)?( anything)? (for|to get) (a |an |the )?(estimate|quote|quotation|consultation|visit)\\b";
+  var PAYMENT =
+    "\\b(payments?|payment methods?|credit cards?|debit cards?|cards?|venmo|zelle|paypal|cash app|financing|finance|deposit|down payment|installments?|payment plans?|(pay|paying) (by|with|in) (check|cheque|cash|card|credit|debit)|(take|accept) (cash|checks?|cheques?|cards?|credit))\\b";
 
   var SERVICES =
     "\\b(what (work|services|kind of work|do you do|can you do|jobs)|services?|do you (do|offer|handle)|what do you (do|offer)|remodel(ing)?|renovat(e|ion|ions|ing)|restor(e|ation|ations|ing))\\b";
-  var SERVICES_REPLY =
-    "We do bathroom restorations: demolition, installing fixtures (toilets, sinks, showers, bathtubs, vanities, mirrors, doors and cabinets), " +
-    "tile, flooring, and painting walls and ceilings. We don't take on kitchens, exteriors, roofing, or damage restoration. " +
-    "Plumbing and electrical work isn't included in our online estimates and adds to the cost.";
-
-  var LICENCE = "\\b(licen[cs]e[ds]?|insured|insurance|bonded|permits?)\\b";
-  var LICENCE_REPLY =
-    "We do not currently hold a contractor licence. Before any work is agreed, we'll tell you who will do any plumbing and electrical work, how it will be priced, " +
-    "and whether your job needs any permits. Ask us anything else about this when you get in touch: " +
-    PHONE +
-    ".";
-
+  var LICENCE = "\\b(licen[cs]e[ds]?|permits?)\\b";
+  var INSURANCE = "\\b(insured|insurance|insurer|bonded|liability cover(age)?)\\b";
   var WARRANTY = "\\b(warrant(y|ies)|guarantee[ds]?)\\b";
-  var WARRANTY_REPLY =
-    "We don't advertise a standard warranty on this website. If you'd like one, ask us before you agree to the work, and make sure any warranty terms are given to you in writing.";
-
   // Water heaters are plumbing work outside the bathroom restorations we do.
   var WATER_HEATER = "\\b(water heaters?|hot water heaters?|hot water tanks?|tankless|boilers?)\\b";
-  var WATER_HEATER_REPLY =
-    "Sorry, we don't take on water heater installation or replacement: it's plumbing work outside the bathroom restorations we do, " +
-    "and plumbing isn't included in our online prices. A licensed plumber is the right person to ask. For a bathroom restoration, call " +
-    PHONE +
-    " or use the Contact page.";
-
   // When someone can come out or start: only a person can answer that.
   var AVAILABILITY =
     "\\b(come|come out|come over|start|begin|visit|stop by|get here|be here|be there|fit me in|see it|look at it)\\s+(today|tonight|tomorrow|this week|next week|this weekend|this month|next month|soon|asap|right away|on (monday|tuesday|wednesday|thursday|friday|saturday|sunday))\\b|\\b(are you|is anyone) (available|free)\\b|\\b(any|your) availability\\b|\\bwhen (can|could|would|will) (you|someone|somebody) (come|come out|start|begin|visit|get here)\\b|\\bhow soon can\\b|\\b(earliest|next available) (date|day|opening|appointment|slot)\\b|\\b(book|schedule) (a|an) (visit|appointment|consultation)\\b";
-  var AVAILABILITY_REPLY =
-    "This chat can't check dates or book a visit. Call " +
-    PHONE +
-    " or send a request on the Contact page and we'll tell you when we could come out or start.";
-
   var TIMELINE = "\\b(how long|timeline|time frame|timeframe|duration|weeks?|days?|start)\\b";
   // A clear question about time, answered even when it names an item
   // ("How long does a tile job take?").
   var TIMELINE_QUESTION =
     "\\b(how long|timeline|time frame|timeframe|duration|how many (days|weeks|months)|how soon|when (can|could|would) you start)\\b";
-  var TIMELINE_REPLY =
-    "It depends on the size of the bathroom and the work involved. We'll give you an expected timeline once we've seen the job — call " +
-    PHONE +
-    " or use the Contact page.";
-
   var PRIVACY = "\\b(privacy|personal data|delete my|my data|my information)\\b";
-  var PRIVACY_REPLY =
-    "Our Privacy Notice (linked at the bottom of every page) explains what we collect and how to ask us to access or delete your information.";
-
   var CONTACT = "\\b(contact|phone|call|email|e mail|reach|number|talk to)\\b";
-  var CONTACT_REPLY =
-    "You can reach us at " + PHONE + " or " + EMAIL + ", or use the form on our Contact page to send us your request.";
-
   var HOURS = "\\b(hours?|open|opening|available|availability|weekends?|schedule)\\b";
-  var HOURS_REPLY =
-    "Reach out through the Contact page or give us a call at " +
-    PHONE +
-    ", and we'll get back to you as soon as we can.";
-
   var AREA = "\\b(where|area|areas|located|location|serve|service area|cities|city)\\b";
-  var AREA_REPLY =
-    "Call " + PHONE + " or use the Contact page with your address and we'll tell you whether we can take on your job.";
-
   var PHOTOS =
     "\\b(gallery|photos?|pictures?|pics|examples?|portfolio|past (work|jobs|projects)|previous (work|jobs|projects))\\b";
-  var PHOTOS_REPLY =
-    "We don't have photos of our own completed projects online yet — we'd rather show nothing than someone else's work. Ask us about past jobs when you get in touch.";
-
   var GREETING = "^ (hi|hello|hey|hiya|good (morning|afternoon|evening))( there)? $";
-  var GREETING_REPLY = "Hello! Ask me about our bathroom work or prices, or get a rough estimate of your bathroom job.";
-
   var THANKS = "\\b(thanks|thank you|thx|cheers)\\b";
-  var THANKS_REPLY = "You're welcome! If you'd like to talk to a person, call " + PHONE + ".";
 
-  var FALLBACK =
-    "Sorry, I didn't understand that. I can answer questions about our bathroom work and prices, or give you a rough estimate. To talk to a person, call " +
-    PHONE +
-    " or use the Contact page.";
-  var FALLBACK_NO_ESTIMATE =
-    "Sorry, I didn't understand that. I can answer questions about our bathroom work. To talk to a person, call " +
-    PHONE +
-    " or use the Contact page.";
+  // Every reply that names a way to get in touch, worded for the current
+  // settings: with the Get a Quote form switched off ("please call us" mode)
+  // nothing sends the visitor to the form, and with the estimator off nothing
+  // offers an estimate or a price.
+  function wording(estimator, formOn) {
+    var orForm = formOn ? " or use the Get a Quote page" : " or email " + EMAIL;
+    var callOrForm = "call " + PHONE + orForm;
+    var estimateInvite = estimator
+      ? " For a bathroom project, say “bathroom quote” and I can give you a rough estimate."
+      : " For a bathroom project, " + callOrForm + ".";
+    return {
+      callForPrice: "Call " + PHONE + orForm + " for a price.",
+      callOrForm: callOrForm,
+      notBathroom:
+        "Sorry, we currently only take on bathroom restorations — not kitchens, exteriors, roofing, other rooms, or damage restoration — so we can't help with that." +
+        estimateInvite,
+      damage:
+        "Sorry, we don't take on damage restoration (such as water, fire, smoke or mold damage), so we can't help with that. " +
+        "We only do bathroom restorations." +
+        estimateInvite.replace("For a bathroom project", "For a bathroom project without damage"),
+      commercial:
+        "This website doesn't say whether we take on commercial bathrooms (for example in offices, shops or restaurants), " +
+        "so please ask us before relying on an online estimate: " +
+        callOrForm +
+        ".",
+      fixtureProblem:
+        "A leaking or broken faucet, toilet, sink, tub or shower is plumbing work. We can replace bathroom fixtures as part of a bathroom restoration, " +
+        "but plumbing isn't included in our online prices and adds to the cost, and we do not currently hold a contractor licence. " +
+        "Call " +
+        PHONE +
+        " to talk it through — we'll tell you who would do the plumbing and how it would be priced before any work is agreed. " +
+        "(We don't take on water-damage restoration.)",
+      trade:
+        "Our online prices and estimates don't include plumbing or electrical work, and toilets, sinks, showers, and bathtubs also need plumbing work, so expect it to add to the cost. " +
+        "We do not currently hold a contractor licence. " +
+        (formOn ? "Tell us about your project on the Get a Quote page" : "Call " + PHONE) +
+        " and we'll tell you who will do that work and how it will be priced before any work is agreed.",
+      services:
+        "We do bathroom restorations: demolition, installing fixtures (toilets, sinks, showers, bathtubs, vanities, mirrors, doors and cabinets), " +
+        "tile, flooring, and painting walls and ceilings. We don't take on kitchens, exteriors, roofing, or damage restoration. " +
+        "Plumbing and electrical work isn't included in our online estimates and adds to the cost.",
+      licence:
+        "We do not currently hold a contractor licence. Before any work is agreed, we'll tell you who will do any plumbing and electrical work, how it will be priced, " +
+        "and whether your job needs any permits. Ask us anything else about this when you get in touch: " +
+        PHONE +
+        ".",
+      insurance:
+        "This website doesn't give details about insurance — neither our own cover nor insurance claims. Please ask us about it before you agree to any work: call " +
+        PHONE +
+        ".",
+      warranty:
+        "We don't advertise a standard warranty on this website. If you'd like one, ask us before you agree to the work, and make sure any warranty terms are given to you in writing.",
+      waterHeater:
+        "Sorry, we don't take on water heater installation or replacement: it's plumbing work outside the bathroom restorations we do, " +
+        "and plumbing isn't included in our online prices. A licensed plumber is the right person to ask. For a bathroom restoration, " +
+        callOrForm +
+        ".",
+      availability:
+        "This chat can't check dates or book a visit. Call " +
+        PHONE +
+        (formOn ? " or send a request on the Get a Quote page" : " or email " + EMAIL) +
+        " and we'll tell you when we could come out or start.",
+      timeline:
+        "It depends on the size of the bathroom and the work involved. We'll give you an expected timeline once we've seen the job — " +
+        callOrForm +
+        ".",
+      payment:
+        "This website doesn't list the payment methods we accept, or any deposit or financing terms, so please ask us: call " +
+        PHONE +
+        ".",
+      free:
+        (estimator ? "Using the estimate in this chat costs nothing and doesn't commit you to anything. " : "") +
+        "This website doesn't say whether a visit or a written quote is free, so please ask us: call " +
+        PHONE +
+        ".",
+      quoteHowTo:
+        (formOn
+          ? "For a quote, send us a request on the Get a Quote page or call " + PHONE + "."
+          : "For a quote, call " +
+            PHONE +
+            " or email " +
+            EMAIL +
+            " — we're not taking requests through the website form right now.") +
+        " Your actual price is set in writing after we've seen the job.",
+      refinish:
+        "We don't have an online price for refinishing, reglazing or resurfacing — our online prices are for installing new fixtures and surfaces, " +
+        "so they don't apply. Call " +
+        PHONE +
+        " and ask whether we can take it on.",
+      privacy:
+        "Our Privacy Notice (linked at the bottom of every page) explains what we collect and how to ask us to access or delete your information.",
+      contact:
+        "You can reach us at " +
+        PHONE +
+        " or " +
+        EMAIL +
+        (formOn ? ", or use the form on our Get a Quote page to send us your request." : "."),
+      hours:
+        "Call " +
+        PHONE +
+        (formOn ? " or use the Get a Quote page" : " or email " + EMAIL) +
+        ", and we'll get back to you as soon as we can.",
+      area:
+        "Call " +
+        PHONE +
+        (formOn ? " or use the Get a Quote page" : " or email " + EMAIL) +
+        " with your address and we'll tell you whether we can take on your job.",
+      photos:
+        "We don't have photos of our own completed projects online yet — we'd rather show nothing than someone else's work. Ask us about past jobs when you get in touch.",
+      greeting: estimator
+        ? "Hello! Ask me about our bathroom work or prices, or get a rough estimate of your bathroom job."
+        : "Hello! Ask me about our bathroom work or how to get a quote.",
+      thanks: "You're welcome! If you'd like to talk to a person, call " + PHONE + ".",
+      fallback:
+        "Sorry, I didn't understand that. I can answer questions about our bathroom work" +
+        (estimator ? " and prices, or give you a rough estimate." : ".") +
+        " To talk to a person, " +
+        callOrForm +
+        ".",
+    };
+  }
 
-  function reply(message, options) {
-    options = options || {};
-    var estimator = options.estimatorEnabled === true;
-    if (!String(message || "").trim()) return null;
-    var t = normalize(message);
-    var fallback = estimator
-      ? { text: FALLBACK, action: "offerEstimate" }
-      : { text: FALLBACK_NO_ESTIMATE, action: null };
-    // Only emoji or symbols: still answer, never leave the visitor waiting.
-    if (!t.trim()) return fallback;
+  function unpricedReply(t, estimator) {
+    var names = [];
+    (t.match(new RegExp(UNPRICED, "g")) || []).forEach(function (word) {
+      word = word.trim();
+      if (names.indexOf(word) === -1) names.push(word);
+    });
+    return (
+      "We don't have an online price for " +
+      listWords(names) +
+      ": " +
+      (names.length === 1 ? "it isn't" : "they aren't") +
+      " among the items our " +
+      (estimator ? "online estimate covers" : "published prices cover") +
+      ". Call " +
+      PHONE +
+      " and ask whether we can include " +
+      (names.length === 1 ? "it" : "them") +
+      " in your bathroom job."
+    );
+  }
 
-    function offer(text) {
-      return estimator ? { text: text + " " + ESTIMATE_OFFER, action: "offerEstimate" } : { text: text, action: null };
-    }
+  function heatedFloorReply(estimator) {
+    return (
+      "A heated floor needs electrical work, which isn't included in our online prices and adds to the cost, and we do not currently hold a contractor licence. " +
+      (estimator
+        ? "The floor covering itself is priced like any bathroom floor: " +
+          $(PRICES.Floor_Price_Per_SqFt) +
+          " per sq ft for flooring, or " +
+          $(PRICES.Tile_Price_Per_SqFt) +
+          " per sq ft for tile (labor only). "
+        : "") +
+      "Call " +
+      PHONE +
+      " about the heating — we'll tell you who would do the electrical work and how it would be priced before any work is agreed."
+    );
+  }
 
+  // Questions answered on their own subject, even when they name an item
+  // ("Is there a warranty on the tile?"). Licence and insurance can both be
+  // asked at once; availability wins over a general timeline question.
+  function topicalAnswers(t, w) {
+    var list = [];
+    if (has(t, LICENCE)) list.push(w.licence);
+    if (has(t, INSURANCE)) list.push(w.insurance);
+    if (has(t, WARRANTY)) list.push(w.warranty);
+    if (has(t, AVAILABILITY)) list.push(w.availability);
+    else if (has(t, TIMELINE_QUESTION)) list.push(w.timeline);
+    return list.join(" ");
+  }
+
+  function mixedReply(others, estimator, w) {
+    var text =
+      "We can help with the bathroom, but we only take on bathroom restorations, so we can't quote the " +
+      listWords(others) +
+      " part.";
+    if (!estimator) return { text: text + " For a price on the bathroom, " + w.callOrForm + ".", action: null };
+    return {
+      text: text + " For a rough estimate of the bathroom, tap the button below or say “bathroom quote”.",
+      action: "offerEstimate",
+    };
+  }
+
+  // Published item prices named in the message (after unpriced words are
+  // taken out, so "vanity top" is not priced as a vanity).
+  function itemPrices(t) {
+    var matched = [];
+    var rest = t.replace(new RegExp(UNPRICED, "g"), " ");
+    ITEMS.forEach(function (item) {
+      if (new RegExp(item.pattern).test(rest)) {
+        matched.push(item.text());
+        // "shower door" should not also answer "shower".
+        rest = rest.replace(new RegExp(item.pattern, "g"), " ");
+      }
+    });
+    return matched;
+  }
+
+  // What the visitor is asking about before any price is considered: who is
+  // answering, the language, a person, work we don't do, and questions that
+  // only a call can answer. Returns a reply, or null to carry on.
+  function firstChecks(t, estimator, w) {
     if (has(t, IDENTITY)) return { text: IDENTITY_REPLY, action: null };
     if (has(t, OTHER_LANGUAGE)) return { text: OTHER_LANGUAGE_REPLY, action: null };
     if (has(t, PERSON_REQUEST)) return { text: PERSON_REPLY, action: null };
-    if (has(t, DAMAGE)) return { text: DAMAGE_REPLY, action: null };
+    if (has(t, DAMAGE)) return { text: w.damage, action: null };
     var others = otherWorkNamed(t);
     if (others.length) {
-      if (has(t, BATHROOM)) return mixedReply(others, estimator);
-      if (has(t, WATER_HEATER)) return { text: WATER_HEATER_REPLY, action: null };
-      return { text: NOT_BATHROOM_REPLY, action: null };
+      if (has(t, BATHROOM)) return mixedReply(others, estimator, w);
+      if (has(t, WATER_HEATER)) return { text: w.waterHeater, action: null };
+      return { text: w.notBathroom, action: null };
     }
-    if (has(t, FIXTURE_WORDS) && has(t, PROBLEM_WORDS)) return { text: FIXTURE_PROBLEM_REPLY, action: null };
+    if (has(t, COMMERCIAL)) return { text: w.commercial, action: null };
+    if (has(t, FIXTURE_WORDS) && has(t, PROBLEM_WORDS)) return { text: w.fixtureProblem, action: null };
+    if (has(t, REFINISH)) return { text: w.refinish, action: null };
+    if (has(t, QUOTE_HOWTO)) return offerIf(estimator, w.quoteHowTo);
+    var asksFree = has(t.replace(/\bfree ?standing\b/g, " "), FREE) && !has(t, AVAILABILITY);
+    if (asksFree) return offerIf(estimator, w.free);
+    if (has(t, PAYMENT)) return { text: w.payment, action: null };
+    if (has(t, HEATED_FLOOR)) return offerIf(estimator, heatedFloorReply(estimator));
+    return null;
+  }
 
-    // Licence, warranty and timeline questions get their own answer even
-    // when they name an item ("Is there a warranty on the tile?"). If they
-    // also ask a price, both answers are given.
-    var topical = has(t, LICENCE)
-      ? LICENCE_REPLY
-      : has(t, WARRANTY)
-        ? WARRANTY_REPLY
-        : has(t, AVAILABILITY)
-          ? AVAILABILITY_REPLY
-          : has(t, TIMELINE_QUESTION)
-            ? TIMELINE_REPLY
-            : null;
+  function offerIf(estimator, text) {
+    return estimator ? { text: text + " " + ESTIMATE_OFFER, action: "offerEstimate" } : { text: text, action: null };
+  }
+
+  // Prices, unpriced items and estimate requests. Returns a reply, or null.
+  function priceChecks(t, estimator, w, topical) {
     var asksPrice = has(t, PRICE_WORDS);
     if (topical && !asksPrice) return { text: topical, action: null };
-
-    var matched = [];
-    var matchedText = t;
-    ITEMS.forEach(function (item) {
-      var re = new RegExp(item.pattern);
-      if (re.test(matchedText)) {
-        matched.push(item.text());
-        // "shower door" should not also answer "shower".
-        matchedText = matchedText.replace(new RegExp(item.pattern, "g"), " ");
-      }
-    });
+    var extra = topical ? " " + topical : "";
+    var unpriced = has(t, UNPRICED);
+    var matched = itemPrices(t);
+    if (unpriced) {
+      var text = unpricedReply(t, estimator);
+      if (matched.length) text += " " + (estimator ? matched.join(" ") : w.callForPrice);
+      return { text: text + extra, action: matched.length && estimator ? "offerEstimate" : null };
+    }
     if (matched.length) {
-      if (!estimator) return { text: CALL_FOR_PRICE + (topical ? " " + topical : ""), action: null };
-      return offer(matched.join(" ") + (topical ? " " + topical : ""));
+      if (!estimator) return { text: w.callForPrice + extra, action: null };
+      return offerIf(true, matched.join(" ") + extra);
     }
     if (topical) return { text: topical, action: null };
-
-    if (has(t, TRADE)) return { text: TRADE_REPLY, action: null };
-
-    var bathroomPrice = has(t, BATHROOM) && asksPrice;
-    if (has(t, ESTIMATE) || bathroomPrice || asksPrice) {
-      if (!estimator) return { text: CALL_FOR_PRICE, action: null };
-      return { text: null, action: "startEstimate" };
+    if (has(t, TRADE)) return { text: w.trade, action: null };
+    var sizedOrTotal = has(t, BATHROOM) && (has(t, TOTAL_WORDS) || has(t, ROOM_SIZE));
+    if (has(t, ESTIMATE) || asksPrice || sizedOrTotal) {
+      return estimator ? { text: null, action: "startEstimate" } : { text: w.callForPrice, action: null };
     }
+    return null;
+  }
 
-    if (has(t, PHOTOS)) return { text: PHOTOS_REPLY, action: null };
-    if (has(t, TIMELINE)) return { text: TIMELINE_REPLY, action: null };
-    if (has(t, SERVICES) || has(t, BATHROOM)) return offer(SERVICES_REPLY);
-    if (has(t, PRIVACY)) return { text: PRIVACY_REPLY, action: null };
-    if (has(t, AREA)) return { text: AREA_REPLY, action: null };
-    if (has(t, HOURS)) return { text: HOURS_REPLY, action: null };
-    if (has(t, CONTACT)) return { text: CONTACT_REPLY, action: null };
-    if (has(t, THANKS)) return { text: THANKS_REPLY, action: null };
-    if (has(t, GREETING)) return offer(GREETING_REPLY);
+  // Everything else: photos, services, privacy, area, hours, contact, greetings.
+  function generalChecks(t, estimator, w) {
+    if (has(t, PHOTOS)) return { text: w.photos, action: null };
+    if (has(t, TIMELINE)) return { text: w.timeline, action: null };
+    if (has(t, SERVICES) || has(t, BATHROOM)) return offerIf(estimator, w.services);
+    if (has(t, PRIVACY)) return { text: w.privacy, action: null };
+    if (has(t, AREA)) return { text: w.area, action: null };
+    if (has(t, HOURS)) return { text: w.hours, action: null };
+    if (has(t, CONTACT)) return { text: w.contact, action: null };
+    if (has(t, THANKS)) return { text: w.thanks, action: null };
+    if (has(t, GREETING)) return offerIf(estimator, w.greeting);
+    return null;
+  }
 
-    return fallback;
+  // options: { estimatorEnabled, leadFormEnabled } (the form counts as on
+  // unless leadFormEnabled is false).
+  function reply(message, options) {
+    options = options || {};
+    var estimator = options.estimatorEnabled === true;
+    var w = wording(estimator, options.leadFormEnabled !== false);
+    if (!String(message || "").trim()) return null;
+    var t = normalize(message);
+    var fallback = { text: w.fallback, action: estimator ? "offerEstimate" : null };
+    // Only emoji or symbols: still answer, never leave the visitor waiting.
+    if (!t.trim()) return fallback;
+    return (
+      firstChecks(t, estimator, w) ||
+      priceChecks(t, estimator, w, topicalAnswers(t, w)) ||
+      generalChecks(t, estimator, w) ||
+      fallback
+    );
   }
 
   var api = { reply: reply };

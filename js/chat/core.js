@@ -44,6 +44,12 @@
     return !!(C.state.config && C.state.config.priceEstimator.enabled);
   }
 
+  // false in "please call us" mode (leadForm.enabled false): nothing in the
+  // chat then sends the visitor to the Get a Quote form.
+  function leadFormEnabled() {
+    return !(C.state.config && C.state.config.leadForm.paused);
+  }
+
   // The page's chat elements. Returns false when this page has no chat.
   function findElements() {
     var byId = function (id) {
@@ -131,6 +137,7 @@
   C.configReady = configReady;
   C.track = track;
   C.estimatorEnabled = estimatorEnabled;
+  C.leadFormEnabled = leadFormEnabled;
   C.findElements = findElements;
   C.el = el;
   C.scrollToEnd = scrollToEnd;

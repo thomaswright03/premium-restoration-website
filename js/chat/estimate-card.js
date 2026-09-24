@@ -142,13 +142,26 @@
     });
     actions.appendChild(exportBtn);
 
-    var cta = C.el("a", "ai-chat-estimate-cta", "Contact Us About This →");
+    actions.appendChild(nextStepLink(estimate));
+    return actions;
+  }
+
+  // The next step after an estimate: the Get a Quote form, carrying the
+  // estimate with it (every link to that page is labelled "Get a Quote"), or
+  // in "please call us" mode the phone number.
+  function nextStepLink(estimate) {
+    var Business = window.BusinessInfo;
+    if (!C.leadFormEnabled()) {
+      var call = C.el("a", "ai-chat-estimate-cta", "Call " + Business.PHONE + "\u00a0→");
+      call.href = Business.PHONE_HREF;
+      return call;
+    }
+    var cta = C.el("a", "ai-chat-estimate-cta", "Get a Quote\u00a0→");
     cta.href = "contact.html?from=estimate";
     cta.addEventListener("click", function () {
       C.saveSummary(Pricing().buildEstimateSummary(estimate.values, estimate.scope, estimate.result));
     });
-    actions.appendChild(cta);
-    return actions;
+    return cta;
   }
 
   // options.restored: shown after a reload, so focus isn't moved.

@@ -21,7 +21,7 @@
     ESTIMATE_STARTED: "Estimate started",
     ESTIMATE_COMPLETED: "Estimate completed",
     ESTIMATE_PDF_FAILED: "Estimate PDF failed",
-    CONTACT_ABOUT_ESTIMATE: "Contact Us About This",
+    CONTACT_ABOUT_ESTIMATE: "Get a Quote from estimate",
     QUOTE_REQUEST_SENT: "Quote request sent",
     QUOTE_REQUEST_FAILED: "Quote request failed",
     QUOTE_EMAIL_OPENED: "Quote email opened",
