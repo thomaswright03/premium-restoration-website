@@ -8,10 +8,10 @@
 // Prices and the calculation itself come from js/bathroom-pricing.js, the
 // same code the public estimate uses.
 //
-// Screens have their own URL (#/dashboard, #/new, #/details, #/prices), so
-// the browser's Back/Forward buttons move between them. A quote being
-// edited is kept as a draft in this browser, so going Back, or reloading the
-// page, never loses what was entered.
+// Screens have their own URL (#/dashboard, #/details, #/prices), so the
+// browser's Back/Forward buttons move between them. A quote being edited is
+// kept as a draft in this browser, so reloading the page never loses what was
+// entered, and nothing unsaved is thrown away without asking first.
 
 (function () {
   "use strict";
@@ -47,7 +47,8 @@
       "No contractor licence is currently held. Get legal advice on who may do electrical work before quoting it, and tell the customer who will do it before any work is agreed.",
   };
 
-  var ROUTES = { dashboard: "screen-dashboard", new: "screen-step1", details: "screen-step2", prices: "screen-rates" };
+  // "new" is the old address of the first quote step; it now opens the one quote screen.
+  var ROUTES = { dashboard: "screen-dashboard", details: "screen-quote", new: "screen-quote", prices: "screen-rates" };
 
   // ------------------------------------------------------------------
   // Storage. Every write is checked: if the browser refuses (storage full,
@@ -94,16 +95,20 @@
   // ------------------------------------------------------------------
   // Messages
   // ------------------------------------------------------------------
-  var toastTimer = null;
+  // Messages sit at the top of the screen in their own space (never over a
+  // button) and stay until dismissed, replaced, or the screen changes.
+  var toastRoute = null;
 
-  function toast(text) {
-    var el = document.getElementById("admin-toast");
-    el.textContent = text;
-    el.hidden = false;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () {
-      el.hidden = true;
-    }, 6000);
+  function toast(text, route) {
+    document.getElementById("admin-toast").textContent = text;
+    document.getElementById("admin-toast-box").hidden = false;
+    toastRoute = route || currentRoute;
+  }
+
+  function hideToast() {
+    document.getElementById("admin-toast-box").hidden = true;
+    document.getElementById("admin-toast").textContent = "";
+    toastRoute = null;
   }
 
   function alertError(text) {
@@ -111,6 +116,84 @@
     el.textContent = text || "";
     el.hidden = !text;
     if (text) el.scrollIntoView({ block: "nearest" });
+  }
+
+  // ------------------------------------------------------------------
+  // Confirmation dialog, in the site's own style. Cancel has focus to start
+  // with, Escape cancels, and focus goes back to what opened it.
+  //   askDialog({ title, message, actions: [{ id, label, style }], cancelLabel })
+  //   resolves to the chosen action's id, or null for Cancel / Escape.
+  // ------------------------------------------------------------------
+  var dialogPending = null;
+
+  function askDialog(options) {
+    var dialog = document.getElementById("admin-dialog");
+    if (dialogPending) return Promise.resolve(null);
+    if (typeof dialog.showModal !== "function") {
+      // Very old browsers: fall back to the plain confirm box.
+      var ok = window.confirm(options.title + "\n\n" + (options.message || ""));
+      return Promise.resolve(ok && options.actions && options.actions[0] ? options.actions[0].id : null);
+    }
+    var opener = document.activeElement;
+    document.getElementById("admin-dialog-title").textContent = options.title;
+    document.getElementById("admin-dialog-message").textContent = options.message || "";
+    var actions = document.getElementById("admin-dialog-actions");
+    actions.innerHTML = "";
+    var cancel = el("button", "btn btn-outline-dark", options.cancelLabel || "Cancel");
+    cancel.type = "submit";
+    cancel.value = "";
+    cancel.setAttribute("data-dialog-action", "cancel");
+    (options.actions || []).forEach(function (action) {
+      var btn = el(
+        "button",
+        "btn " +
+          (action.style === "danger" ? "btn-danger" : action.style === "primary" ? "btn-primary" : "btn-outline-dark"),
+        action.label,
+      );
+      btn.type = "submit";
+      btn.value = action.id;
+      actions.appendChild(btn);
+    });
+    actions.appendChild(cancel);
+    dialog.returnValue = "";
+    dialogPending = new Promise(function (resolve) {
+      dialog.addEventListener(
+        "close",
+        function () {
+          var choice = dialog.returnValue || null;
+          dialogPending = null;
+          var back = options.returnFocus || opener;
+          if (back && document.contains(back) && back.getClientRects().length) back.focus();
+          resolve(choice);
+        },
+        { once: true },
+      );
+    });
+    dialog.showModal();
+    cancel.focus();
+    return dialogPending;
+  }
+
+  function confirmAction(title, message, label, style) {
+    return askDialog({
+      title: title,
+      message: message,
+      actions: [{ id: "ok", label: label, style: style || "danger" }],
+    }).then(function (choice) {
+      return choice === "ok";
+    });
+  }
+
+  function confirmDiscardQuote(d) {
+    return confirmAction(
+      "Discard unsaved changes?",
+      "Your changes to " + describeDraft(d) + " haven't been saved. Discarding them can't be undone.",
+      "Discard changes",
+    );
+  }
+
+  function describeDraft(d) {
+    return d && d.address ? "the quote for " + d.address : "a new quote";
   }
 
   function formatDate(iso) {
@@ -181,30 +264,39 @@
       currentRoute = null;
       return;
     }
-    var leavingEditor =
-      (currentRoute === "new" || currentRoute === "details") && route !== "new" && route !== "details";
-    if (leavingEditor && draft && isDirty()) {
-      if (!window.confirm("Discard this quote's changes?")) {
-        history.replaceState(null, "", "#/" + currentRoute);
-        return;
-      }
+    if (route === "new") {
+      route = "details";
+      history.replaceState(null, "", "#/details");
+    }
+    // Leaving the quote or the prices with unsaved changes (e.g. the
+    // browser's Back button) asks first; until then, stay where we are.
+    var leavingEditor = currentRoute === "details" && route !== "details";
+    var leavingPrices = currentRoute === "prices" && route !== "prices";
+    if ((leavingEditor && draft && isDirty()) || (leavingPrices && ratesDirty())) {
+      var from = currentRoute;
+      history.replaceState(null, "", "#/" + from);
+      (leavingEditor ? confirmDiscardQuote(draft) : confirmDiscardPrices()).then(function (discard) {
+        if (!discard || currentRoute !== from) return;
+        if (leavingEditor) clearDraft();
+        ratesBaseline = null;
+        currentRoute = null;
+        navigate(route);
+      });
+      return;
     }
     if (leavingEditor) clearDraft();
+    if (leavingPrices) ratesBaseline = null;
 
-    if ((route === "new" || route === "details") && !draft) {
+    if (route === "details" && !draft) {
       route = "dashboard";
       history.replaceState(null, "", "#/dashboard");
     }
-    if (route === "details" && !draft.address) {
-      route = "new";
-      history.replaceState(null, "", "#/new");
-    }
 
     alertError("");
+    if (toastRoute && toastRoute !== route) hideToast();
     currentRoute = route;
     if (route === "dashboard") renderDashboard();
-    if (route === "new") renderStep1();
-    if (route === "details") renderStep2();
+    if (route === "details") renderEditor();
     if (route === "prices") renderRatesForm();
     showScreen(ROUTES[route]);
   }
@@ -215,7 +307,30 @@
   var draft = null;
 
   function snapshot(d) {
-    return JSON.stringify({ address: d.address, values: d.values, scope: d.scope });
+    return JSON.stringify({
+      address: d.address,
+      customer: cleanCustomer(d.customer),
+      values: d.values,
+      scope: d.scope,
+    });
+  }
+
+  // Optional customer details kept with a quote.
+  function cleanCustomer(c) {
+    c = c || {};
+    function text(v) {
+      return typeof v === "string" ? v.trim() : "";
+    }
+    return { name: text(c.name), phone: text(c.phone), email: text(c.email) };
+  }
+
+  function customerSummary(c) {
+    c = cleanCustomer(c);
+    return [c.name, c.phone, c.email].filter(Boolean).join(" · ");
+  }
+
+  function hasUnsavedDraft(stored) {
+    return !!(stored && stored.id && snapshot(stored) !== stored.baseline);
   }
 
   function isDirty() {
@@ -234,6 +349,23 @@
     }
   }
 
+  // The unsaved quote kept in this browser (shared by every tab), if any.
+  function readDraft() {
+    var d = readJson(DRAFT_KEY, null);
+    if (!d || !d.id) return null;
+    if (!d.customer) {
+      // Saved before customer details existed: compare like with like.
+      d.customer = cleanCustomer();
+      try {
+        var base = JSON.parse(d.baseline);
+        d.baseline = snapshot({ address: base.address, customer: null, values: base.values, scope: base.scope });
+      } catch (e) {
+        /* no usable baseline: treated as changed */
+      }
+    }
+    return d;
+  }
+
   function clearDraft() {
     draft = null;
     removeKey(DRAFT_KEY);
@@ -244,6 +376,7 @@
       id: "q_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
       isNew: true,
       address: "",
+      customer: cleanCustomer(),
       values: {},
       scope: {},
     };
@@ -277,6 +410,7 @@
       id: quote.id,
       isNew: false,
       address: quote.address || "",
+      customer: cleanCustomer(quote.customer),
       values: values,
       scope: legacy ? {} : Object.assign({}, bathroom.scope || {}),
       createdAt: quote.createdAt,
@@ -294,16 +428,21 @@
   }
 
   function cancelQuote() {
-    if (isDirty() && !window.confirm("Discard this quote's changes?")) return;
-    clearDraft();
-    currentRoute = "dashboard";
-    navigate("dashboard");
+    (isDirty() ? confirmDiscardQuote(draft) : Promise.resolve(true)).then(function (discard) {
+      if (!discard) return;
+      clearDraft();
+      currentRoute = "dashboard";
+      navigate("dashboard");
+    });
   }
 
   // ------------------------------------------------------------------
   // Dashboard
   // ------------------------------------------------------------------
+  // Quotes marked as having led to work are customer records: never
+  // counted as past retention or deleted by the bulk clean-up.
   function isPastRetention(quote) {
+    if (quote.ledToWork === true) return false;
     var last = new Date(quote.updatedAt || quote.createdAt).getTime();
     if (isNaN(last)) return false;
     return Date.now() - last > QUOTE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
@@ -342,7 +481,7 @@
         (expired.length === 1 ? " quote has" : " quotes have") +
         " not been updated in over " +
         QUOTE_RETENTION_DAYS +
-        " days. Delete any that didn't lead to work."
+        " days and not marked as led to work. Mark any that led to work, then delete the rest."
       : "No quotes in this browser are past the " + QUOTE_RETENTION_DAYS + "-day retention period.";
     textWrap.appendChild(text);
 
@@ -373,44 +512,50 @@
     if (expired.length) {
       actions.appendChild(
         makeButton("Delete Quotes Past Retention", "btn btn-outline-dark", function () {
-          if (
-            !window.confirm(
-              "Delete " +
-                expired.length +
-                " quote(s) not updated in over " +
-                QUOTE_RETENTION_DAYS +
-                " days? Only continue if none of them led to work. This cannot be undone.",
-            )
-          )
-            return;
-          var ids = expired.map(function (q) {
-            return q.id;
+          confirmAction(
+            "Delete quotes past retention?",
+            "Delete " +
+              expired.length +
+              (expired.length === 1 ? " quote" : " quotes") +
+              " not updated in over " +
+              QUOTE_RETENTION_DAYS +
+              " days? Quotes marked as led to work are kept. This can't be undone.",
+            "Delete " + expired.length + (expired.length === 1 ? " quote" : " quotes"),
+          ).then(function (ok) {
+            if (!ok) return;
+            var ids = getQuotes()
+              .filter(isPastRetention)
+              .map(function (q) {
+                return q.id;
+              });
+            var saved = saveQuotes(
+              getQuotes().filter(function (q) {
+                return ids.indexOf(q.id) === -1;
+              }),
+            );
+            if (!saved) return alertError(STORAGE_ERROR);
+            addRetentionLogEntry("quote-purge", ids.length);
+            toast(ids.length + (ids.length === 1 ? " quote" : " quotes") + " deleted.");
+            renderDashboard();
           });
-          var ok = saveQuotes(
-            getQuotes().filter(function (q) {
-              return ids.indexOf(q.id) === -1;
-            }),
-          );
-          if (!ok) return alertError(STORAGE_ERROR);
-          addRetentionLogEntry("quote-purge", ids.length);
-          toast(ids.length + " quote(s) deleted.");
-          renderDashboard();
         }),
       );
     }
     actions.appendChild(
       makeButton("Record Monthly Clean-Up", "btn btn-outline-dark", function () {
-        if (
-          !window.confirm(
-            "Record today's date as a completed monthly clean-up? Only continue once you have deleted, everywhere they are kept " +
-              "(email, voicemail and texts, the form service if one is used, and quotes in every browser that holds them), " +
-              "enquiries that didn't lead to work and are about a month old.",
-          )
-        )
-          return;
-        if (!addRetentionLogEntry("monthly-clean-up", null)) return alertError(STORAGE_ERROR);
-        toast("Monthly clean-up recorded.");
-        renderDashboard();
+        confirmAction(
+          "Record the monthly clean-up?",
+          "Only record today's date once you have deleted, everywhere they are kept (email, voicemail and texts, the form " +
+            "service if one is used, and quotes in every browser that holds them), enquiries that didn't lead to work " +
+            "and are about a month old.",
+          "Record clean-up",
+          "primary",
+        ).then(function (ok) {
+          if (!ok) return;
+          if (!addRetentionLogEntry("monthly-clean-up", null)) return alertError(STORAGE_ERROR);
+          toast("Monthly clean-up recorded.");
+          renderDashboard();
+        });
       }),
     );
     bar.appendChild(actions);
@@ -452,14 +597,24 @@
 
   function renderDraftBanner() {
     var banner = document.getElementById("draft-banner");
-    var stored = readJson(DRAFT_KEY, null);
-    if (!stored || !stored.id || snapshot(stored) === stored.baseline) {
+    var stored = readDraft();
+    if (!hasUnsavedDraft(stored)) {
       banner.hidden = true;
       return;
     }
     document.getElementById("draft-banner-text").textContent =
-      "You have unsaved changes to " + (stored.address ? "the quote for " + stored.address : "a new quote") + ".";
+      "You have unsaved changes to " + describeDraft(stored) + ".";
     banner.hidden = false;
+  }
+
+  // Search by address, customer name, email or phone (digits match however
+  // the number was typed).
+  function matchesFilter(quote, filter) {
+    var c = cleanCustomer(quote.customer);
+    var text = [quote.address, c.name, c.email, c.phone].join(" ").toLowerCase();
+    if (text.indexOf(filter) !== -1) return true;
+    var digits = filter.replace(/\D/g, "");
+    return digits.length >= 3 && c.phone.replace(/\D/g, "").indexOf(digits) !== -1;
   }
 
   function renderDashboard() {
@@ -480,11 +635,7 @@
     var filter = document.getElementById("quote-filter").value.trim().toLowerCase();
     var quotes = filter
       ? all.filter(function (q) {
-          return (
-            String(q.address || "")
-              .toLowerCase()
-              .indexOf(filter) !== -1
-          );
+          return matchesFilter(q, filter);
         })
       : all;
 
@@ -512,6 +663,8 @@
       var h2 = document.createElement("h2");
       h2.textContent = quote.address;
       main.appendChild(h2);
+      var who = customerSummary(quote.customer);
+      if (who) main.appendChild(el("p", "quote-card-customer", who));
 
       var meta = document.createElement("p");
       meta.className = "quote-card-meta";
@@ -532,6 +685,7 @@
       chip("Bathroom");
       if (Number(bathroom.totalPrice) > 0 || !legacy) chip("Total " + money(bathroom.totalPrice), "quote-price-chip");
       if (legacy) chip("Needs review: old calculator", "quote-attention-chip");
+      if (quote.ledToWork === true) chip("Led to work", "quote-won-chip");
       if (isPastRetention(quote)) chip("Past retention period", "quote-attention-chip");
       main.appendChild(chips);
 
@@ -551,33 +705,101 @@
       }
       actions.appendChild(pdfBtn);
       actions.appendChild(
-        makeButton("Delete", "danger", function () {
-          if (!window.confirm('Delete the quote for "' + quote.address + '"? This cannot be undone.')) return;
-          var ok = saveQuotes(
+        makeButton(quote.ledToWork === true ? "Unmark Led to Work" : "Mark as Led to Work", "", function () {
+          setLedToWork(quote.id, quote.ledToWork !== true);
+        }),
+      );
+      var deleteBtn = makeButton("Delete", "danger", function () {
+        confirmAction(
+          "Delete this quote?",
+          "Delete the quote for " + quote.address + "? This can't be undone.",
+          "Delete quote",
+        ).then(function (ok) {
+          if (!ok) return;
+          var saved = saveQuotes(
             getQuotes().filter(function (q) {
               return q.id !== quote.id;
             }),
           );
-          if (!ok) return alertError(STORAGE_ERROR);
+          if (!saved) return alertError(STORAGE_ERROR);
           toast("Quote for " + quote.address + " deleted.");
           renderDashboard();
-        }),
-      );
-
+          document.getElementById("quote-filter").focus();
+        });
+      });
+      deleteBtn.setAttribute("aria-label", "Delete the quote for " + quote.address);
+      actions.appendChild(deleteBtn);
       card.appendChild(main);
       card.appendChild(actions);
       list.appendChild(card);
     });
   }
 
+  function setLedToWork(id, value) {
+    var now = new Date().toISOString();
+    var quotes = getQuotes().map(function (q) {
+      if (q.id !== id) return q;
+      var updated = Object.assign({}, q, { ledToWork: value, statusChangedAt: now });
+      if (!value) delete updated.ledToWork;
+      return updated;
+    });
+    if (!saveQuotes(quotes)) return alertError(STORAGE_ERROR);
+    var quote = quotes.filter(function (q) {
+      return q.id === id;
+    })[0];
+    toast(
+      value
+        ? "Quote for " + quote.address + " marked as led to work. It is kept as a customer record."
+        : "Quote for " + quote.address + " is no longer marked as led to work.",
+    );
+    renderDashboard();
+    var again = document.querySelector(
+      '.quote-card[data-quote-id="' + id + '"] .quote-card-actions button:nth-child(3)',
+    );
+    if (again) again.focus();
+  }
+
+  // Opening a quote never silently replaces unsaved changes to another one.
   function openQuoteForEdit(id) {
     var quote = getQuotes().filter(function (q) {
       return q.id === id;
     })[0];
     if (!quote) return;
-    draft = draftFromQuote(quote);
-    persistDraft();
-    navigate("details");
+    var stored = readDraft();
+    if (hasUnsavedDraft(stored) && stored.id === id) {
+      // Unsaved changes to this same quote: carry on with them.
+      draft = stored;
+      return navigate("details");
+    }
+    var ask = hasUnsavedDraft(stored)
+      ? askUnsavedDraft(
+          stored,
+          "Discard them and open the quote for " + quote.address + ", or resume them?",
+          "Discard and open",
+        )
+      : Promise.resolve("discard");
+    ask.then(function (choice) {
+      if (choice === "resume") {
+        draft = stored;
+        navigate("details");
+      } else if (choice === "discard") {
+        draft = draftFromQuote(quote);
+        persistDraft();
+        navigate("details");
+      }
+    });
+  }
+
+  // Resume / discard / cancel for unsaved changes to another quote.
+  function askUnsavedDraft(stored, message, discardLabel) {
+    return askDialog({
+      title: "You have unsaved changes",
+      message: "Your changes to " + describeDraft(stored) + " haven't been saved. " + message,
+      actions: [
+        { id: "resume", label: "Resume changes", style: "primary" },
+        { id: "discard", label: discardLabel, style: "danger" },
+      ],
+    });
   }
 
   // ------------------------------------------------------------------
@@ -612,6 +834,11 @@
     toast("Exported " + quotes.length + (quotes.length === 1 ? " quote." : " quotes."));
   }
 
+  // When a quote last changed: an edit, or marking it as led to work.
+  function lastChanged(q) {
+    return Math.max(new Date(q.updatedAt).getTime() || 0, new Date(q.statusChangedAt).getTime() || 0);
+  }
+
   function importQuotes(file) {
     var reader = new FileReader();
     reader.onload = function () {
@@ -638,15 +865,25 @@
         if (byId[q.id] === undefined) {
           quotes.push(q);
           added++;
-        } else if (new Date(q.updatedAt) > new Date(quotes[byId[q.id]].updatedAt)) {
+        } else if (lastChanged(q) > lastChanged(quotes[byId[q.id]])) {
           quotes[byId[q.id]] = q;
           updated++;
         }
       });
-      if (!window.confirm("Import " + added + " new quote(s) and update " + updated + " with newer copies?")) return;
-      if (!saveQuotes(quotes)) return alertError(STORAGE_ERROR);
-      toast("Imported " + added + " new and " + updated + " updated quote(s).");
-      renderDashboard();
+      if (!added && !updated) {
+        return toast("Nothing new to import: every quote in that file is already here and up to date.");
+      }
+      confirmAction(
+        "Import quotes?",
+        "Import " + added + " new quote(s) and update " + updated + " with newer copies from this file?",
+        "Import quotes",
+        "primary",
+      ).then(function (ok) {
+        if (!ok) return;
+        if (!saveQuotes(quotes)) return alertError(STORAGE_ERROR);
+        toast("Imported " + added + " new and " + updated + " updated quote(s).");
+        renderDashboard();
+      });
     };
     reader.onerror = function () {
       alertError("That file couldn't be read, so nothing was imported.");
@@ -676,7 +913,7 @@
         totals.push({ label: "Estimated Labor Total", value: money(result.total), strong: true });
         var doc = window.EstimatePdf.build({
           title: "Bathroom Restoration — Labor Estimate",
-          preparedFor: quote.address,
+          preparedFor: [cleanCustomer(quote.customer).name, quote.address].filter(Boolean).join(", "),
           intro: "Labor estimate for the work listed below.",
           lines: result.lines.map(function (l) {
             return { label: l.label, detail: l.detail, amount: money(l.cost) };
@@ -723,29 +960,54 @@
   }
 
   // ------------------------------------------------------------------
-  // Step 1: property
+  // Property and customer (top of the quote screen)
   // ------------------------------------------------------------------
-  function renderStep1() {
+  var CUSTOMER_FIELDS = { name: "quote-customer-name", phone: "quote-customer-phone", email: "quote-customer-email" };
+
+  function renderQuoteHeader() {
+    document.getElementById("quote-eyebrow").textContent = draft.isNew ? "New Quote" : "Editing Quote";
     document.getElementById("quote-address").value = draft.address || "";
-    document.getElementById("step1-error").hidden = true;
-    document.getElementById("step1-eyebrow").textContent = draft.isNew ? "New Quote" : "Editing Quote";
+    var customer = cleanCustomer(draft.customer);
+    Object.keys(CUSTOMER_FIELDS).forEach(function (key) {
+      document.getElementById(CUSTOMER_FIELDS[key]).value = customer[key];
+    });
+    ["quote-address", "quote-customer-phone", "quote-customer-email"].forEach(function (id) {
+      setInputError(id, null);
+    });
   }
 
-  function handleStep1Submit(e) {
-    e.preventDefault();
-    var address = document.getElementById("quote-address").value.trim();
-    if (!address) {
-      document.getElementById("step1-error").hidden = false;
-      document.getElementById("quote-address").focus();
-      return;
+  function setInputError(id, message) {
+    var input = document.getElementById(id);
+    var error = document.getElementById(id + "-error");
+    if (message) error.textContent = message;
+    error.hidden = !message;
+    input.setAttribute("aria-invalid", message ? "true" : "false");
+    input.closest(".form-group").classList.toggle("has-error", !!message);
+  }
+
+  // Address is required; the customer's details are optional but must look
+  // right if given. Returns the id of the first field with a problem.
+  function validateQuoteHeader() {
+    var problems = {};
+    if (!String(draft.address || "").trim()) problems["quote-address"] = "Enter the property address.";
+    var c = cleanCustomer(draft.customer);
+    var digits = c.phone.replace(/\D/g, "");
+    if (c.phone && (!/^[0-9+().\-\s]+$/.test(c.phone) || digits.length < 10 || digits.length > 15)) {
+      problems["quote-customer-phone"] = "Enter a phone number with 10 to 15 digits, or leave it blank.";
     }
-    draft.address = address;
-    persistDraft();
-    navigate("details");
+    if (c.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(c.email)) {
+      problems["quote-customer-email"] = "Enter an email address like name@example.com, or leave it blank.";
+    }
+    var first = null;
+    ["quote-address", "quote-customer-phone", "quote-customer-email"].forEach(function (id) {
+      setInputError(id, problems[id] || null);
+      if (problems[id] && !first) first = id;
+    });
+    return first;
   }
 
   // ------------------------------------------------------------------
-  // Step 2: the bathroom calculator. Every row shows its own cost in one
+  // The bathroom calculator. Every row shows its own cost in one
   // right-hand column; the numbers all come from Pricing.computeEstimate.
   // ------------------------------------------------------------------
   var calc = null; // { costCells: [{ el, keys }], errorEls: {}, recompute }
@@ -880,7 +1142,7 @@
 
   function section(title, note) {
     var wrap = el("section", "calc-section");
-    wrap.appendChild(el("h3", "calc-section-title", title));
+    wrap.appendChild(el("h2", "calc-section-title", title));
     if (note) wrap.appendChild(el("p", "admin-warning-inline", note));
     return wrap;
   }
@@ -901,16 +1163,16 @@
     if (input) input.setAttribute("aria-invalid", message ? "true" : "false");
   }
 
-  function renderStep2() {
+  function renderEditor() {
     var prices = Pricing.getPrices();
     calc = { costCells: [], errorEls: {}, recompute: null };
-    document.getElementById("step2-address-label").textContent = draft.address;
-    document.getElementById("step2-error").hidden = true;
+    renderQuoteHeader();
+    document.getElementById("quote-error").hidden = true;
     var saveBtn = document.getElementById("save-quote-btn");
     saveBtn.disabled = false;
     saveBtn.textContent = "Save Quote";
 
-    var container = document.getElementById("step2-sections");
+    var container = document.getElementById("quote-sections");
     container.innerHTML = "";
     var root = el("div", "bathroom-calculator");
 
@@ -1107,19 +1369,25 @@
 
   var saving = false;
 
-  function handleStep2Submit(e) {
+  function handleQuoteSubmit(e) {
     e.preventDefault();
     if (saving || !draft) return;
-    var errorBox = document.getElementById("step2-error");
+    var errorBox = document.getElementById("quote-error");
+    var firstHeaderProblem = validateQuoteHeader();
     var validation = Pricing.validateJob(draft.values, draft.scope, { includeTrade: true });
     Object.keys(calc.errorEls).forEach(function (key) {
       setFieldError(key, validation.errors[key] || null);
     });
-    if (!validation.valid) {
-      var count = Object.keys(validation.errors).length;
+    if (firstHeaderProblem || !validation.valid) {
+      var count =
+        Object.keys(validation.errors).length + document.querySelectorAll("#screen-quote .form-group.has-error").length;
       errorBox.textContent =
         "Fix the " + (count === 1 ? "highlighted answer" : count + " highlighted answers") + " before saving.";
       errorBox.hidden = false;
+      if (firstHeaderProblem) {
+        document.getElementById(firstHeaderProblem).focus();
+        return;
+      }
       var firstKey = Object.keys(calc.errorEls).filter(function (k) {
         return validation.errors[k];
       })[0];
@@ -1166,8 +1434,8 @@
     })[0];
     var record = Object.assign({}, existing || {}, {
       id: draft.id,
-      address: draft.address,
-      categories: ["bathroom"],
+      address: draft.address.trim(),
+      customer: cleanCustomer(draft.customer),
       data: { bathroom: bathroom },
       createdAt: (existing && existing.createdAt) || draft.createdAt || now,
       updatedAt: now,
@@ -1180,7 +1448,7 @@
       quotes.push(record);
     }
 
-    var address = draft.address;
+    var address = draft.address.trim();
     if (!saveQuotes(quotes)) {
       saving = false;
       saveBtn.disabled = false;
@@ -1238,6 +1506,38 @@
     },
   ];
 
+  // What the price fields held when the screen opened, to know whether
+  // leaving would throw edits away.
+  var ratesBaseline = null;
+
+  function ratesSnapshot() {
+    return JSON.stringify(
+      Array.prototype.map.call(document.querySelectorAll("#rates-form input[name]"), function (input) {
+        return [input.name, input.value.trim()];
+      }),
+    );
+  }
+
+  function ratesDirty() {
+    return ratesBaseline !== null && ratesSnapshot() !== ratesBaseline;
+  }
+
+  function confirmDiscardPrices() {
+    return confirmAction(
+      "Discard price changes?",
+      "Your changes to Business Prices haven't been saved.",
+      "Discard changes",
+    );
+  }
+
+  function leavePrices() {
+    (ratesDirty() ? confirmDiscardPrices() : Promise.resolve(true)).then(function (discard) {
+      if (!discard) return;
+      ratesBaseline = null;
+      navigate("dashboard");
+    });
+  }
+
   function renderRatesForm() {
     var prices = Pricing.getPrices();
     var container = document.getElementById("rates-sections");
@@ -1268,6 +1568,7 @@
       });
       container.appendChild(group);
     });
+    ratesBaseline = ratesSnapshot();
   }
 
   function handleRatesSubmit(e) {
@@ -1289,26 +1590,34 @@
       return;
     }
     if (!writeJson(Pricing.RATES_KEY, { prices: prices })) return alertError(STORAGE_ERROR);
+    ratesBaseline = null;
+    toast("Business prices saved.", "dashboard");
     navigate("dashboard");
-    toast("Business prices saved.");
   }
 
   // ------------------------------------------------------------------
   // Wire up
   // ------------------------------------------------------------------
   function startNewQuote() {
-    var stored = readJson(DRAFT_KEY, null);
-    if (stored && stored.id && snapshot(stored) !== stored.baseline) {
-      if (!window.confirm("You have unsaved changes to another quote. Discard them and start a new quote?")) return;
-    }
-    draft = newDraft();
-    persistDraft();
-    navigate("new");
+    var stored = readDraft();
+    var ask = hasUnsavedDraft(stored)
+      ? askUnsavedDraft(stored, "Discard them and start a new quote, or resume them?", "Discard and start new")
+      : Promise.resolve("discard");
+    ask.then(function (choice) {
+      if (choice === "resume") {
+        draft = stored;
+        navigate("details");
+      } else if (choice === "discard") {
+        draft = newDraft();
+        persistDraft();
+        navigate("details");
+      }
+    });
   }
 
   document.addEventListener("DOMContentLoaded", function () {
     // Restore an unsaved quote (e.g. after a reload).
-    var stored = readJson(DRAFT_KEY, null);
+    var stored = readDraft();
     if (stored && stored.id) draft = stored;
 
     document.getElementById("login-form").addEventListener("submit", function (e) {
@@ -1340,41 +1649,50 @@
     });
     document.getElementById("quote-filter").addEventListener("input", renderDashboard);
     document.getElementById("draft-resume-btn").addEventListener("click", function () {
-      draft = readJson(DRAFT_KEY, null);
-      if (draft) navigate(draft.address ? "details" : "new");
+      draft = readDraft();
+      if (draft) navigate("details");
     });
     document.getElementById("draft-discard-btn").addEventListener("click", function () {
-      if (!window.confirm("Discard this quote's changes?")) return;
-      clearDraft();
-      renderDashboard();
+      var stored = readDraft();
+      confirmDiscardQuote(stored).then(function (discard) {
+        if (!discard) return;
+        clearDraft();
+        renderDashboard();
+        document.getElementById("create-quote-btn").focus();
+      });
     });
+    document.getElementById("admin-toast-close").addEventListener("click", hideToast);
     document.getElementById("rates-form").addEventListener("submit", handleRatesSubmit);
-    document.getElementById("step1-form").addEventListener("submit", handleStep1Submit);
     document.getElementById("quote-address").addEventListener("input", function (e) {
       if (!draft) return;
-      draft.address = e.target.value.trim();
-      document.getElementById("step1-error").hidden = true;
+      draft.address = e.target.value;
+      setInputError("quote-address", null);
       persistDraft();
     });
-    document.getElementById("step2-form").addEventListener("submit", handleStep2Submit);
-    document.getElementById("step2-back").addEventListener("click", function () {
-      navigate("new");
+    Object.keys(CUSTOMER_FIELDS).forEach(function (key) {
+      var input = document.getElementById(CUSTOMER_FIELDS[key]);
+      input.addEventListener("input", function () {
+        if (!draft) return;
+        draft.customer = cleanCustomer(draft.customer);
+        draft.customer[key] = input.value;
+        if (key !== "name") setInputError(CUSTOMER_FIELDS[key], null);
+        persistDraft();
+      });
     });
+    document.getElementById("quote-form").addEventListener("submit", handleQuoteSubmit);
     Array.prototype.forEach.call(document.querySelectorAll('[data-action="cancel-quote"]'), function (btn) {
       btn.addEventListener("click", cancelQuote);
     });
-    Array.prototype.forEach.call(document.querySelectorAll('[data-action="back-to-dashboard"]'), function (btn) {
-      btn.addEventListener("click", function () {
-        navigate("dashboard");
-      });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-action="leave-prices"]'), function (btn) {
+      btn.addEventListener("click", leavePrices);
     });
     window.addEventListener("hashchange", function () {
       render(routeFromHash());
     });
 
     var route = routeFromHash();
-    if (draft && (route === "new" || route === "details") && isAuthed() && snapshot(draft) !== draft.baseline) {
-      toast("Restored your unsaved changes" + (draft.address ? " to the quote for " + draft.address : "") + ".");
+    if (draft && (route === "new" || route === "details") && isAuthed() && hasUnsavedDraft(draft)) {
+      toast("Restored your unsaved changes to " + describeDraft(draft) + ".", "details");
     }
     render(route);
   });

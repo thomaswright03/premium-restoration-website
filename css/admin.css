@@ -58,33 +58,58 @@
   text-align: left;
 }
 
-/* Messages */
+/* Messages: at the top of the screen in their own space, so they never
+   cover a button; dismissible. */
 .admin-messages {
-  position: fixed;
-  left: 50%;
-  bottom: var(--space-5);
-  transform: translateX(-50%);
-  z-index: 50;
-  width: min(560px, calc(100% - 2 * var(--gutter)));
+  max-width: calc(900px + 2 * var(--gutter));
+  margin: 0 auto;
+  padding: 0 var(--gutter);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  pointer-events: none;
 }
 
 .admin-toast,
 .admin-alert {
-  margin: 0;
+  margin: var(--space-5) 0 0;
   padding: var(--space-3) var(--space-5);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-  pointer-events: auto;
+  box-shadow: var(--shadow-soft);
+  overflow-wrap: anywhere;
 }
 
 .admin-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-right: var(--space-2);
   background: var(--color-selected-bg);
   color: var(--color-selected-ink);
   font-weight: 500;
+}
+
+.admin-toast p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-message-close {
+  flex-shrink: 0;
+  width: var(--tap);
+  height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.admin-message-close:hover {
+  background: color-mix(in srgb, currentColor 14%, transparent);
 }
 
 .admin-alert {
@@ -92,6 +117,50 @@
   color: var(--color-ink);
   border: 1px solid var(--color-danger);
   border-left-width: 4px;
+}
+
+/* Confirmation dialog */
+.admin-dialog {
+  width: min(480px, calc(100% - 2 * var(--gutter)));
+  padding: var(--space-6);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: var(--shadow);
+}
+
+.admin-dialog::backdrop {
+  background: rgba(20, 18, 15, 0.6);
+}
+
+.admin-dialog-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-lg);
+}
+
+.admin-dialog-message {
+  margin: 0 0 var(--space-5);
+  color: var(--color-ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.admin-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.btn-danger {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-surface);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
 }
 
 /* Header shared by the post-login screens */
@@ -248,6 +317,12 @@
   overflow-wrap: anywhere;
 }
 
+.quote-card-customer {
+  margin: 0 0 var(--space-1);
+  color: var(--color-ink-soft);
+  overflow-wrap: anywhere;
+}
+
 .quote-card-meta {
   color: var(--color-muted);
   font-size: var(--fs-sm);
@@ -274,6 +349,12 @@
   background: var(--color-selected-bg);
   border-color: var(--color-selected-bg);
   color: var(--color-selected-ink);
+  font-weight: 600;
+}
+
+.quote-won-chip {
+  border-color: var(--color-success);
+  color: var(--color-success);
   font-weight: 600;
 }
 
@@ -306,9 +387,16 @@
   color: var(--color-accent-text);
 }
 
-.quote-card-actions button.danger:hover {
+/* Delete always looks destructive, not only on hover. */
+.quote-card-actions button.danger {
   border-color: var(--color-danger);
   color: var(--color-danger);
+}
+
+.quote-card-actions button.danger:hover:not(:disabled) {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-surface);
 }
 
 .quote-card-actions button:disabled {
@@ -390,8 +478,7 @@
   padding: var(--space-6);
 }
 
-.admin-panel label,
-.admin-field-label {
+.admin-panel label {
   display: block;
   font-weight: 600;
   margin: 0 0 var(--space-2);
@@ -401,10 +488,31 @@
   color: var(--color-ink-soft);
 }
 
-.admin-scope-fixed {
-  margin: 0;
-  font-size: var(--fs-md);
-  color: var(--color-ink);
+/* Property and customer, at the top of the quote screen */
+.calc-section.quote-customer {
+  border-top: none;
+  padding-top: 0;
+}
+
+.quote-customer .form-group {
+  margin-bottom: var(--space-4);
+}
+
+.quote-customer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: 0 var(--space-5);
+}
+
+.admin-optional {
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-muted);
+}
+
+.form-group.has-error input {
+  border-bottom-color: var(--color-danger);
 }
 
 .admin-form-actions {
@@ -421,11 +529,6 @@
   margin-bottom: var(--space-6);
   padding-top: var(--space-5);
   border-top: 1px solid var(--color-line);
-}
-
-.bathroom-calculator > .calc-section:first-of-type {
-  border-top: none;
-  padding-top: 0;
 }
 
 .calc-section-title {

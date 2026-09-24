@@ -41,11 +41,33 @@
       </form>
     </main>
 
-    <!-- Messages shown on any screen: save confirmations and storage errors -->
+    <!-- Messages shown at the top of any screen (save confirmations, storage errors). They take their own
+         space, so they never cover a button, and stay until dismissed or the screen changes. -->
     <div class="admin-messages">
-      <p id="admin-toast" class="admin-toast" role="status" aria-live="polite" hidden></p>
+      <div id="admin-toast-box" class="admin-toast" hidden>
+        <p id="admin-toast" role="status" aria-live="polite"></p>
+        <button type="button" class="admin-message-close" id="admin-toast-close" aria-label="Dismiss message">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
       <div id="admin-alert" class="admin-alert" role="alert" hidden></div>
     </div>
+
+    <!-- Confirmation dialog (js/admin.js askDialog) -->
+    <dialog
+      id="admin-dialog"
+      class="admin-dialog"
+      aria-labelledby="admin-dialog-title"
+      aria-describedby="admin-dialog-message"
+    >
+      <form method="dialog" class="admin-dialog-form">
+        <h2 id="admin-dialog-title" class="admin-dialog-title"></h2>
+        <p id="admin-dialog-message" class="admin-dialog-message"></p>
+        <div id="admin-dialog-actions" class="admin-dialog-actions"></div>
+      </form>
+    </dialog>
 
     <!-- DASHBOARD -->
     <main id="screen-dashboard" class="admin-screen" hidden>
@@ -84,72 +106,86 @@
       <div id="retention-bar" class="retention-bar" hidden></div>
 
       <div class="admin-filter">
-        <label for="quote-filter">Find a quote by address</label>
-        <input type="search" id="quote-filter" placeholder="Start typing an address" autocomplete="off" />
+        <label for="quote-filter">Find a quote by address or customer</label>
+        <input type="search" id="quote-filter" placeholder="Address, name, phone or email" autocomplete="off" />
       </div>
       <p id="quote-count" class="admin-muted admin-count" aria-live="polite"></p>
       <div id="quote-list" class="quote-list"></div>
       <p id="quote-list-empty" class="admin-muted" hidden>No quotes yet. Choose "Create New Quote" to get started.</p>
       <p class="admin-muted admin-footnote">
-        Data handling: quotes contain homeowners' property addresses and are saved only in this browser (use Export
-        Quotes to keep a copy). Delete quotes that didn't lead to work after about a month (30 days; the public Privacy
-        Notice says enquiries are kept for about a month), and delete a quote promptly if the homeowner asks. The
-        clean-up record above is kept only in this browser, so also note each clean-up in the business's own records.
-        Tax on labor: the tax rate defaults to 0% &mdash; only change it under Business Prices once a tax adviser
-        confirms tax applies.
+        Data handling: quotes contain homeowners' property addresses and, if entered, customers' names and contact
+        details. They are saved only in this browser (use Export Quotes to keep a copy). Delete quotes that didn't lead
+        to work after about a month (30 days; the public Privacy Notice says enquiries are kept for about a month), mark
+        quotes that did lead to work so they are kept, and delete a quote promptly if the homeowner asks. The clean-up
+        record above is kept only in this browser, so also note each clean-up in the business's own records. Tax on
+        labor: the tax rate defaults to 0% &mdash; only change it under Business Prices once a tax adviser confirms tax
+        applies.
       </p>
     </main>
 
-    <!-- STEP 1: PROPERTY -->
-    <main id="screen-step1" class="admin-screen" hidden>
+    <!-- QUOTE: property, customer and the bathroom calculator on one screen -->
+    <main id="screen-quote" class="admin-screen" hidden>
       <header class="admin-header">
         <div>
-          <p class="eyebrow" id="step1-eyebrow">New Quote</p>
-          <h1>Property &amp; Scope</h1>
+          <p class="eyebrow" id="quote-eyebrow">New Quote</p>
+          <h1>Bathroom Quote</h1>
         </div>
         <button class="admin-link-btn" type="button" data-action="cancel-quote">Cancel</button>
       </header>
 
-      <form id="step1-form" class="admin-panel" novalidate>
-        <div class="form-group">
-          <label for="quote-address">Property address (listing name)</label>
-          <input
-            type="text"
-            id="quote-address"
-            name="address"
-            placeholder="123 Main St, Springfield"
-            required
-            aria-describedby="step1-error"
-          />
-        </div>
-        <div class="form-group">
-          <p class="admin-field-label">Scope</p>
-          <p class="admin-scope-fixed">Bathroom restoration</p>
-          <p class="admin-muted admin-small">We only take on bathroom restorations.</p>
-        </div>
-        <p id="step1-error" class="admin-error" role="alert" hidden>Enter the property address.</p>
+      <form id="quote-form" class="admin-panel" novalidate>
+        <section class="calc-section quote-customer" aria-labelledby="quote-customer-title">
+          <h2 class="calc-section-title" id="quote-customer-title">Property &amp; customer</h2>
+          <div class="form-group">
+            <label for="quote-address">Property address</label>
+            <input
+              type="text"
+              id="quote-address"
+              name="address"
+              placeholder="123 Main St, Springfield"
+              autocomplete="off"
+              required
+              aria-describedby="quote-address-error"
+            />
+            <p id="quote-address-error" class="calc-error" hidden>Enter the property address.</p>
+          </div>
+          <div class="quote-customer-grid">
+            <div class="form-group">
+              <label for="quote-customer-name">Customer name <span class="admin-optional">(optional)</span></label>
+              <input type="text" id="quote-customer-name" name="customerName" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label for="quote-customer-phone">Phone <span class="admin-optional">(optional)</span></label>
+              <input
+                type="tel"
+                id="quote-customer-phone"
+                name="customerPhone"
+                inputmode="tel"
+                autocomplete="off"
+                aria-describedby="quote-customer-phone-error"
+              />
+              <p id="quote-customer-phone-error" class="calc-error" hidden></p>
+            </div>
+            <div class="form-group">
+              <label for="quote-customer-email">Email <span class="admin-optional">(optional)</span></label>
+              <input
+                type="email"
+                id="quote-customer-email"
+                name="customerEmail"
+                autocomplete="off"
+                aria-describedby="quote-customer-email-error"
+              />
+              <p id="quote-customer-email-error" class="calc-error" hidden></p>
+            </div>
+          </div>
+          <p class="admin-muted admin-small">
+            Scope: bathroom restoration only. We only take on bathroom restorations.
+          </p>
+        </section>
+        <div id="quote-sections"></div>
+        <p id="quote-error" class="admin-error" role="alert" hidden></p>
         <div class="admin-form-actions">
           <button type="button" class="btn btn-outline-dark" data-action="cancel-quote">Cancel</button>
-          <button type="submit" class="btn btn-primary">Get Started</button>
-        </div>
-      </form>
-    </main>
-
-    <!-- STEP 2: QUOTE DETAILS -->
-    <main id="screen-step2" class="admin-screen" hidden>
-      <header class="admin-header">
-        <div>
-          <p class="eyebrow" id="step2-address-label">New Quote</p>
-          <h1>Quote Details</h1>
-        </div>
-        <button class="admin-link-btn" type="button" data-action="cancel-quote">Cancel</button>
-      </header>
-
-      <form id="step2-form" class="admin-panel" novalidate>
-        <div id="step2-sections"></div>
-        <p id="step2-error" class="admin-error" role="alert" hidden></p>
-        <div class="admin-form-actions">
-          <button type="button" class="btn btn-outline-dark" id="step2-back">Back</button>
           <button type="submit" class="btn btn-primary" id="save-quote-btn">Save Quote</button>
         </div>
       </form>
@@ -162,7 +198,7 @@
           <p class="eyebrow">Bathroom Pricing</p>
           <h1>Business Prices</h1>
         </div>
-        <button class="admin-link-btn" type="button" data-action="back-to-dashboard">Cancel</button>
+        <button class="admin-link-btn" type="button" data-action="leave-prices">Cancel</button>
       </header>
 
       <form id="rates-form" class="admin-panel" novalidate>
@@ -177,7 +213,7 @@
         </p>
         <div id="rates-sections"></div>
         <div class="admin-form-actions">
-          <button type="button" class="btn btn-outline-dark" data-action="back-to-dashboard">Cancel</button>
+          <button type="button" class="btn btn-outline-dark" data-action="leave-prices">Cancel</button>
           <button type="submit" class="btn btn-primary">Save Prices</button>
         </div>
       </form>

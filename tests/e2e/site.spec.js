@@ -164,9 +164,9 @@ test.describe("accessibility", () => {
       await page.fill("#login-password", "templein26)");
       await page.click('button:has-text("Log In")');
       await page.click("#create-quote-btn");
-      await page.fill("#quote-address", "1 Contrast St");
-      await page.click('button:has-text("Get Started")');
+      await page.fill("#quote-customer-email", "not-an-email");
       await page.click("#save-quote-btn"); // show validation messages
+      await expect(page.locator("#quote-address-error")).toBeVisible();
       results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
       expect(results.violations.flatMap((v) => v.nodes.map((n) => n.target + " " + n.failureSummary))).toEqual([]);
     });
