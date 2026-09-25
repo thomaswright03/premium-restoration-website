@@ -1,142 +1,189 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Admin | Premium Restoration</title>
-<meta name="robots" content="noindex, nofollow" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="../css/style.css" />
-<link rel="stylesheet" href="../css/admin.css" />
-</head>
-<body class="admin-body">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin | Premium Restoration</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <!-- chrome:head -->
+    <meta name="theme-color" content="#15130f" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="../favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("pr_theme");
+          if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="../css/style.css" />
+    <!-- /chrome:head -->
+    <link rel="stylesheet" href="../css/admin.css" />
+  </head>
+  <body class="admin-body">
+    <!-- LOGIN -->
+    <main id="screen-login" class="admin-screen admin-login-screen">
+      <form id="login-form" class="admin-login-card">
+        <p class="eyebrow">Staff Access</p>
+        <h1>Admin Login</h1>
+        <p class="admin-muted">Enter the password to open the quoting tool.</p>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" name="password" autocomplete="current-password" required />
+        </div>
+        <p id="login-error" class="admin-error" role="alert" hidden>Incorrect password. Try again.</p>
+        <button type="submit" class="btn btn-primary btn-block">Log In</button>
+      </form>
+    </main>
 
-<!-- LOGIN SCREEN -->
-<section id="screen-login" class="admin-screen admin-login-screen">
-  <form id="login-form" class="admin-login-card">
-    <span class="eyebrow">Staff Access</span>
-    <h1>Admin Login</h1>
-    <p class="admin-muted">Enter the password to access the quoting tool.</p>
-    <div class="form-group">
-      <label for="login-password">Password</label>
-      <input type="password" id="login-password" name="password" autocomplete="current-password" required />
-    </div>
-    <p id="login-error" class="admin-error" hidden>Incorrect password. Try again.</p>
-    <button type="submit" class="btn btn-primary admin-btn-block">Log In</button>
-  </form>
-</section>
-
-<!-- DASHBOARD SCREEN -->
-<section id="screen-dashboard" class="admin-screen" hidden>
-  <header class="admin-header">
-    <div>
-      <span class="eyebrow">Premium Restoration</span>
-      <h1>Restoration Quoting</h1>
-    </div>
-    <button id="logout-btn" class="admin-link-btn" type="button">Log Out</button>
-  </header>
-
-  <div class="admin-toolbar">
-    <button id="create-quote-btn" class="btn btn-primary" type="button">Create New Quote</button>
-    <button id="open-rates-btn" class="btn btn-outline-dark" type="button">Business Prices</button>
-  </div>
-
-  <div id="quote-list" class="quote-list"></div>
-  <p id="quote-list-empty" class="admin-muted" hidden>No quotes yet. Click "Create New Quote" to get started.</p>
-</section>
-
-<!-- STEP 1: ADDRESS + CATEGORIES -->
-<section id="screen-step1" class="admin-screen" hidden>
-  <header class="admin-header">
-    <div>
-      <span class="eyebrow">New Quote</span>
-      <h1>Property &amp; Scope</h1>
-    </div>
-    <button class="admin-link-btn" type="button" data-action="back-to-dashboard">Cancel</button>
-  </header>
-
-  <form id="step1-form" class="admin-panel">
-    <div class="form-group">
-      <label for="quote-address">Address (Listing Name)</label>
-      <input type="text" id="quote-address" name="address" placeholder="123 Main St, Springfield" required />
+    <!-- Messages shown on any screen: save confirmations and storage errors -->
+    <div class="admin-messages">
+      <p id="admin-toast" class="admin-toast" role="status" aria-live="polite" hidden></p>
+      <div id="admin-alert" class="admin-alert" role="alert" hidden></div>
     </div>
 
-    <div class="form-group">
-      <label>Categories</label>
-      <div class="checkbox-grid">
-        <label class="checkbox-tile coming-soon">
-          <span class="coming-soon-banner">Coming Soon!</span>
-          <input type="checkbox" name="category" value="exterior" disabled />
-          <span>Exterior</span>
-        </label>
-        <label class="checkbox-tile coming-soon">
-          <span class="coming-soon-banner">Coming Soon!</span>
-          <input type="checkbox" name="category" value="kitchen" disabled />
-          <span>Kitchen</span>
-        </label>
-        <label class="checkbox-tile">
-          <input type="checkbox" name="category" value="bathroom" />
-          <span>Bathroom</span>
-        </label>
-        <label class="checkbox-tile coming-soon">
-          <span class="coming-soon-banner">Coming Soon!</span>
-          <input type="checkbox" name="category" value="flooring" disabled />
-          <span>Flooring</span>
-        </label>
+    <!-- DASHBOARD -->
+    <main id="screen-dashboard" class="admin-screen" hidden>
+      <header class="admin-header">
+        <div>
+          <p class="eyebrow">Premium Restoration</p>
+          <h1>Restoration Quoting</h1>
+        </div>
+        <div class="admin-header-actions">
+          <div class="theme-switch admin-theme-switch" role="group" aria-label="Colour theme">
+            <button type="button" data-theme-choice="system" aria-pressed="true">System</button>
+            <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+            <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+          </div>
+          <button id="logout-btn" class="admin-link-btn" type="button">Log Out</button>
+        </div>
+      </header>
+
+      <div id="draft-banner" class="admin-panel-note" hidden>
+        <p id="draft-banner-text"></p>
+        <div class="admin-inline-actions">
+          <button type="button" class="btn btn-primary" id="draft-resume-btn">Resume</button>
+          <button type="button" class="btn btn-outline-dark" id="draft-discard-btn">Discard</button>
+        </div>
       </div>
-    </div>
 
-    <p id="step1-error" class="admin-error" hidden>Enter an address and select at least one category.</p>
-    <button type="submit" class="btn btn-primary">Get Started</button>
-  </form>
-</section>
+      <div class="admin-toolbar">
+        <button id="create-quote-btn" class="btn btn-primary" type="button">Create New Quote</button>
+        <button id="open-rates-btn" class="btn btn-outline-dark" type="button">Business Prices</button>
+        <button id="export-quotes-btn" class="btn btn-outline-dark" type="button">Export Quotes</button>
+        <label class="btn btn-outline-dark admin-file-btn" for="import-quotes-input">Import Quotes</label>
+        <input id="import-quotes-input" class="visually-hidden" type="file" accept="application/json,.json" />
+      </div>
 
-<!-- STEP 2: CATEGORY DETAILS -->
-<section id="screen-step2" class="admin-screen" hidden>
-  <header class="admin-header">
-    <div>
-      <span class="eyebrow" id="step2-address-label">New Quote</span>
-      <h1>Quote Details</h1>
-    </div>
-    <button class="admin-link-btn" type="button" data-action="back-to-dashboard">Cancel</button>
-  </header>
+      <div id="price-drift-notice" class="admin-notice-slot" hidden></div>
+      <div id="retention-bar" class="retention-bar" hidden></div>
 
-  <form id="step2-form" class="admin-panel">
-    <div id="step2-sections"></div>
-    <div class="admin-form-actions">
-      <button type="button" class="btn btn-outline-dark" data-action="back-to-step1">Back</button>
-      <button type="submit" class="btn btn-primary">Save Quote</button>
-    </div>
-  </form>
-</section>
+      <div class="admin-filter">
+        <label for="quote-filter">Find a quote by address</label>
+        <input type="search" id="quote-filter" placeholder="Start typing an address" autocomplete="off" />
+      </div>
+      <p id="quote-count" class="admin-muted admin-count" aria-live="polite"></p>
+      <div id="quote-list" class="quote-list"></div>
+      <p id="quote-list-empty" class="admin-muted" hidden>No quotes yet. Choose "Create New Quote" to get started.</p>
+      <p class="admin-muted admin-footnote">
+        Data handling: quotes contain homeowners' property addresses and are saved only in this browser (use Export
+        Quotes to keep a copy). Delete quotes that didn't lead to work after about a month (30 days; the public Privacy
+        Notice says enquiries are kept for about a month), and delete a quote promptly if the homeowner asks. The
+        clean-up record above is kept only in this browser, so also note each clean-up in the business's own records.
+        Tax on labor: the tax rate defaults to 0% &mdash; only change it under Business Prices once a tax adviser
+        confirms tax applies.
+      </p>
+    </main>
 
-<!-- BUSINESS PRICES -->
-<section id="screen-rates" class="admin-screen" hidden>
-  <header class="admin-header">
-    <div>
-      <span class="eyebrow">Bathroom Remodel Pricing</span>
-      <h1>Business Prices</h1>
-    </div>
-    <button class="admin-link-btn" type="button" data-action="back-to-dashboard">Cancel</button>
-  </header>
+    <!-- STEP 1: PROPERTY -->
+    <main id="screen-step1" class="admin-screen" hidden>
+      <header class="admin-header">
+        <div>
+          <p class="eyebrow" id="step1-eyebrow">New Quote</p>
+          <h1>Property &amp; Scope</h1>
+        </div>
+        <button class="admin-link-btn" type="button" data-action="cancel-quote">Cancel</button>
+      </header>
 
-  <form id="rates-form" class="admin-panel">
-    <p class="admin-muted rates-intro">
-      A flat $ price per unit for each item — not hours x rate. Set them once
-      here — every bathroom quote reuses them automatically. These are labor
-      prices only; materials are never included.
-    </p>
-    <div id="rates-sections"></div>
-    <div class="admin-form-actions">
-      <button type="button" class="btn btn-outline-dark" data-action="back-to-dashboard">Cancel</button>
-      <button type="submit" class="btn btn-primary">Save Prices</button>
-    </div>
-  </form>
-</section>
+      <form id="step1-form" class="admin-panel" novalidate>
+        <div class="form-group">
+          <label for="quote-address">Property address (listing name)</label>
+          <input
+            type="text"
+            id="quote-address"
+            name="address"
+            placeholder="123 Main St, Springfield"
+            required
+            aria-describedby="step1-error"
+          />
+        </div>
+        <div class="form-group">
+          <p class="admin-field-label">Scope</p>
+          <p class="admin-scope-fixed">Bathroom restoration</p>
+          <p class="admin-muted admin-small">We only take on bathroom restorations.</p>
+        </div>
+        <p id="step1-error" class="admin-error" role="alert" hidden>Enter the property address.</p>
+        <div class="admin-form-actions">
+          <button type="button" class="btn btn-outline-dark" data-action="cancel-quote">Cancel</button>
+          <button type="submit" class="btn btn-primary">Get Started</button>
+        </div>
+      </form>
+    </main>
 
-<script src="../js/bathroom-pricing.js"></script>
-<script src="../js/admin.js"></script>
-</body>
+    <!-- STEP 2: QUOTE DETAILS -->
+    <main id="screen-step2" class="admin-screen" hidden>
+      <header class="admin-header">
+        <div>
+          <p class="eyebrow" id="step2-address-label">New Quote</p>
+          <h1>Quote Details</h1>
+        </div>
+        <button class="admin-link-btn" type="button" data-action="cancel-quote">Cancel</button>
+      </header>
+
+      <form id="step2-form" class="admin-panel" novalidate>
+        <div id="step2-sections"></div>
+        <p id="step2-error" class="admin-error" role="alert" hidden></p>
+        <div class="admin-form-actions">
+          <button type="button" class="btn btn-outline-dark" id="step2-back">Back</button>
+          <button type="submit" class="btn btn-primary" id="save-quote-btn">Save Quote</button>
+        </div>
+      </form>
+    </main>
+
+    <!-- BUSINESS PRICES -->
+    <main id="screen-rates" class="admin-screen" hidden>
+      <header class="admin-header">
+        <div>
+          <p class="eyebrow">Bathroom Pricing</p>
+          <h1>Business Prices</h1>
+        </div>
+        <button class="admin-link-btn" type="button" data-action="back-to-dashboard">Cancel</button>
+      </header>
+
+      <form id="rates-form" class="admin-panel" novalidate>
+        <p class="admin-muted rates-intro">
+          A flat $ price per unit for each item — not hours x rate. Set them once here and every bathroom quote uses
+          them. These are labor prices only; materials are never included.
+        </p>
+        <p class="admin-muted rates-intro">
+          The public website shows its own published prices (for example $60 per cabinet and $5 per sq ft of flooring).
+          If you change a price here that the website also shows, ask your web developer to update the website prices
+          too, or quotes won't match what the website advertises. The dashboard warns you when they differ.
+        </p>
+        <div id="rates-sections"></div>
+        <div class="admin-form-actions">
+          <button type="button" class="btn btn-outline-dark" data-action="back-to-dashboard">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Prices</button>
+        </div>
+      </form>
+    </main>
+
+    <script src="../js/bathroom-pricing.js"></script>
+    <script src="../js/theme.js"></script>
+    <script src="../js/estimate-pdf.js"></script>
+    <script src="../js/admin.js"></script>
+  </body>
 </html>

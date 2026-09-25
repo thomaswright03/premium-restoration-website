@@ -1,0 +1,18 @@
+{
+  "_help": "Site settings. Edit, commit and push; Vercel redeploys in about a minute and visitors get the change on their next page load. See README.md 'Site settings'.",
+  "priceEstimator": {
+    "enabled": true
+  },
+  "leadForm": {
+    "endpoint": "",
+    "serviceName": "",
+    "servicePrivacyUrl": ""
+  },
+  "owner": {
+    "legalName": "",
+    "contactAddress": ""
+  },
+  "privacy": {
+    "responsePeriod": ""
+  }
+}
