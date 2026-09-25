@@ -455,3 +455,75 @@ test("clampEntryOffset keeps an offset within the door's clearance envelope on t
 test("clampEntryOffset never goes below the half-width even on a wall shorter than the door's own span", () => {
   assert.equal(L.clampEntryOffset(1, 0.5), 1.25);
 });
+
+test("every fixture's footprint is its real-world size in inches", () => {
+  var F = L.FIXTURE_LAYOUT;
+  assert.equal(F.Bathtub_Quantity.wallSpan, 60 / 12);
+  assert.equal(F.Bathtub_Quantity.depth, 30 / 12);
+  assert.equal(F.Shower_Quantity.wallSpan, 36 / 12);
+  assert.equal(F.Shower_Quantity.depth, 36 / 12);
+  assert.equal(F.Vanity_Quantity.depth, 21 / 12);
+  assert.equal(F.Vanity_Quantity.height, 34 / 12);
+  assert.equal(F.Sink_Quantity.wallSpan, 22 / 12);
+  assert.equal(F.Door_Quantity.wallSpan, 30 / 12);
+  assert.equal(F.Door_Quantity.height, 80 / 12);
+  // Mirrors hang with their bottom edge 40in off the floor.
+  assert.ok(Math.abs(F.Mirror_Quantity.mountHeight - F.Mirror_Quantity.height / 2 - 40 / 12) < 1e-9);
+  assert.ok(Math.abs(F.Mirror_Huge_Quantity.mountHeight - F.Mirror_Huge_Quantity.height / 2 - 40 / 12) < 1e-9);
+});
+
+test("sampleCounts scales with floor area", () => {
+  var small = L.sampleCounts(8, 5);
+  assert.equal(small.Toilet_Quantity, 1);
+  assert.equal(small.Vanity_Quantity, 1);
+  assert.equal(small.Shower_Quantity, 0);
+  assert.equal(small.Cabinet_Quantity, 0);
+  var mid = L.sampleCounts(12, 9);
+  assert.equal(mid.Shower_Quantity, 1);
+  assert.equal(mid.Vanity_Quantity, 2);
+  assert.equal(mid.Cabinet_Quantity, 1);
+  var big = L.sampleCounts(24, 14);
+  assert.equal(big.Toilet_Quantity, 5);
+  assert.equal(big.Vanity_Quantity, 3);
+  assert.equal(L.sampleCounts(50, 50).Toilet_Quantity, 6);
+});
+
+test("computeLayout without showSamples places only what was asked for", () => {
+  var result = L.computeLayout({ widthFt: 12, lengthFt: 9, fixtureCounts: {} });
+  assert.deepEqual(result.placements, []);
+});
+
+test("computeLayout with showSamples fills unanswered counts, flagged sample", () => {
+  var result = L.computeLayout({ widthFt: 12, lengthFt: 9, fixtureCounts: {}, showSamples: true });
+  var keys = result.placements.map((p) => p.fixtureKey);
+  ["Toilet_Quantity", "Bathtub_Quantity", "Shower_Quantity", "Vanity_Quantity", "Mirror_Quantity"].forEach((k) =>
+    assert.ok(keys.indexOf(k) !== -1, k),
+  );
+  result.placements.forEach((p) => assert.equal(p.sample, true));
+  assert.deepEqual(result.droppedCounts, {});
+});
+
+test("computeLayout: an answered count (including 0) replaces that fixture's samples", () => {
+  var result = L.computeLayout({
+    widthFt: 12,
+    lengthFt: 9,
+    fixtureCounts: { Toilet_Quantity: 0, Vanity_Quantity: 1 },
+    showSamples: true,
+  });
+  assert.equal(result.placements.filter((p) => p.fixtureKey === "Toilet_Quantity").length, 0);
+  var vanities = result.placements.filter((p) => p.fixtureKey === "Vanity_Quantity");
+  assert.equal(vanities.length, 1);
+  assert.equal(vanities[0].sample, undefined);
+});
+
+test("computeLayout: sample toilets in a large restroom line up along one wall", () => {
+  var result = L.computeLayout({ widthFt: 24, lengthFt: 14, fixtureCounts: {}, showSamples: true });
+  var toilets = result.placements.filter((p) => p.fixtureKey === "Toilet_Quantity");
+  assert.equal(toilets.length, 5);
+  toilets.forEach((p) => assert.equal(p.wallId, toilets[0].wallId));
+});
+
+test("computeLayout: samples that don't fit are left out without being reported as dropped", () => {
+  var result = L.computeLayout({ widthFt: 3, lengthFt: 3, fixtureCounts: {}, showSamples: true });
+  assert.deepEqual(result.droppedCounts, {});
+});

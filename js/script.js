@@ -441,6 +441,12 @@ document.addEventListener("DOMContentLoaded", function () {
           fieldEls[field.key] = { wrap: fieldWrap, error: errorEl, focus: input, input: input };
           readers.push(function () {
             quoteState.values[field.key] = input.value.trim();
+            // Submitting the fixtures group answers every count, blanks
+            // included (blank means none), so the 3D preview's sample
+            // fixtures give way to exactly what the visitor entered.
+            if (group.id !== "dimensions" && window.BathroomRoom3D) {
+              window.BathroomRoom3D.setFixtureCount(field.key, input.value);
+            }
           });
         }
         fieldWrap.appendChild(errorEl);
