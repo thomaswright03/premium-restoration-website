@@ -87,7 +87,7 @@ test("computeLayout: two large fixtures genuinely competing for wall space still
 
 test("computeLayout: entry door prefers the South wall when it is empty", () => {
   var result = L.computeLayout({ widthFt: 10, lengthFt: 8, fixtureCounts: { Door_Quantity: 1 } });
-  var door = result.placements[0];
+  var door = result.placements.filter((p) => p.fixtureKey === "Door_Quantity")[0];
   assert.equal(door.wallId, "S");
 });
 
@@ -187,8 +187,61 @@ test("computeLayout: an oversized request (max count of one fixture) in the tiny
   assert.ok(placed > 0);
 });
 
-test("computeLayout handles the default footprint (8x5) with no fixtures", () => {
+test("computeLayout handles the default footprint (8x5) with no fixtures answered: one sample toilet", () => {
   var result = L.computeLayout({ widthFt: 8, lengthFt: 5, fixtureCounts: {} });
+  assert.equal(result.placements.length, 1);
+  assert.equal(result.placements[0].fixtureKey, "Toilet_Quantity");
+  assert.equal(result.placements[0].sample, true);
+  assert.deepEqual(result.droppedCounts, {});
+});
+
+test("computeLayout: an explicit toilet count of 0 shows no toilets at all", () => {
+  var result = L.computeLayout({ widthFt: 8, lengthFt: 5, fixtureCounts: { Toilet_Quantity: 0 } });
+  assert.deepEqual(result.placements, []);
+  assert.deepEqual(result.droppedCounts, {});
+});
+
+test("computeLayout: an answered toilet count replaces the samples and is not flagged sample", () => {
+  var result = L.computeLayout({ widthFt: 24, lengthFt: 14, fixtureCounts: { Toilet_Quantity: 1 } });
+  var toilets = result.placements.filter((p) => p.fixtureKey === "Toilet_Quantity");
+  assert.equal(toilets.length, 1);
+  assert.equal(toilets[0].sample, undefined);
+});
+
+test("sampleToiletCount scales with floor area: one in a home bath, a capped row in a big restroom", () => {
+  assert.equal(L.sampleToiletCount(8, 5), 1);
+  assert.equal(L.sampleToiletCount(10, 8), 1);
+  assert.equal(L.sampleToiletCount(14, 10), 2);
+  assert.equal(L.sampleToiletCount(24, 14), 5);
+  assert.equal(L.sampleToiletCount(50, 50), 6);
+});
+
+test("toilet footprint uses real-world size and IRC clearances", () => {
+  var t = L.FIXTURE_LAYOUT.Toilet_Quantity;
+  assert.equal(t.depth, 29 / 12);
+  assert.equal(t.wallSpan, 30 / 12);
+  assert.equal(t.clearFront, 21 / 12);
+});
+
+test("computeLayout: sample toilets line up on one wall at 30 in or more on center", () => {
+  var result = L.computeLayout({ widthFt: 24, lengthFt: 14, fixtureCounts: {} });
+  var toilets = result.placements.filter((p) => p.fixtureKey === "Toilet_Quantity");
+  assert.equal(toilets.length, 5);
+  toilets.forEach((p) => assert.equal(p.wallId, "N"));
+  for (var i = 1; i < toilets.length; i++) assert.ok(toilets[i].x - toilets[i - 1].x >= 2.5);
+  // First centerline at least 15 in off the side wall.
+  assert.ok(toilets[0].x >= 15 / 12);
+});
+
+test("computeLayout: a toilet is never placed where it lacks 21 in of floor in front", () => {
+  // 10 x 3: the long walls face only 3 ft of floor, the short walls are too narrow.
+  var result = L.computeLayout({ widthFt: 10, lengthFt: 3, fixtureCounts: { Toilet_Quantity: 1 } });
+  assert.equal(result.placements.length, 0);
+  assert.equal(result.droppedCounts.Toilet_Quantity, 1);
+});
+
+test("computeLayout: sample toilets that don't fit are left out without being reported as dropped", () => {
+  var result = L.computeLayout({ widthFt: 2, lengthFt: 2, fixtureCounts: {} });
   assert.deepEqual(result.placements, []);
   assert.deepEqual(result.droppedCounts, {});
 });

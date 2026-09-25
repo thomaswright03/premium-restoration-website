@@ -22,6 +22,32 @@
   var DEFAULT_ROOM = { widthFt: 8, lengthFt: 5, heightFt: 8 };
   var DIMENSION_BOUNDS = { widthFt: 50, lengthFt: 50, heightFt: 20 };
   var RENDER_MIN_DIM = 2; // floor for a sane, non-degenerate rendered room
+
+  // Real-world size of a standard two-piece elongated toilet, in inches —
+  // the 3D module builds its toilet mesh from these same numbers.
+  // clearWidthIn/clearFrontIn are the IRC R307 minimums: 15 in from the
+  // centerline to any side wall or fixture (30 in total) and 21 in of open
+  // floor in front of the bowl.
+  var TOILET = {
+    depthIn: 29, // wall to front of bowl
+    roughInIn: 12, // wall to drain centerline
+    bowlWidthIn: 15,
+    bowlLengthIn: 18.5, // elongated bowl, rim front-to-back
+    rimHeightIn: 15,
+    seatHeightIn: 16,
+    tankWidthIn: 20,
+    tankDepthIn: 8,
+    tankTopIn: 30,
+    clearWidthIn: 30,
+    clearFrontIn: 21,
+  };
+
+  // Before the visitor has answered the toilet count, the preview shows
+  // sample toilets so the room reads as a bathroom at a believable scale:
+  // one per ~60 sq ft of floor (a home bath gets one, a big commercial
+  // restroom a row of them), capped, and only as many as actually fit.
+  var SAMPLE_TOILET_SQFT_EACH = 60;
+  var SAMPLE_TOILET_MAX = 6;
   var MAX_FIXTURE_COUNT = 20; // mirrors Pricing.MAX_FIXTURE_COUNT
 
   // Per-fixture footprint, in feet, used by the layout algorithm below.
@@ -32,8 +58,20 @@
   // mount: "floor" (walks the wall scan), "attach" (rides along with
   // another floor fixture instance by index), or "wall" (attaches to a
   // placed floor fixture from its anchors list).
+  // clearFront: open floor the fixture needs in front of it; a wall whose
+  // room depth can't hold depth + clearFront is skipped for that fixture.
+  // sameWall: every instance scans from the same starting wall, so several
+  // of them line up in a row (restroom-style) instead of spreading around
+  // the room.
   var FIXTURE_LAYOUT = {
-    Toilet_Quantity: { wallSpan: 0.9, depth: 1.1, height: 1.0, mount: "floor" },
+    Toilet_Quantity: {
+      wallSpan: TOILET.clearWidthIn / 12,
+      depth: TOILET.depthIn / 12,
+      height: TOILET.tankTopIn / 12,
+      clearFront: TOILET.clearFrontIn / 12,
+      mount: "floor",
+      sameWall: true,
+    },
     Bathtub_Quantity: { wallSpan: 5.2, depth: 2.6, height: 1.6, mount: "floor" },
     Shower_Quantity: { wallSpan: 3.2, depth: 3.2, height: 6.5, mount: "floor" },
     Shower_Door_Quantity: { wallSpan: 2.5, depth: 0.1, height: 6.5, mount: "attach", attachTo: "Shower_Quantity" },
@@ -138,6 +176,11 @@
   // starts, since the dimensions chat group is only asked when the chosen
   // scope needs floor/wall area (see scopeNeeds() in bathroom-pricing.js) —
   // a fixtures-only job never asks for width/length/height at all.
+  function sampleToiletCount(widthFt, lengthFt) {
+    var areaSqFt = (widthFt || DEFAULT_ROOM.widthFt) * (lengthFt || DEFAULT_ROOM.lengthFt);
+    return clamp(Math.floor(areaSqFt / SAMPLE_TOILET_SQFT_EACH), 1, SAMPLE_TOILET_MAX);
+  }
+
   function computeRoomDimensions(dims) {
     dims = dims || {};
     return {
@@ -153,10 +196,40 @@
   // already spoken for during one computeLayout() call.
   function wallsFor(widthFt, lengthFt) {
     return [
-      { id: "N", originX: 0, originZ: 0, dirX: 1, dirZ: 0, span: widthFt, facingY: 0, used: 0 },
-      { id: "E", originX: widthFt, originZ: 0, dirX: 0, dirZ: 1, span: lengthFt, facingY: -Math.PI / 2, used: 0 },
-      { id: "S", originX: widthFt, originZ: lengthFt, dirX: -1, dirZ: 0, span: widthFt, facingY: Math.PI, used: 0 },
-      { id: "W", originX: 0, originZ: lengthFt, dirX: 0, dirZ: -1, span: lengthFt, facingY: Math.PI / 2, used: 0 },
+      { id: "N", originX: 0, originZ: 0, dirX: 1, dirZ: 0, span: widthFt, roomDepth: lengthFt, facingY: 0, used: 0 },
+      {
+        id: "E",
+        originX: widthFt,
+        originZ: 0,
+        dirX: 0,
+        dirZ: 1,
+        span: lengthFt,
+        roomDepth: widthFt,
+        facingY: -Math.PI / 2,
+        used: 0,
+      },
+      {
+        id: "S",
+        originX: widthFt,
+        originZ: lengthFt,
+        dirX: -1,
+        dirZ: 0,
+        span: widthFt,
+        roomDepth: lengthFt,
+        facingY: Math.PI,
+        used: 0,
+      },
+      {
+        id: "W",
+        originX: 0,
+        originZ: lengthFt,
+        dirX: 0,
+        dirZ: -1,
+        span: lengthFt,
+        roomDepth: widthFt,
+        facingY: Math.PI / 2,
+        used: 0,
+      },
     ];
   }
 
@@ -172,12 +245,18 @@
   }
 
   function wallFits(wall, footprint) {
+    if (footprint.clearFront != null && wall.roomDepth < footprint.depth + footprint.clearFront) return false;
     return wall.span - wall.used >= footprint.wallSpan + 2 * MARGIN;
   }
 
   // Deterministic, pure: the same (widthFt, lengthFt, fixtureCounts) triple
   // always produces byte-identical placements. No Math.random, no
   // object-iteration-order dependence.
+  //
+  // A Toilet_Quantity that is missing (not yet answered, as opposed to an
+  // explicit 0) gets sampleToiletCount() toilets, flagged sample: true;
+  // samples that don't fit are left out quietly rather than reported in
+  // droppedCounts, since the visitor never asked for them.
   function computeLayout(input) {
     input = input || {};
     var widthFt = input.widthFt || DEFAULT_ROOM.widthFt;
@@ -208,10 +287,13 @@
     // Pass 1: floor-standing fixtures.
     FLOOR_PRIORITY.forEach(function (fixtureKey, priorityIdx) {
       var footprint = FIXTURE_LAYOUT[fixtureKey];
-      var count = clamp(Math.floor(fixtureCounts[fixtureKey] || 0), 0, MAX_FIXTURE_COUNT);
+      var isSample = fixtureKey === "Toilet_Quantity" && fixtureCounts[fixtureKey] == null;
+      var count = isSample
+        ? sampleToiletCount(widthFt, lengthFt)
+        : clamp(Math.floor(fixtureCounts[fixtureKey] || 0), 0, MAX_FIXTURE_COUNT);
       placedByType[fixtureKey] = [];
       for (var i = 0; i < count; i++) {
-        var candidateWalls = scanOrderFor(priorityIdx, i);
+        var candidateWalls = scanOrderFor(priorityIdx, footprint.sameWall ? 0 : i);
         if (footprint.preferWall) {
           var preferred = wallByIdOrder([footprint.preferWall])[0];
           if (preferred && preferred.used === 0) candidateWalls = [preferred];
@@ -224,12 +306,13 @@
           }
         }
         if (!chosen) {
-          droppedCounts[fixtureKey] = (droppedCounts[fixtureKey] || 0) + 1;
+          if (!isSample) droppedCounts[fixtureKey] = (droppedCounts[fixtureKey] || 0) + 1;
           continue;
         }
         var placement = placeOnWall(chosen, footprint);
         placement.fixtureKey = fixtureKey;
         placement.index = i;
+        if (isSample) placement.sample = true;
         chosen.used += footprint.wallSpan + MARGIN;
         placements.push(placement);
         placedByType[fixtureKey].push(placement);
@@ -352,6 +435,8 @@
     RENDER_MIN_DIM: RENDER_MIN_DIM,
     MAX_FIXTURE_COUNT: MAX_FIXTURE_COUNT,
     FIXTURE_LAYOUT: FIXTURE_LAYOUT,
+    TOILET: TOILET,
+    sampleToiletCount: sampleToiletCount,
     applyDimensionInput: applyDimensionInput,
     applyFixtureInput: applyFixtureInput,
     computeRoomDimensions: computeRoomDimensions,

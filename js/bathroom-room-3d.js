@@ -62,14 +62,37 @@ function buildMaterials(isDark) {
     metalness: 0.6,
     roughness: 0.35,
   });
-  return { porcelain: porcelain, cabinetWood: cabinetWood, doorTone: doorTone, glass: glass, brass: brass };
+  // The toilet reads as real vitreous china rather than the stylized
+  // brand-toned stand-ins: glossy white with a soft chrome for its trim.
+  var toiletPorcelain = new THREE.MeshStandardMaterial({
+    color: isDark ? 0xdedbd5 : 0xf7f6f3,
+    roughness: 0.28,
+    metalness: 0,
+    side: THREE.DoubleSide,
+  });
+  var toiletSeat = new THREE.MeshStandardMaterial({ color: isDark ? 0xe6e3dd : 0xfdfcfa, roughness: 0.45 });
+  var toiletWater = new THREE.MeshStandardMaterial({
+    color: 0x9fc7d6,
+    roughness: 0.1,
+    transparent: true,
+    opacity: 0.75,
+  });
+  var chrome = new THREE.MeshStandardMaterial({ color: 0xd6dadf, metalness: 0.55, roughness: 0.22 });
+  return {
+    porcelain: porcelain,
+    cabinetWood: cabinetWood,
+    doorTone: doorTone,
+    glass: glass,
+    brass: brass,
+    toiletPorcelain: toiletPorcelain,
+    toiletSeat: toiletSeat,
+    toiletWater: toiletWater,
+    chrome: chrome,
+  };
 }
 
 function buildGeometries() {
-  return {
-    toiletBowl: new THREE.CylinderGeometry(0.5, 0.55, 0.9, 16),
-    toiletTank: new THREE.BoxGeometry(0.55, 0.65, 0.3),
-    toiletSeat: new THREE.TorusGeometry(0.42, 0.06, 8, 24),
+  return Object.assign(toiletGeometries(), {
     sinkBasin: new THREE.CylinderGeometry(0.7, 0.6, 0.15, 16),
     sinkColumn: new THREE.CylinderGeometry(0.18, 0.22, 2.4, 12),
     bathtubOuter: new THREE.BoxGeometry(5.2, 1.6, 2.6),
@@ -88,7 +111,7 @@ function buildGeometries() {
     mirrorHugeGlass: new THREE.PlaneGeometry(3.35, 3.85),
     mirrorHugeFrameEdge: new THREE.BoxGeometry(0.06, 3.85, 0.06),
     shelfBody: new THREE.BoxGeometry(0.8, 0.15, 0.2),
-  };
+  });
 }
 
 function frameStrips(edgeGeometry, mat, width, height) {
@@ -107,21 +130,128 @@ function frameStrips(edgeGeometry, mat, width, height) {
   return group;
 }
 
+// A standard two-piece elongated toilet at real size, built from
+// Layout.TOILET (inches, converted to feet here). Local origin sits on the
+// wall at floor level (z=0, y=0); the fixture projects forward into the
+// room as z increases — the tank near the wall, the bowl further out,
+// matching every other floor fixture builder in this file.
 function buildToilet(geo, mat) {
-  // Local origin sits on the wall (z=0); the fixture projects forward into
-  // the room as z increases — the tank sits near the wall, the bowl further
-  // out, matching every other floor fixture builder in this file.
+  var T = Layout.TOILET;
+  var ft = function (inches) {
+    return inches / 12;
+  };
   var g = new THREE.Group();
-  var tank = new THREE.Mesh(geo.toiletTank, mat.porcelain);
-  tank.position.set(0, 0.75, 0.15);
-  var bowl = new THREE.Mesh(geo.toiletBowl, mat.porcelain);
-  bowl.position.set(0, 0.45, 0.6);
-  var seat = new THREE.Mesh(geo.toiletSeat, mat.porcelain);
-  seat.rotation.x = Math.PI / 2;
-  seat.scale.set(1, 1, 0.5);
-  seat.position.set(0, 0.92, 0.6);
-  g.add(bowl, tank, seat);
+
+  // Bowl: one lathe profile (pedestal flaring up to the rim, then back down
+  // the inside of the basin), stretched front-to-back into an elongated
+  // oval. Its center sits so the bowl's front edge lands at depthIn.
+  var bowlCenterZ = ft(T.depthIn - T.bowlLengthIn / 2);
+  var bowl = new THREE.Mesh(geo.toiletBowl, mat.toiletPorcelain);
+  bowl.scale.set(1, 1, T.bowlLengthIn / T.bowlWidthIn);
+  bowl.position.set(0, 0, bowlCenterZ);
+
+  var water = new THREE.Mesh(geo.toiletWater, mat.toiletWater);
+  water.rotation.x = -Math.PI / 2;
+  water.scale.set(1, T.bowlLengthIn / T.bowlWidthIn, 1);
+  water.position.set(0, ft(9), bowlCenterZ);
+
+  // Back of the bowl (the deck the seat hinges on) bridging to the tank.
+  var deck = new THREE.Mesh(geo.toiletDeck, mat.toiletPorcelain);
+  deck.position.set(0, ft(T.rimHeightIn - 1.5), ft(T.tankDepthIn + 3.5));
+
+  // Seat ring and raised lid, leaning back against the tank.
+  var seat = new THREE.Mesh(geo.toiletSeat, mat.toiletSeat);
+  seat.rotation.x = -Math.PI / 2;
+  seat.position.set(0, ft(T.rimHeightIn), bowlCenterZ + ft(0.5));
+  var lid = new THREE.Mesh(geo.toiletLid, mat.toiletSeat);
+  lid.rotation.x = -0.12;
+  lid.position.set(0, ft(T.seatHeightIn + T.bowlLengthIn / 2), ft(T.depthIn - T.bowlLengthIn + 0.5));
+
+  // Tank and lid, 1 in off the finished wall.
+  var tankHeightIn = T.tankTopIn - 1 - T.rimHeightIn;
+  var tank = new THREE.Mesh(geo.toiletTank, mat.toiletPorcelain);
+  tank.position.set(0, ft(T.rimHeightIn + tankHeightIn / 2), ft(1 + T.tankDepthIn / 2));
+  var tankLid = new THREE.Mesh(geo.toiletTankLid, mat.toiletPorcelain);
+  tankLid.position.set(0, ft(T.tankTopIn - 0.5), ft(1 + T.tankDepthIn / 2));
+
+  // Chrome trip lever on the front-left of the tank.
+  var handle = new THREE.Mesh(geo.toiletHandle, mat.chrome);
+  handle.position.set(ft(-T.tankWidthIn / 2 + 3), ft(T.tankTopIn - 4), ft(1 + T.tankDepthIn + 0.3));
+
+  // Supply stop and line coming out of the wall on the left.
+  var stop = new THREE.Mesh(geo.toiletSupplyStop, mat.chrome);
+  stop.rotation.x = Math.PI / 2;
+  stop.position.set(ft(-6), ft(7), ft(1));
+  var line = new THREE.Mesh(geo.toiletSupplyLine, mat.chrome);
+  line.position.set(ft(-6), ft(7 + (T.rimHeightIn - 7) / 2 + 0.5), ft(2));
+
+  // Floor bolt caps either side of the drain (roughInIn from the wall).
+  var boltL = new THREE.Mesh(geo.toiletBoltCap, mat.toiletPorcelain);
+  boltL.position.set(ft(-4.5), 0, ft(T.roughInIn));
+  var boltR = boltL.clone();
+  boltR.position.set(ft(4.5), 0, ft(T.roughInIn));
+
+  g.add(bowl, water, deck, seat, lid, tank, tankLid, handle, stop, line, boltL, boltR);
   return g;
+}
+
+function toiletGeometries() {
+  var T = Layout.TOILET;
+  var ft = function (inches) {
+    return inches / 12;
+  };
+  var r = ft(T.bowlWidthIn / 2);
+  var rim = ft(T.rimHeightIn);
+  // [radius, height] pairs, outside going up, then inside going down.
+  var profile = [
+    [0, 0],
+    [ft(4.8), 0],
+    [ft(5), ft(0.6)],
+    [ft(4.6), ft(3)],
+    [ft(4.4), ft(5.5)],
+    [ft(5.2), ft(8.5)],
+    [r - ft(0.9), ft(12)],
+    [r, rim - ft(1)],
+    [r, rim],
+    [r - ft(1.3), rim],
+    [r - ft(1.6), rim - ft(1.5)],
+    [ft(4.8), ft(11)],
+    [ft(3.6), ft(9)],
+    [ft(2.2), ft(7.5)],
+    [0, ft(7)],
+  ].map(function (pt) {
+    return new THREE.Vector2(pt[0], pt[1]);
+  });
+
+  var seatOuter = new THREE.Shape();
+  seatOuter.absellipse(0, 0, r + ft(0.3), ft(T.bowlLengthIn / 2 + 0.3), 0, Math.PI * 2, false, 0);
+  var seatHole = new THREE.Path();
+  seatHole.absellipse(0, -ft(0.6), r - ft(2.3), ft(T.bowlLengthIn / 2 - 3), 0, Math.PI * 2, true, 0);
+  seatOuter.holes.push(seatHole);
+  var lidShape = new THREE.Shape();
+  lidShape.absellipse(0, 0, r + ft(0.2), ft(T.bowlLengthIn / 2 + 0.2), 0, Math.PI * 2, false, 0);
+
+  var tankHeightIn = T.tankTopIn - 1 - T.rimHeightIn;
+  return {
+    toiletBowl: new THREE.LatheGeometry(profile, 40),
+    toiletWater: new THREE.CircleGeometry(ft(3.5), 32),
+    toiletDeck: new THREE.BoxGeometry(ft(10), ft(3), ft(7)),
+    toiletSeat: new THREE.ExtrudeGeometry(seatOuter, { depth: ft(1), bevelEnabled: false, curveSegments: 32 }),
+    toiletLid: new THREE.ExtrudeGeometry(lidShape, {
+      depth: ft(0.8),
+      bevelEnabled: true,
+      bevelSize: ft(0.3),
+      bevelThickness: ft(0.3),
+      bevelSegments: 2,
+      curveSegments: 32,
+    }),
+    toiletTank: new THREE.BoxGeometry(ft(T.tankWidthIn - 1), ft(tankHeightIn), ft(T.tankDepthIn)),
+    toiletTankLid: new THREE.BoxGeometry(ft(T.tankWidthIn), ft(1), ft(T.tankDepthIn + 1)),
+    toiletHandle: new THREE.BoxGeometry(ft(3), ft(0.5), ft(0.6)),
+    toiletSupplyStop: new THREE.CylinderGeometry(ft(0.6), ft(0.6), ft(2), 12),
+    toiletSupplyLine: new THREE.CylinderGeometry(ft(0.2), ft(0.2), ft(T.rimHeightIn - 7), 8),
+    toiletBoltCap: new THREE.SphereGeometry(ft(0.9), 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+  };
 }
 
 function buildSink(geo, mat) {
@@ -421,6 +551,15 @@ function applyCameraLerp(s) {
   if (t >= 1) s.cameraLerp = null;
 }
 
+// How far back the camera sits so the whole floor plan fits the panel,
+// whichever of its (often tall and narrow) width or height is the tighter
+// field of view. Slightly under a full fit: the near walls cut away anyway.
+function framingDistance(s, diag) {
+  var vHalf = THREE.MathUtils.degToRad(s.camera.fov / 2);
+  var hHalf = Math.atan(Math.tan(vHalf) * s.camera.aspect);
+  return (diag / 2 / Math.sin(Math.min(vHalf, hHalf))) * 0.7;
+}
+
 function rebuild() {
   var s = threeState;
   if (!s) return;
@@ -437,19 +576,23 @@ function rebuild() {
     var target = new THREE.Vector3(dims.widthFt / 2, dims.heightFt * 0.4, dims.lengthFt / 2);
     var diag = Math.sqrt(dims.widthFt * dims.widthFt + dims.lengthFt * dims.lengthFt);
     var minDistance = clamp(diag * 0.5, 3, 20);
-    var maxDistance = clamp(diag * 1.9, 12, 160);
+    var maxDistance = clamp(diag * 3, 12, 160);
     s.controls.minDistance = minDistance;
     s.controls.maxDistance = maxDistance;
 
+    var fitDistance = clamp(framingDistance(s, diag), minDistance, maxDistance);
     if (!s.lastDims) {
       // First build: place the camera directly, no lerp needed.
-      s.camera.position.set(dims.widthFt * 1.3, dims.heightFt * 1.1, dims.lengthFt * 1.6);
+      var viewDir = new THREE.Vector3(dims.widthFt * 1.3, dims.heightFt * 1.1, dims.lengthFt * 1.6)
+        .sub(target)
+        .normalize();
+      s.camera.position.copy(target).addScaledVector(viewDir, fitDistance);
       s.controls.target.copy(target);
     } else {
       var jump = target.distanceTo(s.controls.target) + Math.abs(diag - (s.lastDiag || diag));
       s.controls.target.copy(target);
       if (jump > 0.75) {
-        startCameraLerp(s, target, clamp(s.camera.position.distanceTo(s.controls.target), minDistance, maxDistance));
+        startCameraLerp(s, target, fitDistance);
       }
     }
     s.controls.update();
