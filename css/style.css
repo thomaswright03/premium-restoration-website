@@ -640,10 +640,12 @@ body.ai-chat-locked {
   overflow: hidden;
 }
 
-/* Bathroom visualizer: a mockup, not a real rendering — plain icon badges
-   docked over the customer's own uploaded photo. Hidden until a photo is
-   provided; js/script.js only removes [hidden] once one is. */
-.ai-chat-visualizer {
+/* 3D bathroom room preview: a stylized, non-photorealistic room built from
+   entered dimensions and live-updated as the estimate is answered — not a
+   photo, not a real architectural rendering. Hidden until the estimate
+   starts; js/bathroom-room-3d.js owns showing/hiding it and mounting the
+   canvas. */
+.ai-chat-room-3d {
   flex: 0 0 320px;
   display: flex;
   flex-direction: column;
@@ -654,55 +656,27 @@ body.ai-chat-locked {
   border-left: 1px solid var(--color-line);
 }
 
-.ai-chat-visualizer-disclosure {
+.ai-chat-room-3d-disclosure {
   margin: 0;
   font-size: var(--fs-sm);
   color: var(--color-ink-soft);
   line-height: 1.5;
 }
 
-.ai-chat-visualizer-photo-wrap {
+.ai-chat-room-3d-canvas-wrap {
   position: relative;
+  flex: 1 1 auto;
+  min-height: 220px;
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--color-surface);
+  touch-action: none;
 }
 
-.ai-chat-visualizer-photo {
+.ai-chat-room-3d-canvas-wrap canvas {
   display: block;
   width: 100%;
-  height: auto;
-}
-
-.ai-chat-visualizer-chips {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  padding: var(--space-2);
-  background: linear-gradient(to top, rgb(0 0 0 / 0.65), transparent);
-}
-
-.ai-chat-visualizer-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-pill);
-  background: rgb(0 0 0 / 0.55);
-  color: #fff;
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  line-height: 1.3;
-}
-
-.ai-chat-visualizer-chip svg {
-  width: 16px;
-  height: 16px;
-  flex: none;
+  height: 100%;
 }
 
 /* Toolbar: estimate progress on the left, close button on the right — they
@@ -946,29 +920,6 @@ body.ai-chat-locked {
   background: var(--color-selected-bg);
   border-color: var(--color-selected-bg);
   color: var(--color-selected-ink);
-}
-
-.ai-chat-photo-upload-label {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--tap);
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--color-line-strong);
-  border-radius: var(--radius);
-  background: var(--color-surface);
-  color: var(--color-ink);
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  cursor: pointer;
-  width: fit-content;
-}
-
-.ai-chat-photo-upload-thumb {
-  max-width: 220px;
-  max-height: 220px;
-  border-radius: var(--radius);
-  object-fit: cover;
 }
 
 .ai-chat-group-actions {
@@ -1453,7 +1404,7 @@ body.ai-chat-locked {
     flex-direction: column;
   }
 
-  .ai-chat-visualizer {
+  .ai-chat-room-3d {
     order: -1;
     flex: 0 0 auto;
     max-height: 38vh;

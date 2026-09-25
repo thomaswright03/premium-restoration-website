@@ -21,6 +21,23 @@
     </script>
     <link rel="stylesheet" href="css/style.css" />
     <!-- /chrome:head -->
+    <!-- 3D bathroom room preview (index.html only — not part of the shared
+         page chrome, see README "3D bathroom room preview"). The import map
+         must come before the modulepreload links below: a module preload
+         resolves its target's bare specifiers (OrbitControls.js imports
+         "three") against whatever import map is registered at preload time,
+         so the map has to exist first. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./js/vendor/three/three.module.js",
+          "three/addons/": "./js/vendor/three/addons/"
+        }
+      }
+    </script>
+    <link rel="modulepreload" href="js/vendor/three/three.module.js" />
+    <link rel="modulepreload" href="js/vendor/three/three.core.js" />
+    <link rel="modulepreload" href="js/vendor/three/addons/controls/OrbitControls.js" />
   </head>
   <body>
     <!-- chrome:header -->
@@ -113,19 +130,12 @@
                 </div>
               </div>
             </div>
-            <div class="ai-chat-visualizer" id="ai-chat-visualizer" hidden>
-              <p class="ai-chat-visualizer-disclosure">
-                Mockup preview — icons show what you've chosen, not an actual rendering of your bathroom. Your photo
-                stays in your browser; it's never uploaded anywhere.
+            <div class="ai-chat-room-3d" id="ai-chat-room-3d" hidden>
+              <p class="ai-chat-room-3d-disclosure">
+                Stylized 3D preview built from what you've told us — not a photorealistic rendering. Drag to look
+                around.
               </p>
-              <div class="ai-chat-visualizer-photo-wrap">
-                <img
-                  class="ai-chat-visualizer-photo"
-                  id="ai-chat-visualizer-photo"
-                  alt="Your uploaded bathroom photo"
-                />
-                <div class="ai-chat-visualizer-chips" id="ai-chat-visualizer-chips"></div>
-              </div>
+              <div class="ai-chat-room-3d-canvas-wrap" id="ai-chat-room-3d-canvas-wrap"></div>
             </div>
           </div>
           <form class="ai-chat-input-bar" id="ai-chat-form">
@@ -291,11 +301,12 @@
 
     <script src="js/bathroom-pricing.js"></script>
     <script src="js/materials-pricing.js"></script>
-    <script src="js/bathroom-visualizer.js"></script>
+    <script src="js/bathroom-room-layout.js"></script>
     <script src="js/chat-replies.js"></script>
     <script src="js/site-config.js"></script>
     <script src="js/theme.js"></script>
     <script src="js/estimate-pdf.js"></script>
     <script src="js/script.js"></script>
+    <script type="module" src="js/bathroom-room-3d.js"></script>
   </body>
 </html>

@@ -130,10 +130,9 @@ document.addEventListener("DOMContentLoaded", function () {
       return !!(siteConfig && siteConfig.materialsEstimator && siteConfig.materialsEstimator.enabled);
     }
 
-    // Bathroom visualizer overlays icon badges on the customer's own uploaded
-    // photo as a mockup — no AI rendering yet — off unless the owner has
-    // deliberately turned it on in site-config.json.
-    function bathroomVisualizerEnabled() {
+    // The 3D bathroom room preview (js/bathroom-room-3d.js) is off unless
+    // the owner has deliberately turned it on in site-config.json.
+    function bathroomRoom3dEnabled() {
       return !!(siteConfig && siteConfig.bathroomVisualizer && siteConfig.bathroomVisualizer.enabled);
     }
 
@@ -279,16 +278,17 @@ document.addEventListener("DOMContentLoaded", function () {
       quoteState = { groups: buildGroups(null), index: 0, values: {}, scope: {} };
       chatForm.hidden = true;
       setProgress(0);
-      if (bathroomVisualizerEnabled()) {
-        appendPhotoUploadStep();
-      } else {
-        appendGroupForm();
+      if (window.BathroomRoom3D) {
+        window.BathroomRoom3D.reset();
+        if (bathroomRoom3dEnabled()) window.BathroomRoom3D.show();
+        else window.BathroomRoom3D.hide();
       }
+      appendGroupForm();
     }
 
     function cancelEstimate() {
       quoteState = null;
-      hideVisualizerPanel();
+      if (window.BathroomRoom3D) window.BathroomRoom3D.hide();
       hideProgress();
       chatForm.hidden = false;
       appendChatRow(
@@ -362,7 +362,6 @@ document.addEventListener("DOMContentLoaded", function () {
           choiceWrap.setAttribute("aria-describedby", errorEl.id);
           var chosen;
           var buttons = [];
-          var activeVisualKey = null;
           field.options.forEach(function (option) {
             var btn = document.createElement("button");
             btn.type = "button";
@@ -377,12 +376,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 other.setAttribute("aria-pressed", isThis ? "true" : "false");
               });
               showFieldError(field.key, null);
-              if (window.BathroomVisualizer) {
-                if (activeVisualKey) removeVisualizerItem(activeVisualKey);
-                var visItem = window.BathroomVisualizer.visualItemForScopeField(field.key, option.value);
-                activeVisualKey = visItem ? visItem.key : null;
-                if (visItem) setVisualizerItem(visItem.key, visItem.label);
-              }
+              if (window.BathroomRoom3D) window.BathroomRoom3D.setScope(field.key, option.value);
             });
             buttons.push(btn);
             choiceWrap.appendChild(btn);
@@ -406,11 +400,9 @@ document.addEventListener("DOMContentLoaded", function () {
           fieldWrap.appendChild(input);
           input.addEventListener("input", function () {
             showFieldError(field.key, null);
-            if (window.BathroomVisualizer) {
-              var visItem = window.BathroomVisualizer.visualItemForFixture(field.key, input.value, field.label);
-              if (visItem) setVisualizerItem(visItem.key, visItem.label);
-              else removeVisualizerItem(field.key);
-            }
+            if (!window.BathroomRoom3D) return;
+            if (group.id === "dimensions") window.BathroomRoom3D.setDimension(field.key, input.value);
+            else window.BathroomRoom3D.setFixtureCount(field.key, input.value);
           });
           fieldEls[field.key] = { wrap: fieldWrap, error: errorEl, focus: input, input: input };
           readers.push(function () {
@@ -752,202 +744,6 @@ document.addEventListener("DOMContentLoaded", function () {
       return MATERIAL_ICON_SVG[categoryKey] || "";
     }
 
-    // =====================================================================
-    // Bathroom visualizer — MOCKUP, not a real rendering. Overlays plain icon
-    // chips (reusing MATERIAL_ICON_SVG above) on the customer's own uploaded
-    // photo as they answer the estimate questions and, later, pick specific
-    // materials. The photo is read locally with FileReader and never leaves
-    // the browser — no upload, no backend, no AI. Off unless
-    // bathroomVisualizerEnabled() and js/bathroom-visualizer.js are present.
-    // =====================================================================
-    var VISUALIZER_MAX_PHOTO_BYTES = 15 * 1024 * 1024; // 15MB, before downscaling
-    var visualizerPanel = document.getElementById("ai-chat-visualizer");
-    var visualizerPhoto = document.getElementById("ai-chat-visualizer-photo");
-    var visualizerChipsWrap = document.getElementById("ai-chat-visualizer-chips");
-    var visualizerChipEls = {}; // key -> chip DOM node
-
-    function showVisualizerPanel(dataUrl) {
-      if (!visualizerPanel) return;
-      visualizerPhoto.src = dataUrl;
-      visualizerPanel.hidden = false;
-    }
-
-    function hideVisualizerPanel() {
-      if (!visualizerPanel) return;
-      visualizerPanel.hidden = true;
-      visualizerPhoto.src = "";
-      visualizerChipsWrap.innerHTML = "";
-      visualizerChipEls = {};
-    }
-
-    function setVisualizerItem(key, label) {
-      if (!visualizerPanel || visualizerPanel.hidden) return;
-      var icon = materialIconSvg(key);
-      if (!icon) return;
-      var chip = visualizerChipEls[key];
-      if (!chip) {
-        chip = el("span", "ai-chat-visualizer-chip");
-        var iconSpan = document.createElement("span");
-        iconSpan.setAttribute("aria-hidden", "true");
-        iconSpan.innerHTML = icon;
-        chip.appendChild(iconSpan);
-        chip.appendChild(el("span", "ai-chat-visualizer-chip-label"));
-        visualizerChipEls[key] = chip;
-        visualizerChipsWrap.appendChild(chip);
-      }
-      chip.querySelector(".ai-chat-visualizer-chip-label").textContent = label;
-    }
-
-    function removeVisualizerItem(key) {
-      var chip = visualizerChipEls[key];
-      if (!chip) return;
-      chip.remove();
-      delete visualizerChipEls[key];
-    }
-
-    // Downscales large phone photos before they're kept as a data URL, so the
-    // page stays smooth. Resolves with the (possibly resized) data URL.
-    function readAndResizePhoto(file, maxWidth) {
-      return new Promise(function (resolve, reject) {
-        var reader = new FileReader();
-        reader.onerror = function () {
-          reject(new Error("Could not read the photo."));
-        };
-        reader.onload = function () {
-          var img = new Image();
-          img.onerror = function () {
-            reject(new Error("That file doesn't look like an image."));
-          };
-          img.onload = function () {
-            if (img.width <= maxWidth) {
-              resolve(reader.result);
-              return;
-            }
-            var scale = maxWidth / img.width;
-            var canvas = document.createElement("canvas");
-            canvas.width = maxWidth;
-            canvas.height = Math.round(img.height * scale);
-            var ctx = canvas.getContext("2d");
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL("image/jpeg", 0.85));
-          };
-          img.src = reader.result;
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-
-    // One-off step shown before the usual scope/dimensions/fixtures groups,
-    // only when the visualizer is enabled. Uploading is always optional —
-    // skipping leaves the rest of the estimate flow exactly as it is today.
-    function appendPhotoUploadStep() {
-      var parts = botRow();
-      var content = el("div", "ai-chat-text");
-      content.appendChild(
-        el(
-          "p",
-          "ai-chat-group-intro",
-          "Want to see your choices on a photo of your own bathroom as we go? This is a simple mockup — icons " +
-            "for what you pick, not an AI-generated rendering. Your photo stays in your browser; it's never " +
-            "uploaded anywhere. Totally optional.",
-        ),
-      );
-
-      var formEl = document.createElement("form");
-      formEl.className = "ai-chat-group-form";
-
-      var fieldWrap = el("div", "ai-chat-group-field");
-      var errorEl = el("p", "ai-chat-group-error");
-      errorEl.setAttribute("role", "alert");
-      errorEl.hidden = true;
-
-      var fileLabel = el("label", "ai-chat-photo-upload-label", "Choose a photo →");
-      var fileInput = document.createElement("input");
-      fileInput.type = "file";
-      fileInput.accept = "image/*";
-      fileInput.className = "visually-hidden";
-      fileLabel.appendChild(fileInput);
-      fieldWrap.appendChild(fileLabel);
-
-      var thumb = document.createElement("img");
-      thumb.className = "ai-chat-photo-upload-thumb";
-      thumb.hidden = true;
-      thumb.alt = "Your selected photo";
-      fieldWrap.appendChild(thumb);
-
-      var pendingDataUrl = null;
-
-      fileInput.addEventListener("change", function () {
-        var file = fileInput.files && fileInput.files[0];
-        pendingDataUrl = null;
-        thumb.hidden = true;
-        errorEl.hidden = true;
-        if (!file) return;
-        if (file.size > VISUALIZER_MAX_PHOTO_BYTES) {
-          errorEl.textContent = "That photo is a bit large — please choose one under 15MB.";
-          errorEl.hidden = false;
-          fileInput.value = "";
-          return;
-        }
-        readAndResizePhoto(file, 1200)
-          .then(function (dataUrl) {
-            pendingDataUrl = dataUrl;
-            thumb.src = dataUrl;
-            thumb.hidden = false;
-          })
-          .catch(function () {
-            errorEl.textContent = "Sorry, that photo couldn't be used. Please try a different one.";
-            errorEl.hidden = false;
-          });
-      });
-
-      fieldWrap.appendChild(errorEl);
-      formEl.appendChild(fieldWrap);
-
-      var actionsWrap = el("div", "ai-chat-group-actions");
-      var cancelBtn = el("button", "ai-chat-group-cancel", "Cancel");
-      cancelBtn.type = "button";
-      cancelBtn.addEventListener("click", function () {
-        disableForm();
-        cancelEstimate();
-      });
-      var skipBtn = el("button", "ai-chat-group-cancel", "Skip for now");
-      skipBtn.type = "button";
-      skipBtn.addEventListener("click", function () {
-        disableForm();
-        appendGroupForm();
-      });
-      var continueBtn = el("button", "ai-chat-group-continue", "Continue with this photo →");
-      continueBtn.type = "submit";
-      actionsWrap.appendChild(cancelBtn);
-      actionsWrap.appendChild(skipBtn);
-      actionsWrap.appendChild(continueBtn);
-      formEl.appendChild(actionsWrap);
-
-      function disableForm() {
-        Array.prototype.forEach.call(formEl.querySelectorAll("input, button"), function (elToDisable) {
-          elToDisable.disabled = true;
-        });
-      }
-
-      formEl.addEventListener("submit", function (e) {
-        e.preventDefault();
-        if (!pendingDataUrl) {
-          errorEl.textContent = "Choose a photo first, or use Skip for now.";
-          errorEl.hidden = false;
-          return;
-        }
-        showVisualizerPanel(pendingDataUrl);
-        disableForm();
-        appendGroupForm();
-      });
-
-      content.appendChild(formEl);
-      parts.inner.appendChild(content);
-      chatMessages.appendChild(parts.row);
-      scrollToEnd();
-    }
-
     var materialsState = null; // null when inactive, else { categories, categoryIndex, zip, picks, laborResult }
 
     function startMaterialsFlow(values, scope, laborResult) {
@@ -1111,7 +907,6 @@ document.addEventListener("DOMContentLoaded", function () {
         btn.setAttribute("aria-pressed", "false");
         btn.addEventListener("click", function () {
           chosen = opt;
-          setVisualizerItem(category.key, category.label + " — " + opt.name);
           buttons.forEach(function (other) {
             var isThis = other === btn;
             other.classList.toggle("selected", isThis);
