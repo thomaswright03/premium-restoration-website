@@ -1134,6 +1134,69 @@ body.ai-chat-locked {
   color: var(--color-danger);
 }
 
+/* Materials picker — option cards, "sample data" notice, shopping list */
+.ai-chat-materials-disclosure {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-surface-alt);
+  color: var(--color-ink-soft);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+
+.ai-chat-choices--material {
+  flex-direction: column;
+}
+
+.ai-chat-choice--material {
+  flex-basis: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+}
+
+.ai-chat-material-name {
+  font-weight: 600;
+  color: inherit;
+}
+
+.ai-chat-material-price {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: inherit;
+}
+
+.ai-chat-material-note {
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  font-style: italic;
+  color: var(--color-muted);
+}
+
+.ai-chat-choice--material.selected .ai-chat-material-note {
+  color: var(--color-on-dark-muted);
+}
+
+.ai-chat-materials-shopping ul {
+  margin: 0;
+  padding-left: var(--space-4);
+  list-style: disc;
+}
+
+.ai-chat-materials-shopping li {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--color-ink-soft);
+}
+
+.ai-chat-materials-shopping a {
+  color: var(--color-accent-text);
+}
+
 .ai-chat-typing {
   display: inline-flex;
   gap: var(--space-1);

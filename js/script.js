@@ -123,6 +123,13 @@ document.addEventListener("DOMContentLoaded", function () {
       return !!(siteConfig && siteConfig.priceEstimator.enabled);
     }
 
+    // Materials picker uses MOCK product/price data (js/materials-pricing.js)
+    // until a real pricing source is connected — off unless the owner has
+    // deliberately turned it on in site-config.json.
+    function materialsEstimatorEnabled() {
+      return !!(siteConfig && siteConfig.materialsEstimator && siteConfig.materialsEstimator.enabled);
+    }
+
     configReady.then(function () {
       if (starterRow) starterRow.hidden = !estimatorEnabled();
     });
@@ -595,6 +602,18 @@ document.addEventListener("DOMContentLoaded", function () {
       });
       actions.appendChild(exportBtn);
 
+      if (materialsEstimatorEnabled() && window.MaterialsPricing) {
+        var materialCategories = window.MaterialsPricing.categoriesFromLines(result.lines);
+        if (materialCategories.length) {
+          var materialsBtn = el("button", "ai-chat-estimate-export", "Pick Your Materials →");
+          materialsBtn.type = "button";
+          materialsBtn.addEventListener("click", function () {
+            startMaterialsFlow(values, scope, result);
+          });
+          actions.appendChild(materialsBtn);
+        }
+      }
+
       var cta = el("a", "ai-chat-estimate-cta", "Contact Us About This →");
       cta.href = "contact.html?from=estimate";
       cta.addEventListener("click", function () {
@@ -653,6 +672,419 @@ document.addEventListener("DOMContentLoaded", function () {
           status.textContent = "Sorry, the PDF couldn't be prepared. Check your connection and press Retry PDF.";
           status.classList.add("is-error");
         });
+    }
+
+    // =====================================================================
+    // Materials picker — MOCK DATA (js/materials-pricing.js) until a real
+    // pricing source is connected. Starts only after the labor estimate is
+    // finished, from the "Pick Your Materials" button on its card. Reuses
+    // the same fullscreen/progress-bar/group-form UI as the labor estimate.
+    // =====================================================================
+    var MATERIALS_DISCLOSURE =
+      "Sample prices shown for illustration only — these are not current retail prices. Materials pricing is " +
+      "placeholder data until a live pricing source is connected. Always confirm real prices before buying, and " +
+      "before agreeing to any job cost.";
+
+    var materialsState = null; // null when inactive, else { categories, categoryIndex, zip, picks, laborResult }
+
+    function startMaterialsFlow(values, scope, laborResult) {
+      if (materialsState || !window.MaterialsPricing) return;
+      var categories = window.MaterialsPricing.categoriesFromLines(laborResult.lines);
+      if (!categories.length) return;
+      materialsState = { categories: categories, categoryIndex: -1, zip: "", picks: {}, laborResult: laborResult };
+      chatForm.hidden = true;
+      setProgress(0);
+      appendMaterialsZipForm();
+    }
+
+    function cancelMaterialsFlow() {
+      materialsState = null;
+      hideProgress();
+      chatForm.hidden = false;
+      appendChatRow("bot", "No problem, I've stopped the materials picker. Ask me anything else.");
+      chatInput.focus();
+    }
+
+    function advanceMaterialsCategory() {
+      materialsState.categoryIndex++;
+      var totalSteps = materialsState.categories.length + 1; // +1 for the ZIP step
+      if (materialsState.categoryIndex < materialsState.categories.length) {
+        setProgress(Math.round(((materialsState.categoryIndex + 1) / totalSteps) * 100));
+        appendMaterialCategoryForm(materialsState.categoryIndex);
+        return;
+      }
+      setProgress(100);
+      var state = materialsState;
+      materialsState = null;
+      chatForm.hidden = false;
+      appendMaterialsCard(state);
+      setTimeout(hideProgress, 1200);
+      chatInput.focus();
+    }
+
+    function appendMaterialsZipForm() {
+      var parts = botRow();
+      var content = el("div", "ai-chat-text");
+      content.appendChild(
+        el(
+          "p",
+          "ai-chat-group-intro",
+          "Now let's pick your materials — " +
+            MATERIALS_DISCLOSURE +
+            " What ZIP code is the job in? (Prices can vary a little by area.)",
+        ),
+      );
+
+      var formEl = document.createElement("form");
+      formEl.className = "ai-chat-group-form";
+
+      var fieldWrap = el("div", "ai-chat-group-field");
+      fieldWrap.appendChild(el("label", "ai-chat-field-label", "ZIP code"));
+      var input = document.createElement("input");
+      input.type = "text";
+      input.inputMode = "numeric";
+      input.autocomplete = "postal-code";
+      input.placeholder = "84101";
+      input.maxLength = 5;
+      fieldWrap.appendChild(input);
+      var errorEl = el("p", "ai-chat-field-error");
+      errorEl.hidden = true;
+      fieldWrap.appendChild(errorEl);
+      input.addEventListener("input", function () {
+        errorEl.hidden = true;
+        fieldWrap.classList.remove("has-error");
+      });
+      formEl.appendChild(fieldWrap);
+
+      var actionsWrap = el("div", "ai-chat-group-actions");
+      var cancelBtn = el("button", "ai-chat-group-cancel", "Cancel");
+      cancelBtn.type = "button";
+      var continueBtn = el("button", "ai-chat-group-continue", "Continue →");
+      continueBtn.type = "submit";
+      actionsWrap.appendChild(cancelBtn);
+      actionsWrap.appendChild(continueBtn);
+      formEl.appendChild(actionsWrap);
+
+      function disableForm() {
+        Array.prototype.forEach.call(formEl.querySelectorAll("input, button"), function (elx) {
+          elx.disabled = true;
+        });
+      }
+
+      cancelBtn.addEventListener("click", function () {
+        disableForm();
+        cancelMaterialsFlow();
+      });
+
+      formEl.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var zip = input.value.trim();
+        if (!/^\d{5}$/.test(zip)) {
+          errorEl.textContent = "Enter a 5-digit ZIP code.";
+          errorEl.hidden = false;
+          fieldWrap.classList.add("has-error");
+          input.focus();
+          return;
+        }
+        materialsState.zip = zip;
+        disableForm();
+        advanceMaterialsCategory();
+      });
+
+      content.appendChild(formEl);
+      parts.inner.appendChild(content);
+      chatMessages.appendChild(parts.row);
+      scrollToEnd();
+      input.focus({ preventScroll: true });
+    }
+
+    function appendMaterialCategoryForm(index) {
+      var category = materialsState.categories[index];
+      var options = window.MaterialsPricing.getOptionsForCategory(category.key, materialsState.zip);
+
+      var parts = botRow();
+      var content = el("div", "ai-chat-text");
+      content.appendChild(
+        el(
+          "p",
+          "ai-chat-group-intro",
+          "Which " +
+            category.label.toLowerCase() +
+            " would you like? (" +
+            Pricing.formatQty(category.qty) +
+            " " +
+            category.unit +
+            ")",
+        ),
+      );
+
+      var formEl = document.createElement("form");
+      formEl.className = "ai-chat-group-form";
+
+      var fieldWrap = el("div", "ai-chat-group-field is-choice");
+      var errorEl = el("p", "ai-chat-group-error");
+      errorEl.hidden = true;
+      var choicesWrap = el("div", "ai-chat-choices ai-chat-choices--material");
+      var chosen = null;
+      var buttons = [];
+      options.forEach(function (opt) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "ai-chat-choice ai-chat-choice--material";
+        btn.appendChild(el("span", "ai-chat-material-name", opt.name));
+        btn.appendChild(el("span", "ai-chat-material-price", Pricing.money(opt.best.price) + " at " + opt.best.name));
+        if (opt.best.compareNote) btn.appendChild(el("span", "ai-chat-material-note", opt.best.compareNote));
+        btn.setAttribute("aria-pressed", "false");
+        btn.addEventListener("click", function () {
+          chosen = opt;
+          buttons.forEach(function (other) {
+            var isThis = other === btn;
+            other.classList.toggle("selected", isThis);
+            other.setAttribute("aria-pressed", isThis ? "true" : "false");
+          });
+          errorEl.hidden = true;
+        });
+        buttons.push(btn);
+        choicesWrap.appendChild(btn);
+      });
+      fieldWrap.appendChild(choicesWrap);
+      formEl.appendChild(fieldWrap);
+      formEl.appendChild(errorEl);
+
+      var actionsWrap = el("div", "ai-chat-group-actions");
+      var cancelBtn = el("button", "ai-chat-group-cancel", "Cancel");
+      cancelBtn.type = "button";
+      var isLast = index === materialsState.categories.length - 1;
+      var continueBtn = el("button", "ai-chat-group-continue", isLast ? "See My Materials Total →" : "Continue →");
+      continueBtn.type = "submit";
+      actionsWrap.appendChild(cancelBtn);
+      actionsWrap.appendChild(continueBtn);
+      formEl.appendChild(actionsWrap);
+
+      function disableForm() {
+        Array.prototype.forEach.call(formEl.querySelectorAll("button"), function (elx) {
+          elx.disabled = true;
+        });
+      }
+
+      cancelBtn.addEventListener("click", function () {
+        disableForm();
+        cancelMaterialsFlow();
+      });
+
+      formEl.addEventListener("submit", function (e) {
+        e.preventDefault();
+        if (!chosen) {
+          errorEl.textContent = "Pick one option to continue.";
+          errorEl.hidden = false;
+          return;
+        }
+        var costInfo = window.MaterialsPricing.computeMaterialCost(
+          category.key,
+          category.qty,
+          category.unit,
+          chosen.best.price,
+        );
+        materialsState.picks[category.key] = {
+          categoryLabel: category.label,
+          productName: chosen.name,
+          retailer: chosen.best.name,
+          url: chosen.best.url,
+          quantityLabel: costInfo.quantityLabel,
+          cost: costInfo.cost,
+        };
+        disableForm();
+        advanceMaterialsCategory();
+      });
+
+      content.appendChild(formEl);
+      parts.inner.appendChild(content);
+      chatMessages.appendChild(parts.row);
+      scrollToEnd();
+      var first = formEl.querySelector(".ai-chat-choice");
+      if (first) first.focus({ preventScroll: true });
+    }
+
+    function buildMaterialsSummary(pickList, materialsSubtotal, combinedTotal) {
+      var out = ["My bathroom materials picks from your website (sample pricing, not final):"];
+      pickList.forEach(function (p) {
+        out.push("- " + p.categoryLabel + ": " + p.productName + " (" + p.retailer + ") — " + Pricing.money(p.cost));
+      });
+      out.push("- Materials subtotal: " + Pricing.money(materialsSubtotal));
+      out.push("- Labor + materials (before plumbing/electrical, permits and taxes): " + Pricing.money(combinedTotal));
+      return out.join("\n");
+    }
+
+    function exportMaterialsPdf(button, status, pickList, materialsSubtotal, combinedTotal) {
+      if (button.disabled) return;
+      var label = button.textContent;
+      button.disabled = true;
+      button.textContent = "Preparing PDF…";
+      status.hidden = true;
+      status.textContent = "";
+      window.EstimatePdf.load()
+        .then(function () {
+          var doc = window.EstimatePdf.build({
+            title: "Bathroom Restoration — Materials List",
+            intro: "Sample prices for illustration only — not current retail prices.",
+            lines: pickList.map(function (p) {
+              return {
+                label: p.categoryLabel + ": " + p.productName,
+                detail: p.quantityLabel + " · " + p.retailer,
+                amount: Pricing.money(p.cost),
+              };
+            }),
+            excluded: [],
+            totals: [
+              { label: "Materials Subtotal", value: Pricing.money(materialsSubtotal), strong: true },
+              {
+                label: "Labor + Materials (before plumbing/electrical, permits, taxes)",
+                value: Pricing.money(combinedTotal),
+              },
+            ],
+            afterTotal: [MATERIALS_DISCLOSURE],
+            sections: [
+              {
+                title: "Where to buy",
+                items: pickList.map(function (p) {
+                  return (
+                    p.categoryLabel +
+                    ": " +
+                    p.productName +
+                    " — " +
+                    p.retailer +
+                    " (" +
+                    p.url +
+                    ") — " +
+                    Pricing.money(p.cost)
+                  );
+                }),
+              },
+            ],
+            footer: {
+              business: businessLine(),
+              phone: PHONE,
+              email: EMAIL,
+              date: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
+            },
+          });
+          doc.save("premium-restoration-materials-list.pdf");
+          button.disabled = false;
+          button.textContent = label;
+        })
+        .catch(function () {
+          button.disabled = false;
+          button.textContent = "Retry PDF";
+          status.hidden = false;
+          status.textContent = "Sorry, the PDF couldn't be prepared. Check your connection and press Retry PDF.";
+          status.classList.add("is-error");
+        });
+    }
+
+    function appendMaterialsCard(state) {
+      var pickList = state.categories
+        .map(function (c) {
+          return state.picks[c.key];
+        })
+        .filter(Boolean);
+      var materialsSubtotal = Pricing.roundCents(
+        pickList.reduce(function (sum, p) {
+          return sum + p.cost;
+        }, 0),
+      );
+      var combinedTotal = Pricing.roundCents(state.laborResult.subtotal + materialsSubtotal);
+
+      var parts = botRow();
+      var content = el("div", "ai-chat-text");
+      var card = el("div", "ai-chat-estimate ai-chat-materials");
+
+      var head = el("div", "ai-chat-estimate-header");
+      head.appendChild(el("p", "eyebrow", "Sample Materials Pricing"));
+      head.appendChild(el("h3", null, "Bathroom Materials"));
+      head.appendChild(el("p", "ai-chat-estimate-lede", "Based on the items you picked above."));
+      card.appendChild(head);
+
+      card.appendChild(el("p", "ai-chat-materials-disclosure", MATERIALS_DISCLOSURE));
+
+      var lines = el("div", "ai-chat-estimate-lines");
+      pickList.forEach(function (p) {
+        var line = el("div", "ai-chat-estimate-line");
+        var labelWrap = el("span", null, p.categoryLabel + ": " + p.productName + " ");
+        labelWrap.appendChild(el("small", "ai-chat-estimate-detail", p.quantityLabel + " · " + p.retailer));
+        line.appendChild(labelWrap);
+        line.appendChild(el("span", "ai-chat-estimate-amount", Pricing.money(p.cost)));
+        lines.appendChild(line);
+      });
+      if (!pickList.length) {
+        var empty = el("div", "ai-chat-estimate-line");
+        empty.appendChild(el("span", null, "No materials selected"));
+        empty.appendChild(el("span", "ai-chat-estimate-amount", Pricing.money(0)));
+        lines.appendChild(empty);
+      }
+      card.appendChild(lines);
+
+      var totalWrap = el("div", "ai-chat-estimate-total");
+      totalWrap.appendChild(el("span", "ai-chat-estimate-total-label", "Materials Subtotal"));
+      totalWrap.appendChild(el("span", "ai-chat-estimate-total-value", Pricing.money(materialsSubtotal)));
+      card.appendChild(totalWrap);
+
+      var combinedWrap = el("div", "ai-chat-estimate-line muted");
+      combinedWrap.appendChild(el("span", null, "Labor + materials, before plumbing/electrical, permits & taxes"));
+      combinedWrap.appendChild(el("span", null, Pricing.money(combinedTotal)));
+      card.appendChild(combinedWrap);
+
+      if (pickList.length) {
+        var shoppingWrap = el("div", "ai-chat-estimate-assumptions ai-chat-materials-shopping");
+        shoppingWrap.appendChild(el("p", "ai-chat-estimate-assumptions-title", "Where to buy these"));
+        var list = document.createElement("ul");
+        pickList.forEach(function (p) {
+          var item = document.createElement("li");
+          item.appendChild(document.createTextNode(p.categoryLabel + ": " + p.productName + " — "));
+          var link = document.createElement("a");
+          link.href = p.url;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = p.retailer;
+          item.appendChild(link);
+          item.appendChild(document.createTextNode(" — " + Pricing.money(p.cost)));
+          list.appendChild(item);
+        });
+        shoppingWrap.appendChild(list);
+        card.appendChild(shoppingWrap);
+      }
+
+      var actions = el("div", "ai-chat-estimate-actions");
+      var exportBtn = el("button", "ai-chat-estimate-export", "Export as PDF");
+      exportBtn.type = "button";
+      var pdfStatus = el("p", "ai-chat-estimate-pdf-status");
+      pdfStatus.setAttribute("role", "status");
+      pdfStatus.hidden = true;
+      exportBtn.addEventListener("click", function () {
+        exportMaterialsPdf(exportBtn, pdfStatus, pickList, materialsSubtotal, combinedTotal);
+      });
+      actions.appendChild(exportBtn);
+
+      var cta = el("a", "ai-chat-estimate-cta", "Contact Us About This →");
+      cta.href = "contact.html?from=materials";
+      cta.addEventListener("click", function () {
+        try {
+          sessionStorage.setItem(
+            "pr_materials_summary",
+            buildMaterialsSummary(pickList, materialsSubtotal, combinedTotal),
+          );
+        } catch (e) {
+          /* storage blocked: the contact form just starts empty */
+        }
+      });
+      actions.appendChild(cta);
+      card.appendChild(actions);
+      card.appendChild(pdfStatus);
+
+      content.appendChild(card);
+      parts.inner.appendChild(content);
+      chatMessages.appendChild(parts.row);
+      scrollToEnd();
+      chatInput.focus({ preventScroll: true });
     }
 
     // ---------- messages ----------
@@ -722,12 +1154,15 @@ document.addEventListener("DOMContentLoaded", function () {
     var submit = document.getElementById("lead-submit");
     var message = document.getElementById("message");
     var SUMMARY_KEY = "pr_estimate_summary";
+    var MATERIALS_SUMMARY_KEY = "pr_materials_summary";
 
-    // Pre-fill the project details from "Contact Us About This".
-    if (/[?&]from=estimate\b/.test(window.location.search)) {
+    // Pre-fill the project details from "Contact Us About This" (labor
+    // estimate or materials picker — whichever the visitor came from).
+    if (/[?&]from=(estimate|materials)\b/.test(window.location.search)) {
+      var fromMaterials = /[?&]from=materials\b/.test(window.location.search);
       var summary = null;
       try {
-        summary = sessionStorage.getItem(SUMMARY_KEY);
+        summary = sessionStorage.getItem(fromMaterials ? MATERIALS_SUMMARY_KEY : SUMMARY_KEY);
       } catch (e) {
         summary = null;
       }
@@ -885,6 +1320,7 @@ document.addEventListener("DOMContentLoaded", function () {
           form.reset();
           try {
             sessionStorage.removeItem(SUMMARY_KEY);
+            sessionStorage.removeItem(MATERIALS_SUMMARY_KEY);
           } catch (e) {
             /* ignore */
           }

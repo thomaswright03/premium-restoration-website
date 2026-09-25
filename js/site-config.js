@@ -18,6 +18,10 @@
 
   var DEFAULTS = {
     priceEstimator: { enabled: false },
+    // Materials picker uses MOCK product/price data (see js/materials-pricing.js)
+    // until a real pricing source is connected — defaults off so a customer
+    // never sees it without the owner deliberately turning it on.
+    materialsEstimator: { enabled: false },
     leadForm: { endpoint: "", serviceName: "", servicePrivacyUrl: "" },
     owner: { legalName: "", contactAddress: "" },
     privacy: { responsePeriod: "" },
@@ -30,6 +34,7 @@
   function normalize(raw) {
     raw = raw || {};
     var pe = raw.priceEstimator || {};
+    var me = raw.materialsEstimator || {};
     var lf = raw.leadForm || {};
     var owner = raw.owner || {};
     var privacy = raw.privacy || {};
@@ -37,6 +42,7 @@
     return {
       loaded: true,
       priceEstimator: { enabled: pe.enabled === true },
+      materialsEstimator: { enabled: me.enabled === true },
       leadForm: {
         // Only an https:// address is used; anything else keeps the email-app form.
         endpoint: /^https:\/\/[^\s]+$/.test(endpoint) ? endpoint : "",

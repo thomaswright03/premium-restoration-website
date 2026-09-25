@@ -3,6 +3,9 @@
   "priceEstimator": {
     "enabled": true
   },
+  "materialsEstimator": {
+    "enabled": true
+  },
   "leadForm": {
     "endpoint": "",
     "serviceName": "",

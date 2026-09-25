@@ -32,6 +32,7 @@ The site says "Get a Quote" / "Request a Quote", not "Free Quote": nothing confi
 ├── css/style.css             design tokens (colours incl. dark theme, type and spacing scales) + public styles
 ├── css/admin.css             admin tool styles (uses the same tokens)
 ├── js/bathroom-pricing.js    prices + THE bathroom calculation, validation and estimate text (shared)
+├── js/materials-pricing.js   materials picker catalog + logic — MOCK DATA (see "Materials picker")
 ├── js/chat-replies.js        scripted chat answers (pure function, unit-tested)
 ├── js/site-config.js         loads site-config.json and shows/hides owner details on the page
 ├── js/theme.js               Light / Dark / System switch
@@ -44,7 +45,7 @@ The site says "Get a Quote" / "Request a Quote", not "Free Quote": nothing confi
 ├── scripts/sync-pages.mjs    copies the partials and published prices into every page
 ├── scripts/check-placeholders.mjs   fails if a [BRACKETED PLACEHOLDER] is visible
 ├── scripts/serve.mjs         local server that behaves like Vercel (404.html for unknown URLs)
-├── tests/unit/               Node unit tests (pricing, chat replies)
+├── tests/unit/               Node unit tests (pricing, materials picker, chat replies)
 ├── tests/e2e/                Playwright browser tests
 └── .github/workflows/ci.yml  runs every check on each push and pull request
 ```
@@ -64,6 +65,7 @@ If you can't see the change after two minutes, check the deployment on the Verce
 | Setting                      | What it does                                                                                                                                                                                                                                                                    |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `priceEstimator.enabled`     | `true` shows the "Get a bathroom price estimate" button and lets the chat give estimates and item prices. `false` hides the button, stops the "bathroom quote" trigger, and the chat answers any price question with "Call (385) 356-8733 or use the Contact page for a price." |
+| `materialsEstimator.enabled` | `true` shows "Pick Your Materials →" on a finished estimate card. **Uses mock product/price data** (see "Materials picker") — leave `false` until a real pricing source is connected, unless you're comfortable a customer seeing placeholder prices labelled as such.          |
 | `leadForm.endpoint`          | Blank = the Get a Quote form opens the visitor's email app (current behaviour). An `https://` address of a form service (e.g. Formspree `https://formspree.io/f/xxxxxxx`) = the form sends the request directly (see "Contact / lead form").                                    |
 | `leadForm.serviceName`       | Name of that form service, shown on the form and in the Privacy Notice (e.g. `"Formspree"`).                                                                                                                                                                                    |
 | `leadForm.servicePrivacyUrl` | Optional `https://` link to the form service's privacy policy, linked from the Privacy Notice.                                                                                                                                                                                  |
@@ -82,6 +84,17 @@ The chat on the home page is front-end only — no AI, no backend, no API key. R
 - **PDF**: built by `js/estimate-pdf.js` with jsPDF, which is **self-hosted** in `js/vendor/` (MIT licence, licence text alongside) and loaded only when someone exports. Pages are added as needed and every page has a footer with the date, phone, email, business name and page number.
 
 The public estimate always uses the published `DEFAULT_PRICES` in `js/bathroom-pricing.js`; it ignores prices saved in a browser under Business Prices, so every visitor sees the same figures. This publishes your real bathroom prices to anyone (including competitors); switch it off with `priceEstimator.enabled` if you'd rather not.
+
+## Materials picker
+
+**Uses mock data.** Every product name, retailer and price in `js/materials-pricing.js` is placeholder data for building and testing the feature — none of it is fetched from anywhere real. Controlled separately from the labor estimate by `materialsEstimator.enabled` (default `false`) precisely because it isn't real pricing yet.
+
+- Once the labor estimate finishes, "Pick Your Materials →" on the card starts a second guided flow: a ZIP code (used only for a placeholder regional price adjustment, `mockRegionalFactor()`), then one grouped choice per material the labor estimate actually priced — read straight from `computeEstimate`'s own line items (`categoriesFromLines()`), so it can never offer a material for work that wasn't chosen, and never needs updating when the scope model changes.
+- **Cheaper of two retailers, only when it's a real match.** An option with more than one entry in `retailers` represents the _same manufacturer model_ sold at both Home Depot and Lowe's (e.g. one specific Kohler or American Standard SKU) — `bestRetailer()` picks the lower price and shows "Cheaper than [other] ($X) for the same product." A store-exclusive private-label product (Lowe's "allen + roth", Home Depot's "TrafficMaster", etc.) has only one retailer, since there's no real equivalent to compare against — never a fuzzy guess.
+- **Paint is bought by the gallon**, not by the square foot: `computeMaterialCost()` rounds the painted area up to whole gallons (400 sq ft coverage) before pricing, and never rounds down below one gallon.
+- **The finished materials card** always leads with the sample-data disclosure, then itemised picks, a Materials Subtotal, a combined Labor + Materials line, and a **"Where to buy these"** shopping list with a real link per pick — followed by **Export as PDF** (same jsPDF pipeline as the labor estimate) and **Contact Us About This →** (prefills the Get a Quote form with the materials summary, same pattern as the labor estimate's `from=estimate`, here `from=materials`).
+
+To go live with real prices later: sign up for the Home Depot and/or Lowe's affiliate/data-feed programs (self-serve, free), replace `getOptionsForCategory()` with a server-side lookup (a Vercel serverless function, so no retailer API key is ever exposed in this public file), replace `mockRegionalFactor()` with a real location adjustment (e.g. BEA Regional Price Parities), and set `IS_MOCK_DATA` to `false`. Nothing else needs to change — `js/script.js` only calls the functions `js/materials-pricing.js` already exposes.
 
 ## One calculation, one set of prices
 
@@ -226,6 +239,7 @@ These are decisions or facts only the owner can supply. Until then, the site lea
 - **Tax**: a tax adviser's confirmation before any tax is added to quotes.
 - **Prices other than $60/cabinet and $5/sq ft of flooring**: confirm the remaining published rates (demolition, tile, paint, fixtures) are current.
 - **Estimator on or off**: confirm the owner is happy publishing live prices through the chat (`priceEstimator.enabled`).
+- **Materials picker**: currently mock data (see "Materials picker") — needs a real pricing source connected (e.g. Home Depot/Lowe's affiliate feeds) before `materialsEstimator.enabled` should ever be turned on for real customers.
 - **GitHub branch protection** requiring the CI check before merging (repository admin).
 
 ## Legal pages
