@@ -85,6 +85,47 @@ test("computeLayout: two large fixtures genuinely competing for wall space still
   assert.equal(placedCount + (a.droppedCounts.Bathtub_Quantity || 0), 2);
 });
 
+test("computeLayout: a fixture on one wall is rejected for clipping another's clearance on an adjacent wall, even though each wall alone has room", () => {
+  // 6x6ft: every wall's own span (6ft) comfortably exceeds one bathtub's
+  // 5.2ft wall-span, so the OLD same-wall-only fit test would have placed
+  // both (on two different walls, independently). With real front-clearance
+  // (depth 2.6ft + 21in code clearance = 4.35ft projected into the room),
+  // any second wall's clearance zone clips the first bathtub's near this
+  // room's shared corners — only one can actually fit.
+  var result = L.computeLayout({ widthFt: 6, lengthFt: 6, fixtureCounts: { Bathtub_Quantity: 2 } });
+  var placed = result.placements.filter((p) => p.fixtureKey === "Bathtub_Quantity");
+  assert.equal(placed.length, 1);
+  assert.equal(result.droppedCounts.Bathtub_Quantity, 1);
+});
+
+test("computeLayout: toilet spacing reflects real centerline clearance (15in), not just its own physical width", () => {
+  // Toilet wallSpan is 1.7ft (half = 0.85ft), but CLEARANCE_IN.Toilet_Quantity.side
+  // is 15in (1.25ft) — the code clearance is the larger of the two and must
+  // be what actually determines placement, not the fixture's own half-width.
+  var result = L.computeLayout({ widthFt: 10, lengthFt: 8, fixtureCounts: { Toilet_Quantity: 1 } });
+  var toilet = result.placements[0];
+  assert.equal(toilet.wallId, "N");
+  assert.equal(toilet.x, 1.25); // originX(0) + dirX(1) * halfWidth(max(0.85, 15/12) = 1.25)
+});
+
+test("CLEARANCE_IN exposes representative code-minimum side/front clearances for every floor-standing fixture", () => {
+  [
+    "Toilet_Quantity",
+    "Sink_Quantity",
+    "Bathtub_Quantity",
+    "Shower_Quantity",
+    "Vanity_Quantity",
+    "Cabinet_Quantity",
+    "Door_Quantity",
+  ].forEach((key) => {
+    var c = L.CLEARANCE_IN[key];
+    assert.ok(c, `${key} should have a clearance entry`);
+    assert.equal(typeof c.side, "number");
+    assert.equal(typeof c.front, "number");
+    assert.ok(c.side >= 0 && c.front >= 0);
+  });
+});
+
 test("computeLayout: entry door prefers the South wall when it is empty", () => {
   var result = L.computeLayout({ widthFt: 10, lengthFt: 8, fixtureCounts: { Door_Quantity: 1 } });
   var door = result.placements[0];

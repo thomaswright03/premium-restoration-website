@@ -4,9 +4,14 @@
 // fixture stand-ins. No DOM, no Three.js — js/bathroom-room-3d.js owns all
 // rendering; this module only ever returns plain data.
 //
-// This is a stylized preview, not a real floor plan: the layout algorithm
-// is a simple deterministic first-fit around the room's walls, not a
-// plumbing-aware or code-compliant design.
+// The layout algorithm is a deterministic first-fit around the room's
+// walls (still no backtracking/optimization, still not a substitute for an
+// actual code review), but it now checks REAL clearance: every candidate
+// placement's footprint, expanded by its own required side/front clearance
+// (see CLEARANCE_IN below), must not overlap any already-placed fixture's
+// own expanded footprint — not just "is there unused linear space on this
+// one wall" like before, so two fixtures on adjacent walls that would
+// physically clip into a shared corner are correctly rejected too.
 (function (root, factory) {
   var api = factory();
   if (typeof module !== "undefined" && module.exports) {
@@ -69,6 +74,30 @@
     },
   };
 
+  // Representative residential code-minimum clearances, in inches — typical
+  // values, not a substitute for an actual code review (same spirit as the
+  // rest of this preview). side: how far from the fixture's own centerline
+  // (toilet) or edge (everything else) must stay clear of any obstruction
+  // on either side, along the wall. front: clear floor space required in
+  // front of the fixture, beyond its own physical depth, so a person can
+  // actually use it (includes shower/door swing clearance). Wall-mounted
+  // fixtures (mirrors, shelf) and attached ones (shower door) need no
+  // floor-clearance entry — they don't independently consume floor space.
+  var CLEARANCE_IN = {
+    Toilet_Quantity: { side: 15, front: 21 },
+    Sink_Quantity: { side: 4, front: 21 },
+    Bathtub_Quantity: { side: 0, front: 21 },
+    Shower_Quantity: { side: 0, front: 24 },
+    Vanity_Quantity: { side: 3, front: 21 },
+    Cabinet_Quantity: { side: 2, front: 12 },
+    Door_Quantity: { side: 0, front: 24 },
+  };
+
+  function clearanceFt(fixtureKey) {
+    var c = CLEARANCE_IN[fixtureKey] || { side: 0, front: 0 };
+    return { side: c.side / 12, front: c.front / 12 };
+  }
+
   // Fixed priority order for the floor-standing wall scan. Each type scans
   // from its OWN fixed wall index (priorityIndex % 4), not a shared cursor
   // — so changing one fixture type's count never relocates an already
@@ -86,7 +115,6 @@
     "Door_Quantity",
   ];
   var WALL_MOUNT_PRIORITY = ["Mirror_Quantity", "Mirror_Huge_Quantity", "Shower_Shelf_Quantity"];
-  var MARGIN = 0.35; // reserved gap before/after each placed item, in feet
 
   function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
@@ -151,30 +179,93 @@
 
   // The 4 walls of a widthFt x lengthFt room, in a fixed order, each with a
   // start point/direction so a fixture's wall-local offset can be turned
-  // into (x, z, rotationY). "used" tracks how much of the wall's span is
-  // already spoken for during one computeLayout() call.
+  // into (x, z, rotationY), plus its inward-facing normal (normalX/normalZ)
+  // for projecting a fixture's depth+front-clearance into the room. "used"
+  // tracks how much of the wall's span is already spoken for during one
+  // computeLayout() call.
   function wallsFor(widthFt, lengthFt) {
     return [
-      { id: "N", originX: 0, originZ: 0, dirX: 1, dirZ: 0, span: widthFt, facingY: 0, used: 0 },
-      { id: "E", originX: widthFt, originZ: 0, dirX: 0, dirZ: 1, span: lengthFt, facingY: -Math.PI / 2, used: 0 },
-      { id: "S", originX: widthFt, originZ: lengthFt, dirX: -1, dirZ: 0, span: widthFt, facingY: Math.PI, used: 0 },
-      { id: "W", originX: 0, originZ: lengthFt, dirX: 0, dirZ: -1, span: lengthFt, facingY: Math.PI / 2, used: 0 },
+      { id: "N", originX: 0, originZ: 0, dirX: 1, dirZ: 0, normalX: 0, normalZ: 1, span: widthFt, facingY: 0, used: 0 },
+      {
+        id: "E",
+        originX: widthFt,
+        originZ: 0,
+        dirX: 0,
+        dirZ: 1,
+        normalX: -1,
+        normalZ: 0,
+        span: lengthFt,
+        facingY: -Math.PI / 2,
+        used: 0,
+      },
+      {
+        id: "S",
+        originX: widthFt,
+        originZ: lengthFt,
+        dirX: -1,
+        dirZ: 0,
+        normalX: 0,
+        normalZ: -1,
+        span: widthFt,
+        facingY: Math.PI,
+        used: 0,
+      },
+      {
+        id: "W",
+        originX: 0,
+        originZ: lengthFt,
+        dirX: 0,
+        dirZ: -1,
+        normalX: 1,
+        normalZ: 0,
+        span: lengthFt,
+        facingY: Math.PI / 2,
+        used: 0,
+      },
     ];
   }
 
-  function placeOnWall(wall, footprint) {
-    var offset = wall.used + MARGIN + footprint.wallSpan / 2;
+  // Half-width of the clearance envelope a fixture needs along its wall:
+  // its own physical half-width, or its code-required side clearance,
+  // whichever is larger (e.g. a toilet's 15in centerline clearance exceeds
+  // half its ~20in physical width, so the clearance rule dominates).
+  function expandedHalfWidth(footprint, fixtureKey) {
+    return Math.max(footprint.wallSpan / 2, clearanceFt(fixtureKey).side);
+  }
+
+  // The world-space axis-aligned rectangle a fixture's clearance envelope
+  // occupies: centered on `alongOffset` along the wall (±halfWidth), and
+  // from the wall (0) to `depthExtent` into the room along the wall's
+  // normal. Every wall is axis-aligned in this room's coordinate system
+  // (tangent and normal are each purely X or purely Z), so this is always
+  // a real axis-aligned rectangle, never a rotated one.
+  function clearanceRect(wall, alongOffset, halfWidth, depthExtent) {
+    var cx = wall.originX + wall.dirX * alongOffset;
+    var cz = wall.originZ + wall.dirZ * alongOffset;
+    var halfX = Math.abs(wall.dirX) * halfWidth;
+    var halfZ = Math.abs(wall.dirZ) * halfWidth;
+    var depthX = Math.abs(wall.normalX) * depthExtent;
+    var depthZ = Math.abs(wall.normalZ) * depthExtent;
     return {
-      x: wall.originX + wall.dirX * offset,
-      z: wall.originZ + wall.dirZ * offset,
+      minX: cx - halfX - (wall.normalX < 0 ? depthX : 0),
+      maxX: cx + halfX + (wall.normalX > 0 ? depthX : 0),
+      minZ: cz - halfZ - (wall.normalZ < 0 ? depthZ : 0),
+      maxZ: cz + halfZ + (wall.normalZ > 0 ? depthZ : 0),
+    };
+  }
+
+  function rectsOverlap(a, b) {
+    return a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ;
+  }
+
+  function placeAt(wall, alongOffset, footprint) {
+    return {
+      x: wall.originX + wall.dirX * alongOffset,
+      z: wall.originZ + wall.dirZ * alongOffset,
       y: footprint.height / 2,
       rotationY: wall.facingY,
       wallId: wall.id,
     };
-  }
-
-  function wallFits(wall, footprint) {
-    return wall.span - wall.used >= footprint.wallSpan + 2 * MARGIN;
   }
 
   // Deterministic, pure: the same (widthFt, lengthFt, fixtureCounts) triple
@@ -207,9 +298,18 @@
       return walls.slice(start).concat(walls.slice(0, start));
     }
 
-    // Pass 1: floor-standing fixtures.
+    // Pass 1: floor-standing fixtures. placedRects accumulates every placed
+    // fixture's clearance envelope, checked against every NEW candidate
+    // regardless of which wall either one is on — this is what catches a
+    // fixture on an adjacent wall that would clip into a shared corner,
+    // which a same-wall-only check (the old wallFits()) could not.
+    var placedRects = [];
     FLOOR_PRIORITY.forEach(function (fixtureKey, priorityIdx) {
       var footprint = FIXTURE_LAYOUT[fixtureKey];
+      var clearance = clearanceFt(fixtureKey);
+      var halfWidth = expandedHalfWidth(footprint, fixtureKey);
+      var requiredSpan = 2 * halfWidth;
+      var depthExtent = footprint.depth + clearance.front;
       var count = clamp(Math.floor(fixtureCounts[fixtureKey] || 0), 0, MAX_FIXTURE_COUNT);
       placedByType[fixtureKey] = [];
       for (var i = 0; i < count; i++) {
@@ -219,20 +319,31 @@
           if (preferred && preferred.used === 0) candidateWalls = [preferred];
         }
         var chosen = null;
+        var chosenRect = null;
+        var chosenOffset = 0;
         for (var w = 0; w < candidateWalls.length; w++) {
-          if (wallFits(candidateWalls[w], footprint)) {
-            chosen = candidateWalls[w];
-            break;
-          }
+          var wall = candidateWalls[w];
+          if (wall.span - wall.used < requiredSpan) continue;
+          var alongOffset = wall.used + halfWidth;
+          var rect = clearanceRect(wall, alongOffset, halfWidth, depthExtent);
+          var conflict = placedRects.some(function (r) {
+            return rectsOverlap(rect, r);
+          });
+          if (conflict) continue;
+          chosen = wall;
+          chosenRect = rect;
+          chosenOffset = alongOffset;
+          break;
         }
         if (!chosen) {
           droppedCounts[fixtureKey] = (droppedCounts[fixtureKey] || 0) + 1;
           continue;
         }
-        var placement = placeOnWall(chosen, footprint);
+        var placement = placeAt(chosen, chosenOffset, footprint);
         placement.fixtureKey = fixtureKey;
         placement.index = i;
-        chosen.used += footprint.wallSpan + MARGIN;
+        chosen.used = chosenOffset + halfWidth;
+        placedRects.push(chosenRect);
         placements.push(placement);
         placedByType[fixtureKey].push(placement);
       }
@@ -354,6 +465,7 @@
     RENDER_MIN_DIM: RENDER_MIN_DIM,
     MAX_FIXTURE_COUNT: MAX_FIXTURE_COUNT,
     FIXTURE_LAYOUT: FIXTURE_LAYOUT,
+    CLEARANCE_IN: CLEARANCE_IN,
     applyDimensionInput: applyDimensionInput,
     applyFixtureInput: applyFixtureInput,
     computeRoomDimensions: computeRoomDimensions,
