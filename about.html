@@ -1,161 +1,107 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>About Us | Premium Restoration</title>
-    <meta name="description" content="Learn about Premium Restoration, our mission, and our values." />
-    <!-- chrome:head -->
-    <meta name="theme-color" content="#15130f" />
-    <meta name="color-scheme" content="light dark" />
-    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="icon" href="favicon.ico" sizes="32x32" />
-    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-    <script>
-      (function () {
-        try {
-          var t = localStorage.getItem("pr_theme");
-          if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
-        } catch (e) {}
-      })();
-    </script>
-    <link rel="stylesheet" href="css/style.css" />
-    <!-- /chrome:head -->
-  </head>
-  <body>
-    <!-- chrome:header -->
-    <a class="skip-link" href="#main">Skip to content</a>
-    <header class="site-header">
-      <nav class="nav" aria-label="Main">
-        <a href="index.html" class="nav-brand">Premium Restoration</a>
-        <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
-          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
-            <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-          </svg>
-        </button>
-        <ul class="nav-links" id="nav-links">
-          <li><a href="index.html">Home</a></li>
-          <li><a href="index.html#pricing">How We Price</a></li>
-          <li><a href="about.html" class="current" aria-current="page">About Us</a></li>
-          <li><a href="faq.html">FAQs</a></li>
-          <li><a href="contact.html" class="nav-cta">Get a Quote</a></li>
-        </ul>
-      </nav>
-    </header>
-    <!-- /chrome:header -->
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>About Us | Premium Restoration</title>
+<meta name="description" content="Learn about Premium Restoration, our mission, and our values." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
 
-    <main id="main">
-      <section class="hero hero-page">
-        <div class="hero-inner">
-          <p class="eyebrow center">Our Story</p>
-          <h1>About <em>Premium Restoration</em></h1>
-          <p>Get to know the business behind the work.</p>
-        </div>
-      </section>
+<header class="site-header">
+  <nav class="nav">
+    <a href="index.html" class="nav-brand">Premium Restoration</a>
+    <button class="nav-toggle" aria-label="Toggle navigation">&#9776;</button>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="gallery.html">Our Work</a></li>
+      <li><a href="about.html" class="current">About Us</a></li>
+      <li><a href="faq.html">FAQs</a></li>
+      <li><a href="contact.html" class="nav-cta">Get a Quote</a></li>
+    </ul>
+  </nav>
+</header>
 
-      <section class="section">
-        <div class="about-hero">
-          <div class="about-photo" aria-hidden="true">Premium Restoration</div>
-          <div class="about-copy">
-            <p class="eyebrow">Who We Are</p>
-            <h2>Our Story</h2>
-            <p>
-              Premium Restoration was founded with a simple goal: help homeowners restore their homes with quality
-              craftsmanship and honest service.
-            </p>
-            <p>
-              We focus on bathroom restorations only, and we aim to treat every bathroom we work on with attention to
-              detail, clear communication, and respect for your space and schedule.
-            </p>
-          </div>
-        </div>
+<section class="hero" style="padding: 200px 32px 110px;">
+  <div class="hero-inner">
+    <span class="eyebrow center">Our Story</span>
+    <h1>About <em>Premium Restoration</em></h1>
+    <p>Get to know the team behind the work.</p>
+  </div>
+</section>
 
-        <div class="values-grid">
-          <div class="value-item">
-            <div class="value-rule"></div>
-            <h3>Craftsmanship</h3>
-            <p>We take pride in careful, quality work.</p>
-          </div>
-          <div class="value-item">
-            <div class="value-rule"></div>
-            <h3>Honest Communication</h3>
-            <p>You'll always know where your project stands.</p>
-          </div>
-          <div class="value-item">
-            <div class="value-rule"></div>
-            <h3>Clear Pricing</h3>
-            <p>Simple per-item labor rates you can see up front.</p>
-          </div>
-          <div class="value-item">
-            <div class="value-rule"></div>
-            <h3>Respect for Your Home</h3>
-            <p>We treat every home we work in like our own.</p>
-          </div>
-        </div>
-      </section>
+<section class="section">
+  <div class="about-hero">
+    <div class="about-photo">Team / company photo placeholder</div>
+    <div class="about-copy">
+      <span class="eyebrow">Since Day One</span>
+      <h2>Our Story</h2>
+      <p>Premium Restoration was founded with a simple goal: help homeowners restore their homes with quality craftsmanship and honest service.</p>
+      <p>From small repairs to full home restorations, our team treats every project like it's our own home — with attention to detail, clear communication, and respect for your space and schedule.</p>
+    </div>
+  </div>
 
-      <section class="cta-band">
-        <p class="eyebrow center">Work With Us</p>
-        <h2 class="section-title">Want to Work With Us?</h2>
-        <p class="section-subtitle">Reach out and tell us about your bathroom project.</p>
-        <a href="contact.html" class="btn btn-primary">Get a Quote</a>
-      </section>
-    </main>
+  <div class="values-grid">
+    <div class="value-item">
+      <div class="value-rule"></div>
+      <h3>Craftsmanship</h3>
+      <p>We take pride in quality work that lasts.</p>
+    </div>
+    <div class="value-item">
+      <div class="value-rule"></div>
+      <h3>Honest Communication</h3>
+      <p>You'll always know where your project stands.</p>
+    </div>
+    <div class="value-item">
+      <div class="value-rule"></div>
+      <h3>Reliability</h3>
+      <p>On-time, on-budget, and accountable from start to finish.</p>
+    </div>
+    <div class="value-item">
+      <div class="value-rule"></div>
+      <h3>Respect for Your Home</h3>
+      <p>We treat every home we work in like our own.</p>
+    </div>
+  </div>
+</section>
 
-    <!-- chrome:footer -->
-    <footer class="site-footer">
-      <div class="footer-grid">
-        <div class="footer-col">
-          <p class="footer-brand">Premium Restoration</p>
-          <p class="footer-tagline">Bathroom restoration services.</p>
-          <p class="footer-identity">
-            Operated by
-            <span data-show-if="owner.legalName" hidden><span data-fill="owner.legalName"></span>,</span>
-            an individual<br />
-            (not a registered company)
-            <span data-show-if="owner.contactAddress" hidden><br /><span data-fill="owner.contactAddress"></span></span>
-            <!-- There is currently no contractor licence. Add a licence line here only once a licence is
-             actually issued, as <br />Contractor License # [CONTRACTOR LICENSE #] ([LICENSE CLASSIFICATION]) -->
-          </p>
-        </div>
-        <div class="footer-col">
-          <h2 class="footer-heading">Explore</h2>
-          <a href="index.html">Home</a>
-          <a href="index.html#pricing">How We Price</a>
-          <a href="about.html">About Us</a>
-          <a href="faq.html">FAQs</a>
-          <a href="contact.html">Get a Quote</a>
-        </div>
-        <div class="footer-col">
-          <h2 class="footer-heading">Contact</h2>
-          <a href="tel:+13853568733">(385) 356-8733</a>
-          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
-        </div>
-        <div class="footer-col">
-          <h2 class="footer-heading">Legal</h2>
-          <a href="privacy.html">Privacy Notice</a>
-          <a href="terms.html">Terms of Use</a>
-          <a href="privacy.html#your-rights">Access or Delete My Data</a>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p class="footer-copy">
-          &copy; <span data-year>2026</span> Premium Restoration<span data-show-if="owner.legalName" hidden
-            >, operated by <span data-fill="owner.legalName"></span></span
-          >.
-        </p>
-        <div class="theme-switch" role="group" aria-label="Colour theme">
-          <span class="theme-switch-label" aria-hidden="true">Theme</span>
-          <button type="button" data-theme-choice="system" aria-pressed="true">System</button>
-          <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
-          <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
-        </div>
-      </div>
-    </footer>
-    <!-- /chrome:footer -->
+<section class="cta-band">
+  <span class="eyebrow center">Work With Us</span>
+  <h2 class="section-title">Want to Work With Us?</h2>
+  <p class="section-subtitle">Reach out and tell us about your restoration project.</p>
+  <a href="contact.html" class="btn btn-primary">Get a Free Quote</a>
+</section>
 
-    <script src="js/site-config.js"></script>
-    <script src="js/theme.js"></script>
-    <script src="js/script.js"></script>
-  </body>
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-col">
+      <p class="footer-brand">Premium Restoration</p>
+      <p style="max-width:260px; font-size: 0.9rem;">Quality home restoration services.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Explore</h4>
+      <a href="index.html">Home</a>
+      <a href="gallery.html">Our Work</a>
+      <a href="about.html">About Us</a>
+      <a href="faq.html">FAQs</a>
+      <a href="contact.html">Get a Quote</a>
+    </div>
+    <div class="footer-col">
+      <h4>Contact</h4>
+      <a href="tel:+13853568733">(385) 356-8733</a>
+      <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    &copy; <span id="year"></span> Premium Restoration. All rights reserved.
+  </div>
+</footer>
+
+<script src="js/script.js"></script>
+<script>document.getElementById("year").textContent = new Date().getFullYear();</script>
+</body>
 </html>
