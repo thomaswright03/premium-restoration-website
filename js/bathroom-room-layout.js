@@ -185,7 +185,22 @@
   // computeLayout() call.
   function wallsFor(widthFt, lengthFt) {
     return [
-      { id: "N", originX: 0, originZ: 0, dirX: 1, dirZ: 0, normalX: 0, normalZ: 1, span: widthFt, facingY: 0, used: 0 },
+      {
+        id: "N",
+        originX: 0,
+        originZ: 0,
+        dirX: 1,
+        dirZ: 0,
+        normalX: 0,
+        normalZ: 1,
+        span: widthFt,
+        // How far the room actually extends in this wall's inward
+        // direction — a fixture's depth+clearance can never exceed this,
+        // or it would poke through the opposite wall.
+        roomDepth: lengthFt,
+        facingY: 0,
+        used: 0,
+      },
       {
         id: "E",
         originX: widthFt,
@@ -195,6 +210,7 @@
         normalX: -1,
         normalZ: 0,
         span: lengthFt,
+        roomDepth: widthFt,
         facingY: -Math.PI / 2,
         used: 0,
       },
@@ -207,6 +223,7 @@
         normalX: 0,
         normalZ: -1,
         span: widthFt,
+        roomDepth: lengthFt,
         facingY: Math.PI,
         used: 0,
       },
@@ -219,6 +236,7 @@
         normalX: 1,
         normalZ: 0,
         span: lengthFt,
+        roomDepth: widthFt,
         facingY: Math.PI / 2,
         used: 0,
       },
@@ -324,6 +342,7 @@
         for (var w = 0; w < candidateWalls.length; w++) {
           var wall = candidateWalls[w];
           if (wall.span - wall.used < requiredSpan) continue;
+          if (depthExtent > wall.roomDepth) continue; // would poke through the opposite wall
           var alongOffset = wall.used + halfWidth;
           var rect = clearanceRect(wall, alongOffset, halfWidth, depthExtent);
           var conflict = placedRects.some(function (r) {

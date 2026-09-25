@@ -85,6 +85,34 @@ test("computeLayout: two large fixtures genuinely competing for wall space still
   assert.equal(placedCount + (a.droppedCounts.Bathtub_Quantity || 0), 2);
 });
 
+test("computeLayout: a fixture is dropped rather than poking through the opposite wall when the room is too shallow for its depth+clearance", () => {
+  // A shower needs 3.2ft depth + 24in front clearance = 5.2ft into the
+  // room, in whichever direction it projects. A 4x4 room is too shallow in
+  // BOTH directions — every wall's span has room for the shower's 3.2ft
+  // width, but no wall's opposite-side room depth reaches 5.2ft, so it
+  // must be dropped everywhere rather than placed poking through a wall.
+  var result = L.computeLayout({ widthFt: 4, lengthFt: 4, fixtureCounts: { Shower_Quantity: 1 } });
+  assert.equal(result.placements.filter((p) => p.fixtureKey === "Shower_Quantity").length, 0);
+  assert.equal(result.droppedCounts.Shower_Quantity, 1);
+});
+
+test("computeLayout: the same fixture placed on a wall whose span is short but whose room-depth (the perpendicular dimension) is ample still fits", () => {
+  // 10ft wide x 4ft long: the N/S walls run along the 10ft span but only
+  // project 4ft into the room (too shallow for the shower) — while the E/W
+  // walls run along the shorter 4ft span but project a full 10ft into the
+  // room, ample depth. A correct algorithm places it there, not drops it.
+  var result = L.computeLayout({ widthFt: 10, lengthFt: 4, fixtureCounts: { Shower_Quantity: 1 } });
+  var placed = result.placements.filter((p) => p.fixtureKey === "Shower_Quantity");
+  assert.equal(placed.length, 1);
+  assert.ok(["E", "W"].indexOf(placed[0].wallId) !== -1);
+});
+
+test("computeLayout: a fixture that fits the room's depth is still placed normally", () => {
+  var result = L.computeLayout({ widthFt: 10, lengthFt: 8, fixtureCounts: { Shower_Quantity: 1 } });
+  assert.equal(result.placements.filter((p) => p.fixtureKey === "Shower_Quantity").length, 1);
+  assert.equal(result.droppedCounts.Shower_Quantity, undefined);
+});
+
 test("computeLayout: a fixture on one wall is rejected for clipping another's clearance on an adjacent wall, even though each wall alone has room", () => {
   // 6x6ft: every wall's own span (6ft) comfortably exceeds one bathtub's
   // 5.2ft wall-span, so the OLD same-wall-only fit test would have placed

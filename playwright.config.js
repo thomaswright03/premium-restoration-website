@@ -22,6 +22,13 @@ module.exports = defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
+  // Serial execution (above) fixed the multi-worker contention, but the
+  // GitHub-hosted runner's 2 shared vCPUs are still measurably slower than
+  // this sandbox's for first-time WebGL context creation/shader compile —
+  // confirmed: the same two 3D-adjacent expect() calls kept timing out at
+  // the default 5s even running alone. Widen the default assertion timeout
+  // in CI rather than keep chasing the render pipeline's startup cost.
+  expect: { timeout: process.env.CI ? 15000 : 5000 },
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: "retain-on-failure",

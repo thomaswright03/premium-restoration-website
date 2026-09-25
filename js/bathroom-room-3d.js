@@ -231,6 +231,9 @@ function buildGeometries() {
     bathtubInner: new THREE.BoxGeometry(4.7, 1.1, 2.1),
     showerPanel: new THREE.PlaneGeometry(3.2, 6.5),
     showerPan: new THREE.BoxGeometry(3, 0.1, 3),
+    showerHeadArm: new THREE.CylinderGeometry(0.025, 0.025, 0.45, 8),
+    showerHeadElbow: new THREE.SphereGeometry(0.035, 8, 8),
+    showerHeadDisc: new THREE.CylinderGeometry(0.22, 0.22, 0.04, 24),
     showerDoorPanel: new THREE.PlaneGeometry(2.5, 6.5),
     showerDoorFrameEdge: new THREE.BoxGeometry(0.06, 6.5, 0.06),
     doorSlab: new THREE.BoxGeometry(2.5, 6.75, 0.15),
@@ -350,7 +353,18 @@ function buildShower(geo, mat) {
   right.position.set(1.6, 3.25, 1.6);
   var pan = new THREE.Mesh(geo.showerPan, mat.porcelain);
   pan.position.set(0, 0.05, 1.6);
-  g.add(back, left, right, pan);
+  // Wall-mounted shower head: an elbow at the wall, an angled arm, and a
+  // disc head facing down into the shower — chrome, matching the toilet's
+  // flush lever/mirror-frame hardware finish.
+  var headElbow = new THREE.Mesh(geo.showerHeadElbow, mat.chrome);
+  headElbow.position.set(0, 6.3, 0.08);
+  var headArm = new THREE.Mesh(geo.showerHeadArm, mat.chrome);
+  headArm.rotation.x = Math.PI / 2.3;
+  headArm.position.set(0, 6.18, 0.28);
+  var headDisc = new THREE.Mesh(geo.showerHeadDisc, mat.chrome);
+  headDisc.rotation.x = Math.PI / 2.1;
+  headDisc.position.set(0, 6.0, 0.48);
+  g.add(back, left, right, pan, headElbow, headArm, headDisc);
   return g;
 }
 
