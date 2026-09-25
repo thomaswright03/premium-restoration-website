@@ -636,6 +636,13 @@ p {
   overflow-y: auto;
 }
 
+/* With the 3D room showing, it should dominate the screen: the chat
+   column becomes a fixed, comfortable reading width instead of growing,
+   and the room (flex: 1 below) takes every pixel left over. */
+.ai-chat-section.is-fullscreen:has(#ai-chat-room-3d:not([hidden])) .ai-chat-messages {
+  flex: 0 0 380px;
+}
+
 body.ai-chat-locked {
   overflow: hidden;
 }
@@ -654,6 +661,14 @@ body.ai-chat-locked {
   overflow-y: auto;
   background: var(--color-surface-alt);
   border-left: 1px solid var(--color-line);
+}
+
+/* In fullscreen the room is the point — it should dominate the screen,
+   not sit in a narrow fixed sidebar. The chat column above becomes the
+   fixed-width one instead (see .ai-chat-messages). */
+.ai-chat-section.is-fullscreen .ai-chat-room-3d {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .ai-chat-room-3d-disclosure {
