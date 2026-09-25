@@ -6,6 +6,9 @@
   "materialsEstimator": {
     "enabled": true
   },
+  "bathroomVisualizer": {
+    "enabled": true
+  },
   "leadForm": {
     "endpoint": "",
     "serviceName": "",

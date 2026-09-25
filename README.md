@@ -35,6 +35,7 @@ The site says "Get a Quote" / "Request a Quote", not "Free Quote": nothing confi
 ├── css/admin.css             admin tool styles (uses the same tokens)
 ├── js/bathroom-pricing.js    prices + THE bathroom calculation, validation and estimate text (shared)
 ├── js/materials-pricing.js   materials picker catalog + logic — MOCK DATA (see "Materials picker")
+├── js/bathroom-visualizer.js pure logic for the photo-overlay mockup (see "Bathroom visualizer")
 ├── js/chat-replies.js        scripted chat answers (pure function, unit-tested)
 ├── js/site-config.js         loads site-config.json and shows/hides owner details on the page
 ├── js/theme.js               Light / Dark / System switch
@@ -68,6 +69,7 @@ If you can't see the change after two minutes, check the deployment on the Verce
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `priceEstimator.enabled`     | `true` shows the "Get a bathroom price estimate" button and lets the chat give estimates and item prices. `false` hides the button, stops the "bathroom quote" trigger, and the chat answers any price question with "Call (385) 356-8733 or use the Contact page for a price." |
 | `materialsEstimator.enabled` | `true` shows "Pick Your Materials →" on a finished estimate card. **Uses mock product/price data** (see "Materials picker") — leave `false` until a real pricing source is connected, unless you're comfortable a customer seeing placeholder prices labelled as such.          |
+| `bathroomVisualizer.enabled` | `true` offers a photo-upload step at the start of the estimate; icon chips overlay the photo as a mockup (see "Bathroom visualizer"). Not a real rendering — the photo never leaves the browser.                                                                                |
 | `leadForm.endpoint`          | Blank = the Get a Quote form opens the visitor's email app (current behaviour). An `https://` address of a form service (e.g. Formspree `https://formspree.io/f/xxxxxxx`) = the form sends the request directly (see "Contact / lead form").                                    |
 | `leadForm.serviceName`       | Name of that form service, shown on the form and in the Privacy Notice (e.g. `"Formspree"`).                                                                                                                                                                                    |
 | `leadForm.servicePrivacyUrl` | Optional `https://` link to the form service's privacy policy, linked from the Privacy Notice.                                                                                                                                                                                  |
@@ -100,6 +102,17 @@ The public estimate always uses the published `DEFAULT_PRICES` in `js/bathroom-p
 To go live with real prices (and real photos) later: sign up for the Home Depot and/or Lowe's affiliate/data-feed programs (self-serve, free — both include an image URL per product in the feed), replace `getOptionsForCategory()` with a server-side lookup (a Vercel serverless function, so no retailer API key is ever exposed in this public file) that returns each option's real `imageUrl` alongside its price, swap the category `<span>` icon in `appendMaterialCategoryForm()` (`js/script.js`) for an `<img>` using that URL, replace `mockRegionalFactor()` with a real location adjustment (e.g. BEA Regional Price Parities), and set `IS_MOCK_DATA` to `false`. Nothing else needs to change — `js/script.js` only calls the functions `js/materials-pricing.js` already exposes.
 
 **In progress:** a Lowe's Developer Hub app (Product Discovery solution, Product Catalog capability) has been submitted for approval. `api/materials-options.js` is a not-yet-implemented Vercel serverless function stub for this — it validates its inputs and env vars and returns a clear "not configured" error, but makes no real API call yet, since Lowe's exact endpoint path, auth header, and response field names aren't visible until the app is approved and its interactive docs unlock. `.env.example` lists the environment variables it expects (`LOWES_API_KEY`, `LOWES_API_BASE_URL`) — copy it to `.env.local` for local testing, or set them as real Environment Variables in the Vercel project dashboard for production; both are gitignored so a real key never gets committed. Once the account is approved, the API docs will confirm the exact request/response shape needed to finish this function and switch `js/materials-pricing.js` over to calling it.
+
+## Bathroom visualizer
+
+**A mockup, not a real rendering.** Controlled by `bathroomVisualizer.enabled` (default `false`). When on, starting the chat estimate first asks (optionally — "Skip for now" always works) for a photo of the customer's own bathroom. The photo is read locally with `FileReader` and downscaled on an off-screen `<canvas>` before display — it's **never uploaded anywhere**, there's no backend involved at all in this phase.
+
+- If a photo is provided, a side panel (stacked above the conversation on narrow screens, docked to the right on wide ones — `.ai-chat-fullscreen-body` in `css/style.css`) shows it for the rest of the estimate flow.
+- **Icon chips, not an AI-generated image.** As the customer answers each scope question or types a fixture count — before clicking "Continue," not just after — a plain icon badge (reusing the materials picker's `MATERIAL_ICON_SVG`) appears or disappears over the photo. The pure mapping from an answer to a visual item lives in `js/bathroom-visualizer.js` (`visualItemForScopeField`, `visualItemForFixture`), unit-tested in `tests/unit/visualizer.test.js`; `js/script.js` owns the DOM (`setVisualizerItem`/`removeVisualizerItem`) and the icon lookup.
+- The same panel carries into "Pick Your Materials": choosing a specific product upgrades that category's chip from a generic label ("2 Toilets") to the chosen product's name.
+- Demolition has no chip, same reason the materials picker excludes it — there's nothing to visually add for removing something.
+
+To go live with a real rendering later: this is a much bigger step than the materials picker's live-pricing swap — it needs a paid image-generation/editing API (e.g. an image-edit endpoint that takes the uploaded photo plus a text description of the chosen fixtures/materials and returns an edited image), a Vercel serverless function so the API key stays server-side, and a real decision about whether/how the uploaded photo is sent off-device at all (today it deliberately never leaves the browser). Not started — this section documents intent, not a scaffold.
 
 ## One calculation, one set of prices
 
@@ -245,6 +258,7 @@ These are decisions or facts only the owner can supply. Until then, the site lea
 - **Prices other than $60/cabinet and $5/sq ft of flooring**: confirm the remaining published rates (demolition, tile, paint, fixtures) are current.
 - **Estimator on or off**: confirm the owner is happy publishing live prices through the chat (`priceEstimator.enabled`).
 - **Materials picker**: currently mock data (see "Materials picker") — needs a real pricing source connected (e.g. Home Depot/Lowe's affiliate feeds) before `materialsEstimator.enabled` should ever be turned on for real customers.
+- **Bathroom visualizer**: currently an icon-overlay mockup, not a real rendering (see "Bathroom visualizer") — fine to leave on since it's clearly disclosed and the photo never leaves the browser, but confirm the owner is comfortable with that mockup framing before real customers see it.
 - **GitHub branch protection** requiring the CI check before merging (repository admin).
 
 ## Legal pages

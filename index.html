@@ -93,22 +93,38 @@
               </svg>
             </button>
           </div>
-          <div class="ai-chat-messages" id="ai-chat-messages" aria-live="polite">
-            <div class="ai-chat-row bot">
-              <div class="ai-chat-row-inner">
-                <div class="ai-chat-avatar" aria-hidden="true">PR</div>
-                <div class="ai-chat-text">
-                  Hi! I'm Premium Restoration's automated assistant (scripted replies — not a person). We work on
-                  bathroom restorations only. Ask me about bathroom work, prices, or how to get a quote.
+          <div class="ai-chat-fullscreen-body">
+            <div class="ai-chat-messages" id="ai-chat-messages" aria-live="polite">
+              <div class="ai-chat-row bot">
+                <div class="ai-chat-row-inner">
+                  <div class="ai-chat-avatar" aria-hidden="true">PR</div>
+                  <div class="ai-chat-text">
+                    Hi! I'm Premium Restoration's automated assistant (scripted replies — not a person). We work on
+                    bathroom restorations only. Ask me about bathroom work, prices, or how to get a quote.
+                  </div>
+                </div>
+              </div>
+              <div class="ai-chat-row bot" id="ai-chat-quote-starter-row" hidden>
+                <div class="ai-chat-row-inner">
+                  <div class="ai-chat-avatar" aria-hidden="true">PR</div>
+                  <button type="button" id="ai-chat-quote-starter" class="ai-chat-suggestion">
+                    Get a bathroom price estimate →
+                  </button>
                 </div>
               </div>
             </div>
-            <div class="ai-chat-row bot" id="ai-chat-quote-starter-row" hidden>
-              <div class="ai-chat-row-inner">
-                <div class="ai-chat-avatar" aria-hidden="true">PR</div>
-                <button type="button" id="ai-chat-quote-starter" class="ai-chat-suggestion">
-                  Get a bathroom price estimate →
-                </button>
+            <div class="ai-chat-visualizer" id="ai-chat-visualizer" hidden>
+              <p class="ai-chat-visualizer-disclosure">
+                Mockup preview — icons show what you've chosen, not an actual rendering of your bathroom. Your photo
+                stays in your browser; it's never uploaded anywhere.
+              </p>
+              <div class="ai-chat-visualizer-photo-wrap">
+                <img
+                  class="ai-chat-visualizer-photo"
+                  id="ai-chat-visualizer-photo"
+                  alt="Your uploaded bathroom photo"
+                />
+                <div class="ai-chat-visualizer-chips" id="ai-chat-visualizer-chips"></div>
               </div>
             </div>
           </div>
@@ -275,6 +291,7 @@
 
     <script src="js/bathroom-pricing.js"></script>
     <script src="js/materials-pricing.js"></script>
+    <script src="js/bathroom-visualizer.js"></script>
     <script src="js/chat-replies.js"></script>
     <script src="js/site-config.js"></script>
     <script src="js/theme.js"></script>

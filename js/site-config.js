@@ -22,6 +22,10 @@
     // until a real pricing source is connected — defaults off so a customer
     // never sees it without the owner deliberately turning it on.
     materialsEstimator: { enabled: false },
+    // Bathroom visualizer overlays icon badges on the customer's own uploaded
+    // photo as a mockup (see js/bathroom-visualizer.js) — no AI rendering,
+    // photo never leaves the browser. Defaults off, same rollout as above.
+    bathroomVisualizer: { enabled: false },
     leadForm: { endpoint: "", serviceName: "", servicePrivacyUrl: "" },
     owner: { legalName: "", contactAddress: "" },
     privacy: { responsePeriod: "" },
@@ -35,6 +39,7 @@
     raw = raw || {};
     var pe = raw.priceEstimator || {};
     var me = raw.materialsEstimator || {};
+    var bv = raw.bathroomVisualizer || {};
     var lf = raw.leadForm || {};
     var owner = raw.owner || {};
     var privacy = raw.privacy || {};
@@ -43,6 +48,7 @@
       loaded: true,
       priceEstimator: { enabled: pe.enabled === true },
       materialsEstimator: { enabled: me.enabled === true },
+      bathroomVisualizer: { enabled: bv.enabled === true },
       leadForm: {
         // Only an https:// address is used; anything else keeps the email-app form.
         endpoint: /^https:\/\/[^\s]+$/.test(endpoint) ? endpoint : "",
