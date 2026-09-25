@@ -685,6 +685,49 @@ document.addEventListener("DOMContentLoaded", function () {
       "placeholder data until a live pricing source is connected. Always confirm real prices before buying, and " +
       "before agreeing to any job cost.";
 
+    // Generic category glyphs, not real product photos — this is mock data
+    // (see js/materials-pricing.js), so there's no real per-product photo to
+    // show yet. A real pricing integration would normally include an image
+    // URL per product; swap these for <img> tags fed by that at the same
+    // time IS_MOCK_DATA is turned off. Single-stroke, currentColor so they
+    // follow the button's text colour (and the site's dark theme) for free.
+    var MATERIAL_ICON_SVG = {
+      Toilet_Quantity:
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h7v5H7z"/><path d="M6 9h9c1 0 1.6.8 1.4 1.8l-1 5.2A3 3 0 0 1 12.5 18.5h-1A3 3 0 0 1 8.6 16l-1-5.2C7.4 9.8 8 9 9 9"/><path d="M8.5 18.5 8 21m7-2.5.5 2.5"/></svg>',
+      Sink_Quantity:
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4v3M9 4h2"/><path d="M4 10h16"/><ellipse cx="12" cy="14" rx="8" ry="4"/><path d="M9 14a3 3 0 0 0 6 0"/><path d="M8 18l-1 3m10-3 1 3"/></svg>',
+      Bathtub_Quantity:
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16v2a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M4 12a2 2 0 0 1 2-2h1"/><path d="M6 19l-1 2m14-2 1 2M15 4a2 2 0 0 1 2 2v2"/></svg>',
+      Shower_Quantity:
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a5 5 0 0 1 10 0"/><circle cx="11" cy="8" r="1.5" fill="currentColor" stroke="none"/><path d="M4 12h14M8 15v1M12 15v2M16 15v1"/></svg>',
+      Shower_Door_Quantity:
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M12 3v18"/><circle cx="9" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>',
+      Door_Quantity:
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1"/><circle cx="15" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>',
+      Vanity_Quantity:
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="13" width="16" height="7" rx="1"/><ellipse cx="12" cy="10" rx="7" ry="3"/><path d="M12 7v1"/></svg>',
+      Cabinet_Quantity:
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M12 3v18"/><circle cx="10" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="14" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>',
+      Mirror_Quantity:
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="6"/><path d="M9 7l-1.5 8"/></svg>',
+      Mirror_Huge_Quantity:
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7l-1.5 10"/></svg>',
+      Shower_Shelf_Quantity:
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h16M6 10V7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="15.5" r="1"/></svg>',
+      floorTile:
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7"/><rect x="13" y="4" width="7" height="7"/><rect x="4" y="13" width="7" height="7"/><rect x="13" y="13" width="7" height="7"/></svg>',
+      flooring:
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="4"/><rect x="3" y="14" width="10" height="4"/><rect x="15" y="14" width="6" height="4"/></svg>',
+      wallPaint:
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="8" height="5" rx="1"/><path d="M8 9v3a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v4"/><circle cx="13" cy="19" r="1.5" fill="currentColor" stroke="none"/></svg>',
+    };
+    MATERIAL_ICON_SVG.wallTile = MATERIAL_ICON_SVG.floorTile;
+    MATERIAL_ICON_SVG.ceilingPaint = MATERIAL_ICON_SVG.wallPaint;
+
+    function materialIconSvg(categoryKey) {
+      return MATERIAL_ICON_SVG[categoryKey] || "";
+    }
+
     var materialsState = null; // null when inactive, else { categories, categoryIndex, zip, picks, laborResult }
 
     function startMaterialsFlow(values, scope, laborResult) {
@@ -827,13 +870,24 @@ document.addEventListener("DOMContentLoaded", function () {
       var choicesWrap = el("div", "ai-chat-choices ai-chat-choices--material");
       var chosen = null;
       var buttons = [];
+      var iconSvg = materialIconSvg(category.key);
       options.forEach(function (opt) {
         var btn = document.createElement("button");
         btn.type = "button";
         btn.className = "ai-chat-choice ai-chat-choice--material";
-        btn.appendChild(el("span", "ai-chat-material-name", opt.name));
-        btn.appendChild(el("span", "ai-chat-material-price", Pricing.money(opt.best.price) + " at " + opt.best.name));
-        if (opt.best.compareNote) btn.appendChild(el("span", "ai-chat-material-note", opt.best.compareNote));
+        if (iconSvg) {
+          var icon = el("span", "ai-chat-material-icon");
+          icon.setAttribute("aria-hidden", "true");
+          icon.innerHTML = iconSvg;
+          btn.appendChild(icon);
+        }
+        var textWrap = el("span", "ai-chat-material-text");
+        textWrap.appendChild(el("span", "ai-chat-material-name", opt.name));
+        textWrap.appendChild(
+          el("span", "ai-chat-material-price", Pricing.money(opt.best.price) + " at " + opt.best.name),
+        );
+        if (opt.best.compareNote) textWrap.appendChild(el("span", "ai-chat-material-note", opt.best.compareNote));
+        btn.appendChild(textWrap);
         btn.setAttribute("aria-pressed", "false");
         btn.addEventListener("click", function () {
           chosen = opt;

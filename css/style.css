@@ -1152,11 +1152,33 @@ body.ai-chat-locked {
 .ai-chat-choice--material {
   flex-basis: auto;
   display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+}
+
+.ai-chat-material-icon {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  color: inherit;
+  opacity: 0.85;
+}
+
+.ai-chat-material-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.ai-chat-material-text {
+  display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-1);
-  padding: var(--space-3) var(--space-4);
-  text-align: left;
+  min-width: 0;
 }
 
 .ai-chat-material-name {
