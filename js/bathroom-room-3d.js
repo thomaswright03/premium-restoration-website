@@ -138,16 +138,68 @@ function horseshoeSeatGeometry(radiusX, radiusZ, centerZ, tubeRadius, gapDegrees
 // template Group per fixture key built once, cloned cheaply (shared
 // geometry/material references, not re-uploaded) for every placement.
 // ---------------------------------------------------------------------
+// Subway tile (3 x 6in, light grout) drawn once on a canvas, for the
+// shower's back wall.
+function subwayTileTexture() {
+  var c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 256;
+  var ctx = c.getContext("2d");
+  ctx.fillStyle = "#d9d6cf";
+  ctx.fillRect(0, 0, 256, 256);
+  ctx.fillStyle = "#f7f6f2";
+  var tw = 128;
+  var th = 64;
+  for (var row = 0; row < 4; row++) {
+    for (var col = -1; col < 3; col++) {
+      var x = col * tw + (row % 2 ? tw / 2 : 0);
+      ctx.fillRect(x + 2, row * th + 2, tw - 4, th - 4);
+    }
+  }
+  var tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  // 256px = 12in across (two tiles) and 12in tall (four courses).
+  tex.repeat.set(3, 7);
+  return tex;
+}
+
 function buildMaterials(isDark) {
-  var porcelain = new THREE.MeshLambertMaterial({ color: isDark ? 0x8a8377 : 0x6b6358 });
-  var cabinetWood = new THREE.MeshLambertMaterial({ color: isDark ? 0x5c564c : 0x46413a });
-  var doorTone = new THREE.MeshLambertMaterial({ color: isDark ? 0xa79c85 : 0xcfc3ad });
-  var glass = new THREE.MeshLambertMaterial({ color: 0xdce6e6, transparent: true, opacity: 0.3 });
-  var brass = new THREE.MeshStandardMaterial({
-    color: isDark ? 0xcda15f : 0xb3874a,
-    metalness: 0.6,
-    roughness: 0.35,
+  var acrylic = new THREE.MeshPhysicalMaterial({
+    color: isDark ? 0xe6e4de : 0xfbfaf7,
+    roughness: 0.3,
+    metalness: 0,
+    clearcoat: 0.6,
+    clearcoatRoughness: 0.1,
+    side: THREE.DoubleSide,
   });
+  var wood = new THREE.MeshStandardMaterial({ color: 0x7a5638, roughness: 0.6, metalness: 0 });
+  var woodDark = new THREE.MeshStandardMaterial({ color: 0x3b2a1d, roughness: 0.8, metalness: 0 });
+  var paintedWhite = new THREE.MeshStandardMaterial({ color: isDark ? 0xdcd9d2 : 0xf3f1ec, roughness: 0.55 });
+  var quartz = new THREE.MeshPhysicalMaterial({
+    color: 0xeeebe5,
+    roughness: 0.25,
+    clearcoat: 0.8,
+    clearcoatRoughness: 0.1,
+  });
+  var stone = new THREE.MeshStandardMaterial({ color: 0xe4ded3, roughness: 0.4 });
+  var nicheBack = new THREE.MeshStandardMaterial({ color: 0x8f877c, roughness: 0.5 });
+  var showerTile = new THREE.MeshStandardMaterial({ map: subwayTileTexture(), roughness: 0.3 });
+  // Clear tempered glass: nearly invisible, with a faint green-blue edge
+  // tint and environment reflections. Not written to the depth buffer so
+  // fixtures behind it still draw.
+  var glassClear = new THREE.MeshPhysicalMaterial({
+    color: 0xdff0ee,
+    roughness: 0.03,
+    metalness: 0,
+    transparent: true,
+    opacity: 0.2,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  var mirror = new THREE.MeshStandardMaterial({ color: 0xf2f4f5, roughness: 0.02, metalness: 1 });
+  var brushedMetal = new THREE.MeshStandardMaterial({ color: 0xb9b6b0, roughness: 0.35, metalness: 1 });
   // Glazed ceramic: a thin glossy clearcoat over a mostly-diffuse white
   // body is what actually reads as "porcelain" under image-based lighting,
   // rather than a flat white color.
@@ -173,16 +225,26 @@ function buildMaterials(isDark) {
     metalness: 1,
     clearcoat: 0.3,
   });
-  return {
-    porcelain: porcelain,
-    cabinetWood: cabinetWood,
-    doorTone: doorTone,
-    glass: glass,
-    brass: brass,
+  var materials = {
+    acrylic: acrylic,
+    wood: wood,
+    woodDark: woodDark,
+    paintedWhite: paintedWhite,
+    quartz: quartz,
+    stone: stone,
+    nicheBack: nicheBack,
+    showerTile: showerTile,
+    glassClear: glassClear,
+    mirror: mirror,
+    brushedMetal: brushedMetal,
     porcelainGloss: porcelainGloss,
+    // Sink bowls are open lathe shells seen from inside.
+    porcelainInside: porcelainGloss.clone(),
     seatResin: seatResin,
     chrome: chrome,
   };
+  materials.porcelainInside.side = THREE.DoubleSide;
+  return materials;
 }
 
 // Side-profile (radius, height) of an elongated toilet bowl, floor to rim,
@@ -233,46 +295,7 @@ function buildToiletGeometries() {
 }
 
 function buildGeometries() {
-  return {
-    toilet: buildToiletGeometries(),
-    sinkBasin: new THREE.CylinderGeometry(0.7, 0.6, 0.15, 16),
-    sinkColumn: new THREE.CylinderGeometry(0.18, 0.22, 2.4, 12),
-    bathtubOuter: new THREE.BoxGeometry(5.2, 1.6, 2.6),
-    bathtubInner: new THREE.BoxGeometry(4.7, 1.1, 2.1),
-    showerPanel: new THREE.PlaneGeometry(3.2, 6.5),
-    showerPan: new THREE.BoxGeometry(3, 0.1, 3),
-    showerHeadArm: new THREE.CylinderGeometry(0.025, 0.025, 0.45, 8),
-    showerHeadElbow: new THREE.SphereGeometry(0.035, 8, 8),
-    showerHeadDisc: new THREE.CylinderGeometry(0.22, 0.22, 0.04, 24),
-    showerDoorPanel: new THREE.PlaneGeometry(2.5, 6.5),
-    showerDoorFrameEdge: new THREE.BoxGeometry(0.06, 6.5, 0.06),
-    doorSlab: new THREE.BoxGeometry(2.5, 6.75, 0.15),
-    doorKnob: new THREE.SphereGeometry(0.05, 8, 8),
-    vanityBody: new THREE.BoxGeometry(2.5, 2.6, 1.6),
-    vanityBasin: new THREE.CylinderGeometry(0.55, 0.5, 0.12, 16),
-    cabinetBody: new THREE.BoxGeometry(1.6, 2.6, 1.4),
-    mirrorGlass: new THREE.PlaneGeometry(1.85, 2.35),
-    mirrorFrameEdge: new THREE.BoxGeometry(0.06, 2.35, 0.06),
-    mirrorHugeGlass: new THREE.PlaneGeometry(3.35, 3.85),
-    mirrorHugeFrameEdge: new THREE.BoxGeometry(0.06, 3.85, 0.06),
-    shelfBody: new THREE.BoxGeometry(0.8, 0.15, 0.2),
-  };
-}
-
-function frameStrips(edgeGeometry, mat, width, height) {
-  var group = new THREE.Group();
-  var top = new THREE.Mesh(edgeGeometry, mat);
-  top.rotation.z = Math.PI / 2;
-  top.scale.set(width / 0.06, 1, 1);
-  top.position.set(0, height / 2, 0);
-  var bottom = top.clone();
-  bottom.position.set(0, -height / 2, 0);
-  var left = new THREE.Mesh(edgeGeometry, mat);
-  left.position.set(-width / 2, 0, 0);
-  var right = left.clone();
-  right.position.set(width / 2, 0, 0);
-  group.add(top, bottom, left, right);
-  return group;
+  return { toilet: buildToiletGeometries() };
 }
 
 // Shared by both toilet styles: the bowl, seat, hinge stubs and flush
@@ -330,110 +353,459 @@ function buildToiletStyleB(geo, mat) {
   return g;
 }
 
-function buildSink(geo, mat) {
+// ---------------------------------------------------------------------
+// Every other fixture, built at real size from Layout.REAL_SIZE_IN (inches,
+// converted with inch() below) — the same numbers the layout reserves
+// floor/wall space with. Same convention as the toilet: floor fixtures have
+// their origin on the wall at floor level, x centered, z growing into the
+// room; wall-mounted ones (mirrors, niche) are centered on their origin.
+// ---------------------------------------------------------------------
+var inch = function (n) {
+  return n / 12;
+};
+
+function realSize(key) {
+  return Layout.REAL_SIZE_IN[key];
+}
+
+// A rounded rectangle centered on the origin, for extruded outlines and
+// the holes cut in them (tub rim, countertop and sink cutouts).
+function roundedRectPath(path, width, depth, radius) {
+  var w2 = width / 2;
+  var d2 = depth / 2;
+  var r = Math.min(radius, w2, d2);
+  path.moveTo(-w2 + r, -d2);
+  path.lineTo(w2 - r, -d2);
+  path.quadraticCurveTo(w2, -d2, w2, -d2 + r);
+  path.lineTo(w2, d2 - r);
+  path.quadraticCurveTo(w2, d2, w2 - r, d2);
+  path.lineTo(-w2 + r, d2);
+  path.quadraticCurveTo(-w2, d2, -w2, d2 - r);
+  path.lineTo(-w2, -d2 + r);
+  path.quadraticCurveTo(-w2, -d2, -w2 + r, -d2);
+  return path;
+}
+
+function ellipsePath(path, rx, rz, cz) {
+  path.absellipse(0, cz || 0, rx, rz, 0, Math.PI * 2, false, 0);
+  return path;
+}
+
+// Extrudes a plan-view outline (x across, second coordinate = depth into
+// the room) straight up from yBottom to yTop, with any holes cut through —
+// how the tub shell, countertop and pedestal-sink top are made.
+function planSlabGeometry(shape, yBottom, yTop, zCenter) {
+  var geo = new THREE.ExtrudeGeometry(shape, { depth: yTop - yBottom, bevelEnabled: false, curveSegments: 20 });
+  geo.rotateX(Math.PI / 2); // shape y -> +z, extrusion -> downward
+  geo.translate(0, yTop, zCenter);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+// A flat, upward-facing plan-view shape at height y (a tub or shower floor).
+function planFloorGeometry(shape, y, zCenter) {
+  var geo = new THREE.ShapeGeometry(shape, 20);
+  geo.rotateX(-Math.PI / 2); // faces up; shape y -> -z (shapes here are symmetric)
+  geo.translate(0, y, zCenter);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+// A bowl under a sink cutout: revolved from the rim radius down to a flat
+// bottom, stretched front-to-back into the cutout's oval.
+function sinkBowlGeometry(rx, rz, depth) {
+  var geo = latheProfileGeometry(
+    [
+      [rx, 0],
+      [rx * 0.97, -depth * 0.35],
+      [rx * 0.85, -depth * 0.7],
+      [rx * 0.55, -depth * 0.95],
+      [0, -depth],
+    ],
+    rz / rx,
+    40,
+  );
+  return geo;
+}
+
+function mesh(geometry, material, x, y, z) {
+  var m = new THREE.Mesh(geometry, material);
+  m.position.set(x || 0, y || 0, z || 0);
+  return m;
+}
+
+function box(w, h, d, material, x, y, z) {
+  return mesh(new THREE.BoxGeometry(w, h, d), material, x, y, z);
+}
+
+// A shaker-style door or drawer front, facing +z, centered on (x, y) with
+// its back face at z: a flat center panel inside a raised frame.
+function shakerFront(w, h, material, x, y, z) {
   var g = new THREE.Group();
-  var basin = new THREE.Mesh(geo.sinkBasin, mat.porcelain);
-  basin.position.set(0, 2.4, 0.4);
-  var column = new THREE.Mesh(geo.sinkColumn, mat.porcelain);
-  column.position.set(0, 1.2, 0.4);
-  g.add(basin, column);
+  var rail = Math.min(inch(2.5), w / 4, h / 4);
+  var t = inch(0.75);
+  g.add(box(w, rail, t, material, 0, h / 2 - rail / 2, t / 2));
+  g.add(box(w, rail, t, material, 0, -h / 2 + rail / 2, t / 2));
+  g.add(box(rail, h - 2 * rail, t, material, -w / 2 + rail / 2, 0, t / 2));
+  g.add(box(rail, h - 2 * rail, t, material, w / 2 - rail / 2, 0, t / 2));
+  g.add(box(w - 2 * rail, h - 2 * rail, inch(0.4), material, 0, 0, inch(0.2)));
+  g.position.set(x, y, z);
   return g;
 }
 
+// A bar pull: a short chrome rod on two posts, horizontal or vertical.
+function barPull(mat, lengthIn, vertical, x, y, z) {
+  var g = new THREE.Group();
+  var len = inch(lengthIn);
+  var rod = mesh(new THREE.CylinderGeometry(inch(0.22), inch(0.22), len, 10), mat.chrome, 0, 0, inch(1));
+  if (!vertical) rod.rotation.z = Math.PI / 2;
+  g.add(rod);
+  [-1, 1].forEach(function (sgn) {
+    var post = mesh(new THREE.CylinderGeometry(inch(0.18), inch(0.18), inch(1), 8), mat.chrome);
+    post.rotation.x = Math.PI / 2;
+    post.position.set(vertical ? 0 : (sgn * len) / 2.4, vertical ? (sgn * len) / 2.4 : 0, inch(0.5));
+    g.add(post);
+  });
+  g.position.set(x, y, z);
+  return g;
+}
+
+// A single-hole gooseneck faucet sitting on a deck at height y, set back to z.
+function faucet(mat, y, z) {
+  var g = new THREE.Group();
+  g.add(mesh(new THREE.CylinderGeometry(inch(1.1), inch(1.2), inch(1.5), 20), mat.chrome, 0, y + inch(0.75), z));
+  var neck = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, y + inch(1.5), z),
+    new THREE.Vector3(0, y + inch(8), z),
+    new THREE.Vector3(0, y + inch(10), z + inch(2.5)),
+    new THREE.Vector3(0, y + inch(8.5), z + inch(5)),
+    new THREE.Vector3(0, y + inch(6.5), z + inch(5.3)),
+  ]);
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(neck, 32, inch(0.45), 12, false), mat.chrome));
+  var lever = mesh(new THREE.CapsuleGeometry(inch(0.25), inch(3), 4, 8), mat.chrome, inch(1.2), y + inch(3), z);
+  lever.rotation.z = -Math.PI / 2.6;
+  g.add(lever);
+  return g;
+}
+
+// Alcove bathtub: a glossy acrylic shell with an apron front, an oval-ended
+// basin, drain + overflow at one end, and a wall spout and valve above it.
 function buildBathtub(geo, mat) {
+  var r = realSize("Bathtub_Quantity");
+  var W = inch(r.width);
+  var D = inch(r.depth);
+  var H = inch(r.height);
   var g = new THREE.Group();
-  var outer = new THREE.Mesh(geo.bathtubOuter, mat.porcelain);
-  outer.position.set(0, 0.8, 1.3);
-  var inner = new THREE.Mesh(geo.bathtubInner, mat.porcelain);
-  inner.position.set(0, 1.15, 1.25);
-  g.add(outer, inner);
+  var outer = roundedRectPath(new THREE.Shape(), W, D, inch(1));
+  var basinW = W - inch(8);
+  var basinD = D - inch(8);
+  outer.holes.push(roundedRectPath(new THREE.Path(), basinW, basinD, inch(8)));
+  g.add(new THREE.Mesh(planSlabGeometry(outer, 0, H, D / 2), mat.acrylic));
+  var floorShape = roundedRectPath(new THREE.Shape(), basinW, basinD, inch(8));
+  g.add(new THREE.Mesh(planFloorGeometry(floorShape, inch(2), D / 2), mat.acrylic));
+  // Drain end (left): drain, overflow plate, spout and valve on the wall.
+  var drainX = -W / 2 + inch(10);
+  g.add(mesh(new THREE.CylinderGeometry(inch(1.4), inch(1.4), inch(0.2), 20), mat.chrome, drainX, inch(2.1), D / 2));
+  var overflow = mesh(new THREE.CylinderGeometry(inch(1.4), inch(1.4), inch(0.3), 20), mat.chrome);
+  overflow.rotation.z = Math.PI / 2;
+  overflow.position.set(-basinW / 2 + inch(0.2), H - inch(5), D / 2);
+  g.add(overflow);
+  var spout = mesh(
+    new THREE.CylinderGeometry(inch(0.8), inch(0.9), inch(6), 16),
+    mat.chrome,
+    drainX,
+    H + inch(5),
+    inch(3),
+  );
+  spout.rotation.x = Math.PI / 2;
+  g.add(spout);
+  var trim = mesh(
+    new THREE.CylinderGeometry(inch(3.5), inch(3.5), inch(0.4), 28),
+    mat.chrome,
+    drainX,
+    H + inch(16),
+    inch(0.2),
+  );
+  trim.rotation.x = Math.PI / 2;
+  g.add(trim);
+  var handle = mesh(new THREE.CapsuleGeometry(inch(0.35), inch(3), 4, 8), mat.chrome, drainX, H + inch(16), inch(1.2));
+  handle.rotation.z = Math.PI / 2;
+  g.add(handle);
   return g;
 }
 
+// 36 x 36in stall: an acrylic base with a front curb and center drain,
+// subway tile on the back wall, frameless glass sides in chrome channels,
+// a valve and a shower head. The front is left open for a paired shower
+// door (Shower_Door_Quantity), which attaches at z = depth.
 function buildShower(geo, mat) {
-  // Back panel sits at the wall (z~0); the enclosure opens toward the room
-  // at z=3.2, where a paired Shower_Door_Quantity instance attaches.
+  var r = realSize("Shower_Quantity");
+  var W = inch(r.width);
+  var D = inch(r.depth);
+  var H = inch(r.height);
+  var baseH = inch(3);
   var g = new THREE.Group();
-  var back = new THREE.Mesh(geo.showerPanel, mat.glass);
-  back.position.set(0, 3.25, 0.05);
-  var left = new THREE.Mesh(geo.showerPanel, mat.glass);
-  left.rotation.y = Math.PI / 2;
-  left.position.set(-1.6, 3.25, 1.6);
-  var right = left.clone();
-  right.position.set(1.6, 3.25, 1.6);
-  var pan = new THREE.Mesh(geo.showerPan, mat.porcelain);
-  pan.position.set(0, 0.05, 1.6);
-  // Wall-mounted shower head: an elbow at the wall, an angled arm, and a
-  // disc head facing down into the shower — chrome, matching the toilet's
-  // flush lever/mirror-frame hardware finish.
-  var headElbow = new THREE.Mesh(geo.showerHeadElbow, mat.chrome);
-  headElbow.position.set(0, 6.3, 0.08);
-  var headArm = new THREE.Mesh(geo.showerHeadArm, mat.chrome);
-  headArm.rotation.x = Math.PI / 2.3;
-  headArm.position.set(0, 6.18, 0.28);
-  var headDisc = new THREE.Mesh(geo.showerHeadDisc, mat.chrome);
-  headDisc.rotation.x = Math.PI / 2.1;
-  headDisc.position.set(0, 6.0, 0.48);
-  g.add(back, left, right, pan, headElbow, headArm, headDisc);
+  g.add(box(W, baseH, D, mat.acrylic, 0, baseH / 2, D / 2));
+  g.add(box(W, inch(2), inch(3), mat.acrylic, 0, baseH + inch(1), D - inch(1.5)));
+  g.add(box(inch(4), inch(0.15), inch(4), mat.chrome, 0, baseH + inch(0.08), D / 2));
+  var tileH = H + inch(6) - baseH;
+  var tile = box(W, tileH, inch(0.5), mat.showerTile, 0, baseH + tileH / 2, inch(0.25));
+  g.add(tile);
+  var glassH = H - baseH;
+  [-1, 1].forEach(function (sgn) {
+    var side = box(
+      inch(0.4),
+      glassH,
+      D - inch(0.5),
+      mat.glassClear,
+      (sgn * (W - inch(0.4))) / 2,
+      baseH + glassH / 2,
+      D / 2 + inch(0.25),
+    );
+    g.add(side);
+    g.add(box(inch(0.8), glassH, inch(0.8), mat.chrome, (sgn * (W - inch(0.8))) / 2, baseH + glassH / 2, inch(0.9)));
+  });
+  // Valve trim at 48in, shower head arm at 80in.
+  var valve = mesh(new THREE.CylinderGeometry(inch(3.5), inch(3.5), inch(0.4), 28), mat.chrome, 0, inch(48), inch(0.7));
+  valve.rotation.x = Math.PI / 2;
+  g.add(valve);
+  var valveLever = mesh(new THREE.CapsuleGeometry(inch(0.35), inch(3), 4, 8), mat.chrome, 0, inch(48), inch(1.6));
+  valveLever.rotation.z = Math.PI / 2;
+  g.add(valveLever);
+  var armLen = inch(8);
+  var arm = mesh(
+    new THREE.CylinderGeometry(inch(0.4), inch(0.4), armLen, 10),
+    mat.chrome,
+    0,
+    inch(78),
+    inch(0.5) + armLen / 2,
+  );
+  arm.rotation.x = Math.PI / 2.4;
+  g.add(arm);
+  var head = mesh(
+    new THREE.CylinderGeometry(inch(3), inch(2.4), inch(0.8), 28),
+    mat.chrome,
+    0,
+    inch(76),
+    inch(0.5) + armLen,
+  );
+  head.rotation.x = -Math.PI / 12;
+  g.add(head);
   return g;
 }
 
+// Frameless glass front for the stall: a 12in fixed panel and a 24in
+// hinged door with chrome hinges, a towel-bar handle and a bottom sweep.
+// Origin is the stall's front edge (placed at the shower's depth).
 function buildShowerDoor(geo, mat) {
+  var r = realSize("Shower_Door_Quantity");
+  var W = inch(r.width);
+  var H = inch(r.height);
+  var baseH = inch(5);
   var g = new THREE.Group();
-  var panel = new THREE.Mesh(geo.showerDoorPanel, mat.glass);
-  panel.position.set(0, 3.25, 0);
-  var frame = frameStrips(geo.showerDoorFrameEdge, mat.brass, 2.5, 6.5);
-  frame.position.set(0, 3.25, 0);
-  g.add(panel, frame);
+  var fixedW = inch(12);
+  var doorW = W - fixedW - inch(0.5);
+  g.add(box(fixedW, H - inch(3), inch(0.4), mat.glassClear, -W / 2 + fixedW / 2, baseH + (H - inch(3)) / 2, 0));
+  var doorX = W / 2 - doorW / 2;
+  g.add(box(doorW, H - inch(3), inch(0.4), mat.glassClear, doorX, baseH + (H - inch(3)) / 2, inch(0.2)));
+  [inch(12), H - inch(15)].forEach(function (y) {
+    g.add(box(inch(2.5), inch(4), inch(1), mat.chrome, W / 2 - inch(1), baseH + y, inch(0.2)));
+  });
+  g.add(barPull(mat, 12, true, doorX - doorW / 2 + inch(3), baseH + inch(36), inch(0.4)));
+  g.add(box(doorW, inch(0.6), inch(0.8), mat.chrome, doorX, baseH + inch(0.3), inch(0.2)));
   return g;
 }
 
-function buildEntryDoor(geo, mat) {
-  var g = new THREE.Group();
-  var slab = new THREE.Mesh(geo.doorSlab, mat.doorTone);
-  slab.position.set(0, 3.375, 0);
-  var knob = new THREE.Mesh(geo.doorKnob, mat.brass);
-  knob.position.set(0.95, 3.0, 0.1);
-  g.add(slab, knob);
-  return g;
-}
-
+// 30in single-sink vanity: wood cabinet on a recessed toe kick, a drawer
+// front over two shaker doors with bar pulls, a quartz top with a 4in
+// backsplash and an undermount oval bowl, and a gooseneck faucet.
 function buildVanity(geo, mat) {
+  var r = realSize("Vanity_Quantity");
+  var W = inch(r.width);
+  var D = inch(r.depth);
+  var H = inch(r.height);
+  var topT = inch(1.25);
+  var kickH = inch(4);
+  var bodyD = D - inch(1.5);
+  var bodyH = H - topT - kickH;
   var g = new THREE.Group();
-  var body = new THREE.Mesh(geo.vanityBody, mat.cabinetWood);
-  body.position.set(0, 1.3, 0.8);
-  var basin = new THREE.Mesh(geo.vanityBasin, mat.porcelain);
-  basin.position.set(0, 2.66, 0.8);
-  g.add(body, basin);
+  g.add(box(W - inch(1), kickH, bodyD - inch(3), mat.woodDark, 0, kickH / 2, (bodyD - inch(3)) / 2));
+  // The carcass is solid below the drawer line, open above it (sides and
+  // back only) so the undermount bowl has room under the countertop.
+  var openH = inch(7);
+  g.add(box(W, bodyH - openH, bodyD, mat.wood, 0, kickH + (bodyH - openH) / 2, bodyD / 2));
+  [-1, 1].forEach(function (sgn) {
+    g.add(box(inch(0.75), openH, bodyD, mat.wood, (sgn * (W - inch(0.75))) / 2, H - topT - openH / 2, bodyD / 2));
+  });
+  g.add(box(W, openH, inch(0.75), mat.wood, 0, H - topT - openH / 2, inch(0.375)));
+  var drawerH = inch(6);
+  var doorH = bodyH - drawerH - inch(1.5);
+  var frontZ = bodyD;
+  g.add(shakerFront(W - inch(1), drawerH, mat.wood, 0, H - topT - inch(0.5) - drawerH / 2, frontZ));
+  g.add(barPull(mat, 6, false, 0, H - topT - inch(0.5) - drawerH / 2, frontZ + inch(0.75)));
+  var doorW = (W - inch(1.5)) / 2;
+  [-1, 1].forEach(function (sgn) {
+    var x = (sgn * (doorW + inch(0.5))) / 2;
+    g.add(shakerFront(doorW, doorH, mat.wood, x, kickH + inch(0.5) + doorH / 2, frontZ));
+    g.add(barPull(mat, 4, true, x - sgn * (doorW / 2 - inch(1.5)), kickH + doorH - inch(3), frontZ + inch(0.75)));
+  });
+  var bowlZ = D / 2 + inch(0.5);
+  var top = roundedRectPath(new THREE.Shape(), W, D, inch(0.4));
+  top.holes.push(ellipsePath(new THREE.Path(), inch(8), inch(6), bowlZ - D / 2));
+  g.add(new THREE.Mesh(planSlabGeometry(top, H - topT, H, D / 2), mat.quartz));
+  g.add(box(W, inch(4), inch(0.75), mat.quartz, 0, H + inch(2), inch(0.375)));
+  var bowl = new THREE.Mesh(sinkBowlGeometry(inch(8), inch(6), inch(6)), mat.porcelainInside);
+  bowl.position.set(0, H - topT, bowlZ);
+  g.add(bowl);
+  g.add(faucet(mat, H, inch(2.5)));
   return g;
 }
 
+// Pedestal sink: a porcelain basin top with rounded front corners and an
+// oval bowl, on a waisted pedestal, with a gooseneck faucet.
+function buildSink(geo, mat) {
+  var r = realSize("Sink_Quantity");
+  var W = inch(r.width);
+  var D = inch(r.depth);
+  var H = inch(r.height);
+  var g = new THREE.Group();
+  var topT = inch(5);
+  var top = roundedRectPath(new THREE.Shape(), W, D, inch(4));
+  var bowlZ = D / 2 + inch(1);
+  top.holes.push(ellipsePath(new THREE.Path(), inch(7.5), inch(5.5), bowlZ - D / 2));
+  g.add(new THREE.Mesh(planSlabGeometry(top, H - topT, H, D / 2), mat.porcelainGloss));
+  var bowl = new THREE.Mesh(sinkBowlGeometry(inch(7.5), inch(5.5), inch(4.5)), mat.porcelainInside);
+  bowl.position.set(0, H, bowlZ);
+  g.add(bowl);
+  var pedestal = latheProfileGeometry(
+    [
+      [0, 0],
+      [inch(5), 0],
+      [inch(4.6), inch(1.5)],
+      [inch(3.2), inch(8)],
+      [inch(3), inch(18)],
+      [inch(3.8), inch(26)],
+      [inch(5.5), H - topT],
+      [0, H - topT],
+    ],
+    0.8,
+    32,
+  );
+  g.add(mesh(pedestal, mat.porcelainGloss, 0, 0, inch(8)));
+  g.add(faucet(mat, H, inch(2.5)));
+  return g;
+}
+
+// Freestanding linen cabinet: a tall wood carcass on a toe kick, with a
+// crown cap and two shaker doors with knobs.
 function buildCabinet(geo, mat) {
+  var r = realSize("Cabinet_Quantity");
+  var W = inch(r.width);
+  var D = inch(r.depth);
+  var H = inch(r.height);
+  var kickH = inch(3.5);
+  var capH = inch(1.5);
   var g = new THREE.Group();
-  var body = new THREE.Mesh(geo.cabinetBody, mat.cabinetWood);
-  body.position.set(0, 1.3, 0.7);
-  g.add(body);
+  g.add(box(W - inch(1), kickH, D - inch(3), mat.woodDark, 0, kickH / 2, (D - inch(3)) / 2));
+  var bodyH = H - kickH - capH;
+  g.add(box(W, bodyH, D - inch(0.75), mat.wood, 0, kickH + bodyH / 2, (D - inch(0.75)) / 2));
+  g.add(box(W + inch(1), capH, D + inch(0.25), mat.wood, 0, H - capH / 2, (D + inch(0.25)) / 2 - inch(0.5)));
+  var frontZ = D - inch(0.75);
+  var lowerH = inch(28);
+  var upperH = bodyH - lowerH - inch(1.5);
+  g.add(shakerFront(W - inch(1), lowerH, mat.wood, 0, kickH + inch(0.5) + lowerH / 2, frontZ));
+  g.add(shakerFront(W - inch(1), upperH, mat.wood, 0, kickH + inch(1) + lowerH + upperH / 2, frontZ));
+  [kickH + lowerH - inch(3), kickH + lowerH + inch(4)].forEach(function (y) {
+    g.add(mesh(new THREE.SphereGeometry(inch(0.6), 12, 8), mat.chrome, W / 2 - inch(2.5), y, frontZ + inch(1.2)));
+  });
   return g;
 }
 
+// 30 x 80in interior door, closed, in the wall: a painted two-panel shaker
+// slab with casing trim, three hinges and a lever handle.
+function buildEntryDoor(geo, mat) {
+  var r = realSize("Door_Quantity");
+  var W = inch(r.width);
+  var H = inch(r.height);
+  var T = inch(1.375);
+  var g = new THREE.Group();
+  g.add(box(W, H, T, mat.paintedWhite, 0, H / 2, 0));
+  var faceZ = T / 2;
+  var lowerH = H * 0.55;
+  g.add(shakerFront(W - inch(0.5), lowerH, mat.paintedWhite, 0, lowerH / 2 + inch(0.25), faceZ));
+  g.add(shakerFront(W - inch(0.5), H - lowerH - inch(0.5), mat.paintedWhite, 0, lowerH + (H - lowerH) / 2, faceZ));
+  var casingW = inch(3.5);
+  var casingT = inch(0.75);
+  [-1, 1].forEach(function (sgn) {
+    g.add(box(casingW, H + casingW, casingT, mat.paintedWhite, sgn * (W / 2 + casingW / 2), (H + casingW) / 2, faceZ));
+  });
+  g.add(box(W + 2 * casingW, casingW, casingT, mat.paintedWhite, 0, H + casingW / 2, faceZ));
+  var latchX = W / 2 - inch(2.75);
+  var rose = mesh(
+    new THREE.CylinderGeometry(inch(1.25), inch(1.25), inch(0.4), 20),
+    mat.chrome,
+    latchX,
+    inch(36),
+    faceZ + inch(1),
+  );
+  rose.rotation.x = Math.PI / 2;
+  g.add(rose);
+  var lever = mesh(
+    new THREE.CapsuleGeometry(inch(0.35), inch(4), 4, 8),
+    mat.chrome,
+    latchX - inch(2.2),
+    inch(36),
+    faceZ + inch(1.9),
+  );
+  lever.rotation.z = Math.PI / 2;
+  g.add(lever);
+  [inch(7), H / 2, H - inch(11)].forEach(function (y) {
+    g.add(box(inch(0.6), inch(3.5), inch(0.6), mat.chrome, -W / 2 + inch(0.1), y, faceZ));
+  });
+  return g;
+}
+
+// Mirrors reflect the room environment (a polished metal surface under
+// image-based lighting): the vanity mirror has a slim brushed-metal frame,
+// the oversized one is frameless on four chrome clips.
 function buildMirror(geo, mat, huge) {
+  var r = realSize(huge ? "Mirror_Huge_Quantity" : "Mirror_Quantity");
+  var W = inch(r.width);
+  var H = inch(r.height);
   var g = new THREE.Group();
-  var glassGeo = huge ? geo.mirrorHugeGlass : geo.mirrorGlass;
-  var edgeGeo = huge ? geo.mirrorHugeFrameEdge : geo.mirrorFrameEdge;
-  var width = huge ? 3.35 : 1.85;
-  var height = huge ? 3.85 : 2.35;
-  var glass = new THREE.Mesh(glassGeo, mat.glass);
-  glass.position.set(0, 0, -0.03);
-  var frame = frameStrips(edgeGeo, mat.brass, width, height);
-  g.add(glass, frame);
+  g.add(box(W, H, inch(0.25), mat.mirror, 0, 0, inch(0.4)));
+  if (huge) {
+    [-1, 1].forEach(function (sx) {
+      [-1, 1].forEach(function (sy) {
+        g.add(box(inch(1.2), inch(0.8), inch(0.7), mat.chrome, (sx * (W - inch(6))) / 2, sy * (H / 2), inch(0.45)));
+      });
+    });
+  } else {
+    var f = inch(1);
+    var t = inch(0.9);
+    g.add(box(W + 2 * f, f, t, mat.brushedMetal, 0, H / 2 + f / 2, t / 2));
+    g.add(box(W + 2 * f, f, t, mat.brushedMetal, 0, -H / 2 - f / 2, t / 2));
+    g.add(box(f, H, t, mat.brushedMetal, -W / 2 - f / 2, 0, t / 2));
+    g.add(box(f, H, t, mat.brushedMetal, W / 2 + f / 2, 0, t / 2));
+  }
   return g;
 }
 
+// Built-in niche on the shower's back wall: a recessed-looking dark tile
+// back, stone surround and a stone shelf across the middle.
 function buildShowerShelf(geo, mat) {
+  var r = realSize("Shower_Shelf_Quantity");
+  var W = inch(r.width);
+  var H = inch(r.height);
+  var z0 = inch(0.55);
+  var trim = inch(1.25);
   var g = new THREE.Group();
-  var shelf = new THREE.Mesh(geo.shelfBody, mat.brass);
-  shelf.position.set(0, 0, 0);
-  g.add(shelf);
+  g.add(box(W, H, inch(0.1), mat.nicheBack, 0, 0, z0));
+  g.add(box(W + 2 * trim, trim, inch(0.6), mat.stone, 0, H / 2 + trim / 2, z0 + inch(0.3)));
+  g.add(box(W + 2 * trim, trim, inch(3.5), mat.stone, 0, -H / 2 - trim / 2, z0 + inch(1.75)));
+  g.add(box(trim, H, inch(0.6), mat.stone, -W / 2 - trim / 2, 0, z0 + inch(0.3)));
+  g.add(box(trim, H, inch(0.6), mat.stone, W / 2 + trim / 2, 0, z0 + inch(0.3)));
+  g.add(box(W, inch(0.75), inch(3.5), mat.stone, 0, 0, z0 + inch(1.75)));
   return g;
 }
 
@@ -874,7 +1246,8 @@ function rebuildFinishes(s) {
 function setShadowFlags(object3d) {
   object3d.traverse(function (child) {
     if (child.isMesh) {
-      child.castShadow = true;
+      // Clear glass would otherwise throw a solid shadow.
+      child.castShadow = !child.material.transparent;
       child.receiveShadow = true;
     }
   });
@@ -888,6 +1261,7 @@ function rebuildFixtures(s, widthFt, lengthFt) {
     widthFt: widthFt,
     lengthFt: lengthFt,
     fixtureCounts: state.fixtures,
+    showSamples: true,
     plumbingWallIds: state.plumbingWallIds,
     entryPoints: state.entryPoints,
   });
@@ -979,18 +1353,28 @@ function applyCameraMode(s) {
   // reused here so leaving walk-in mode (with dims unchanged, so rebuild()
   // itself wouldn't otherwise touch the camera) still returns smoothly.
   var target = new THREE.Vector3(dims.widthFt / 2, dims.heightFt * 0.4, dims.lengthFt / 2);
-  var diag = Math.sqrt(dims.widthFt * dims.widthFt + dims.lengthFt * dims.lengthFt);
-  s.controls.minDistance = clamp(diag * 0.5, 3, 20);
-  s.controls.maxDistance = clamp(diag * 1.9, 12, 160);
+  var distances = orbitDistances(s, dims);
+  s.controls.minDistance = distances.min;
+  s.controls.maxDistance = distances.max;
   s.controls.target.copy(target);
-  startCameraLerp(
-    s,
-    target,
-    clamp(s.camera.position.distanceTo(target) || diag, s.controls.minDistance, s.controls.maxDistance),
-  );
+  startCameraLerp(s, target, distances.fit);
   s.controls.update();
   needsRender = true;
   syncCameraControls(s);
+}
+
+// Orbit distances for a room: min/max zoom, and the distance at which the
+// whole floor plan fits the panel along whichever of its width or height is
+// the tighter field of view (slightly under a full fit, since the near
+// walls cut away anyway).
+function orbitDistances(s, dims) {
+  var diag = Math.sqrt(dims.widthFt * dims.widthFt + dims.lengthFt * dims.lengthFt);
+  var vHalf = THREE.MathUtils.degToRad(s.camera.fov / 2);
+  var hHalf = Math.atan(Math.tan(vHalf) * s.camera.aspect);
+  var min = clamp(diag * 0.5, 3, 20);
+  var max = clamp(diag * 3, 12, 160);
+  var fit = clamp((diag / 2 / Math.sin(Math.min(vHalf, hHalf))) * 0.75, min, max);
+  return { diag: diag, min: min, max: max, fit: fit };
 }
 
 function rebuild() {
@@ -1007,11 +1391,10 @@ function rebuild() {
     rebuildShell(s, dims.widthFt, dims.lengthFt, dims.heightFt);
 
     var target = new THREE.Vector3(dims.widthFt / 2, dims.heightFt * 0.4, dims.lengthFt / 2);
-    var diag = Math.sqrt(dims.widthFt * dims.widthFt + dims.lengthFt * dims.lengthFt);
-    var minDistance = clamp(diag * 0.5, 3, 20);
-    var maxDistance = clamp(diag * 1.9, 12, 160);
-    s.controls.minDistance = minDistance;
-    s.controls.maxDistance = maxDistance;
+    var distances = orbitDistances(s, dims);
+    var diag = distances.diag;
+    s.controls.minDistance = distances.min;
+    s.controls.maxDistance = distances.max;
 
     // Directional light + its shadow camera frustum are sized to the
     // room's own diagonal so the shadow stays crisp at both the tiny
@@ -1030,14 +1413,16 @@ function rebuild() {
 
     if (!s.lastDims) {
       // First build: place the camera directly, no lerp needed.
-      s.camera.position.set(dims.widthFt * 1.3, dims.heightFt * 1.1, dims.lengthFt * 1.6);
+      var viewDir = new THREE.Vector3(dims.widthFt * 1.3, dims.heightFt * 1.1, dims.lengthFt * 1.6)
+        .sub(target)
+        .normalize();
+      s.camera.position.copy(target).addScaledVector(viewDir, distances.fit);
       s.controls.target.copy(target);
     } else {
       var jump = target.distanceTo(s.controls.target) + Math.abs(diag - (s.lastDiag || diag));
       s.controls.target.copy(target);
-      if (jump > 0.75) {
-        startCameraLerp(s, target, clamp(s.camera.position.distanceTo(s.controls.target), minDistance, maxDistance));
-      }
+      // A resized room is re-framed so all of it is in view again.
+      if (jump > 0.75) startCameraLerp(s, target, distances.fit);
     }
     s.controls.update();
     s.lastDims = dims;

@@ -37,42 +37,98 @@
   // mount: "floor" (walks the wall scan), "attach" (rides along with
   // another floor fixture instance by index), or "wall" (attaches to a
   // placed floor fixture from its anchors list).
+  //
+  // Every size below is a standard real-world product size, in inches (see
+  // REAL_SIZE_IN), converted to feet — js/bathroom-room-3d.js builds each
+  // fixture's mesh from these same numbers, so what the layout reserves and
+  // what the customer sees always match.
+  var REAL_SIZE_IN = {
+    // Standard alcove tub: 60in long, 30in deep, 18in to the rim.
+    Bathtub_Quantity: { width: 60, depth: 30, height: 18 },
+    // 36 x 36in stall (above the 30 x 30in code minimum), 78in glass on a
+    // 3in base.
+    Shower_Quantity: { width: 36, depth: 36, height: 81 },
+    // Frameless glass front for the stall: 12in fixed panel + 24in door.
+    Shower_Door_Quantity: { width: 36, depth: 0.5, height: 75 },
+    // Single-sink vanity: 30in wide, 21in deep, 34in to the countertop.
+    Vanity_Quantity: { width: 30, depth: 21, height: 34 },
+    // Pedestal sink: 22 x 18in basin, 34in rim height.
+    Sink_Quantity: { width: 22, depth: 18, height: 34 },
+    // Freestanding linen cabinet: 18in wide, 16in deep, 72in tall.
+    Cabinet_Quantity: { width: 18, depth: 16, height: 72 },
+    // Standard interior door slab: 30 x 80in, 1-3/8in thick.
+    Door_Quantity: { width: 30, depth: 1.8, height: 80 },
+    // Vanity mirror 24 x 32in, bottom edge 40in off the floor.
+    Mirror_Quantity: { width: 24, depth: 1, height: 32, bottomAt: 40 },
+    // Oversized mirror 48 x 36in, bottom edge 40in off the floor.
+    Mirror_Huge_Quantity: { width: 48, depth: 1, height: 36, bottomAt: 40 },
+    // Built-in tiled niche 12 x 24in, centered 52in off the floor.
+    Shower_Shelf_Quantity: { width: 12, depth: 3.5, height: 24, bottomAt: 40 },
+  };
+
+  function ft(inches) {
+    return inches / 12;
+  }
+
+  function realFootprint(key, extra) {
+    var r = REAL_SIZE_IN[key];
+    var fp = { wallSpan: ft(r.width), depth: ft(r.depth), height: ft(r.height) };
+    if (r.bottomAt != null) fp.mountHeight = ft(r.bottomAt + r.height / 2);
+    Object.keys(extra).forEach(function (k) {
+      fp[k] = extra[k];
+    });
+    return fp;
+  }
+
   var FIXTURE_LAYOUT = {
     // Real-world elongated-bowl toilet: ~20in wall clearance, ~28in front
     // projection (tank back to bowl front), ~30in to the tank lid.
     Toilet_Quantity: { wallSpan: 1.7, depth: 2.3, height: 2.5, mount: "floor" },
-    Bathtub_Quantity: { wallSpan: 5.2, depth: 2.6, height: 1.6, mount: "floor" },
-    Shower_Quantity: { wallSpan: 3.2, depth: 3.2, height: 6.5, mount: "floor" },
-    Shower_Door_Quantity: { wallSpan: 2.5, depth: 0.1, height: 6.5, mount: "attach", attachTo: "Shower_Quantity" },
-    Vanity_Quantity: { wallSpan: 2.5, depth: 1.6, height: 2.6, mount: "floor" },
-    Sink_Quantity: { wallSpan: 1.0, depth: 0.8, height: 2.6, mount: "floor" },
-    Cabinet_Quantity: { wallSpan: 1.6, depth: 1.4, height: 2.6, mount: "floor" },
-    Door_Quantity: { wallSpan: 2.5, depth: 0.15, height: 6.75, mount: "floor", preferWall: "S" },
-    Mirror_Quantity: {
-      wallSpan: 2.0,
-      depth: 0.06,
-      height: 2.5,
+    Bathtub_Quantity: realFootprint("Bathtub_Quantity", { mount: "floor" }),
+    Shower_Quantity: realFootprint("Shower_Quantity", { mount: "floor" }),
+    Shower_Door_Quantity: realFootprint("Shower_Door_Quantity", { mount: "attach", attachTo: "Shower_Quantity" }),
+    Vanity_Quantity: realFootprint("Vanity_Quantity", { mount: "floor" }),
+    Sink_Quantity: realFootprint("Sink_Quantity", { mount: "floor" }),
+    Cabinet_Quantity: realFootprint("Cabinet_Quantity", { mount: "floor" }),
+    Door_Quantity: realFootprint("Door_Quantity", { mount: "floor", preferWall: "S" }),
+    Mirror_Quantity: realFootprint("Mirror_Quantity", {
       mount: "wall",
       anchors: ["Vanity_Quantity", "Sink_Quantity"],
-      mountHeight: 3.2,
-    },
-    Mirror_Huge_Quantity: {
-      wallSpan: 3.5,
-      depth: 0.06,
-      height: 4.0,
+    }),
+    Mirror_Huge_Quantity: realFootprint("Mirror_Huge_Quantity", {
       mount: "wall",
       anchors: ["Vanity_Quantity", "Sink_Quantity"],
-      mountHeight: 3.0,
-    },
-    Shower_Shelf_Quantity: {
-      wallSpan: 0.8,
-      depth: 0.2,
-      height: 0.15,
+    }),
+    Shower_Shelf_Quantity: realFootprint("Shower_Shelf_Quantity", {
       mount: "wall",
       anchors: ["Shower_Quantity"],
-      mountHeight: 4.0,
-    },
+    }),
   };
+
+  // Before the visitor answers a fixture count, the preview can show sample
+  // fixtures so the room reads as a real bathroom at a believable scale —
+  // how many of each depends on floor area: a small home bath gets a
+  // toilet, vanity, tub and door; a larger one adds a separate shower and a
+  // linen cabinet; a big commercial-size restroom gets a row of toilets and
+  // several vanities. Anything that doesn't fit is simply left out.
+  function sampleCounts(widthFt, lengthFt) {
+    var area = (widthFt || DEFAULT_ROOM.widthFt) * (lengthFt || DEFAULT_ROOM.lengthFt);
+    var vanities = area < 100 ? 1 : area < 250 ? 2 : 3;
+    var shower = area >= 70 ? 1 : 0;
+    return {
+      Toilet_Quantity: clamp(Math.floor(area / 60), 1, 6),
+      Bathtub_Quantity: 1,
+      Shower_Quantity: shower,
+      Shower_Door_Quantity: shower,
+      Shower_Shelf_Quantity: shower,
+      Vanity_Quantity: vanities,
+      Mirror_Quantity: vanities,
+      Sink_Quantity: 0,
+      Mirror_Huge_Quantity: 0,
+      Cabinet_Quantity: area >= 100 ? 1 : 0,
+      Door_Quantity: 1,
+    };
+  }
 
   // Representative residential code-minimum clearances, in inches — typical
   // values, not a substitute for an actual code review (same spirit as the
@@ -311,11 +367,36 @@
   // Deterministic, pure: the same (widthFt, lengthFt, fixtureCounts) triple
   // always produces byte-identical placements. No Math.random, no
   // object-iteration-order dependence.
+  //
+  // input.showSamples: fill every fixture count the visitor hasn't answered
+  // yet (missing, as opposed to an explicit 0) from sampleCounts(). Those
+  // placements carry sample: true, and samples that don't fit are left out
+  // quietly rather than reported in droppedCounts — nobody asked for them.
   function computeLayout(input) {
     input = input || {};
     var widthFt = input.widthFt || DEFAULT_ROOM.widthFt;
     var lengthFt = input.lengthFt || DEFAULT_ROOM.lengthFt;
-    var fixtureCounts = input.fixtureCounts || {};
+    var answeredCounts = input.fixtureCounts || {};
+    var samples = input.showSamples ? sampleCounts(widthFt, lengthFt) : {};
+    var fixtureCounts = {};
+    var isSampleKey = {};
+    Object.keys(answeredCounts).forEach(function (k) {
+      fixtureCounts[k] = answeredCounts[k];
+    });
+    Object.keys(samples).forEach(function (k) {
+      if (answeredCounts[k] == null) {
+        fixtureCounts[k] = samples[k];
+        isSampleKey[k] = true;
+      }
+    });
+    function drop(fixtureKey) {
+      if (isSampleKey[fixtureKey]) return;
+      droppedCounts[fixtureKey] = (droppedCounts[fixtureKey] || 0) + 1;
+    }
+    function tag(placement) {
+      if (isSampleKey[placement.fixtureKey]) placement.sample = true;
+      return placement;
+    }
     // Wall ids restricting the plumbing-needing fixtures (empty/omitted =
     // unrestricted, today's behavior). Multiple walls can carry the stack.
     var plumbingWallIds = Array.isArray(input.plumbingWallIds) ? input.plumbingWallIds : null;
@@ -411,7 +492,9 @@
       placedByType[fixtureKey] = [];
       var isPlumbing = plumbingWallIds && plumbingWallIds.length && PLUMBING_FIXTURE_KEYS.indexOf(fixtureKey) !== -1;
       for (var i = 0; i < count; i++) {
-        var candidateWalls = scanOrderFor(priorityIdx, i);
+        // Samples of one type fill a wall before moving on, so several
+        // toilets or vanities line up in a row the way a real restroom has them.
+        var candidateWalls = scanOrderFor(priorityIdx, isSampleKey[fixtureKey] ? 0 : i);
         if (footprint.preferWall) {
           var preferred = wallByIdOrder([footprint.preferWall])[0];
           if (preferred && preferred.used === 0) candidateWalls = [preferred];
@@ -440,7 +523,7 @@
           break;
         }
         if (!chosen) {
-          droppedCounts[fixtureKey] = (droppedCounts[fixtureKey] || 0) + 1;
+          drop(fixtureKey);
           continue;
         }
         var placement = placeAt(chosen, chosenOffset, footprint);
@@ -448,7 +531,7 @@
         placement.index = i;
         chosen.used = chosenOffset + halfWidth;
         placedRects.push(chosenRect);
-        placements.push(placement);
+        placements.push(tag(placement));
         placedByType[fixtureKey].push(placement);
       }
     });
@@ -463,24 +546,26 @@
     for (var d = 0; d < showerDoorCount; d++) {
       var shower = placedShowers[d];
       if (!shower) {
-        droppedCounts.Shower_Door_Quantity = (droppedCounts.Shower_Door_Quantity || 0) + 1;
+        drop("Shower_Door_Quantity");
         continue;
       }
-      placements.push({
-        fixtureKey: "Shower_Door_Quantity",
-        index: d,
-        x: shower.x,
-        z: shower.z,
-        y: showerDoorFootprint.height / 2,
-        rotationY: shower.rotationY,
-        wallId: shower.wallId,
-        attachedTo: { fixtureKey: "Shower_Quantity", index: shower.index },
-        // Full depth, not half: the shower's own origin sits at the wall
-        // (z=0 in its local space), so the door — mounted at the shower's
-        // OPEN, room-facing edge — needs the full depth offset, not the
-        // midpoint.
-        depthOffset: showerFootprint.depth,
-      });
+      placements.push(
+        tag({
+          fixtureKey: "Shower_Door_Quantity",
+          index: d,
+          x: shower.x,
+          z: shower.z,
+          y: showerDoorFootprint.height / 2,
+          rotationY: shower.rotationY,
+          wallId: shower.wallId,
+          attachedTo: { fixtureKey: "Shower_Quantity", index: shower.index },
+          // Full depth, not half: the shower's own origin sits at the wall
+          // (z=0 in its local space), so the door — mounted at the shower's
+          // OPEN, room-facing edge — needs the full depth offset, not the
+          // midpoint.
+          depthOffset: showerFootprint.depth,
+        }),
+      );
     }
 
     // Pass 2: wall-mounted attachments (mirrors, shower shelf), index-paired
@@ -499,20 +584,22 @@
       }
       for (var i2 = 0; i2 < count; i2++) {
         if (!anchorPool.length) {
-          droppedCounts[fixtureKey] = (droppedCounts[fixtureKey] || 0) + 1;
+          drop(fixtureKey);
           continue;
         }
         var anchor = anchorPool[Math.min(i2, anchorPool.length - 1)];
-        placements.push({
-          fixtureKey: fixtureKey,
-          index: i2,
-          x: anchor.x,
-          z: anchor.z,
-          y: footprint.mountHeight,
-          rotationY: anchor.rotationY,
-          wallId: anchor.wallId,
-          attachedTo: { fixtureKey: anchor.fixtureKey, index: anchor.index },
-        });
+        placements.push(
+          tag({
+            fixtureKey: fixtureKey,
+            index: i2,
+            x: anchor.x,
+            z: anchor.z,
+            y: footprint.mountHeight,
+            rotationY: anchor.rotationY,
+            wallId: anchor.wallId,
+            attachedTo: { fixtureKey: anchor.fixtureKey, index: anchor.index },
+          }),
+        );
       }
     });
 
@@ -569,6 +656,8 @@
     RENDER_MIN_DIM: RENDER_MIN_DIM,
     MAX_FIXTURE_COUNT: MAX_FIXTURE_COUNT,
     FIXTURE_LAYOUT: FIXTURE_LAYOUT,
+    REAL_SIZE_IN: REAL_SIZE_IN,
+    sampleCounts: sampleCounts,
     CLEARANCE_IN: CLEARANCE_IN,
     PLUMBING_FIXTURE_KEYS: PLUMBING_FIXTURE_KEYS,
     clampEntryOffset: clampEntryOffset,
