@@ -154,6 +154,20 @@ test.describe("accessibility", () => {
       const fixtures = page.locator('form[data-group="fixtures"]');
       await fixtures.locator('input[name="Toilet_Quantity"]').fill("1");
       await fixtures.locator(".ai-chat-group-continue").click();
+
+      // A plumbing fixture was listed, so the wall-click plumbing-walls and
+      // entry-points steps come next — check their contrast too before
+      // skipping through to the estimate card.
+      await expect(page.locator(".ai-chat-group-intro", { hasText: "carry the plumbing stack" })).toBeVisible();
+      results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
+      expect(results.violations.flatMap((v) => v.nodes.map((n) => n.target + " " + n.failureSummary))).toEqual([]);
+      await page.locator(".ai-chat-group-cancel", { hasText: "Skip" }).last().click();
+
+      await expect(page.locator(".ai-chat-group-intro", { hasText: "How many entry points" })).toBeVisible();
+      results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
+      expect(results.violations.flatMap((v) => v.nodes.map((n) => n.target + " " + n.failureSummary))).toEqual([]);
+      await page.locator(".ai-chat-group-cancel", { hasText: "Skip" }).last().click();
+
       await expect(page.getByTestId("estimate-card")).toBeVisible();
       results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
       expect(results.violations.flatMap((v) => v.nodes.map((n) => n.target + " " + n.failureSummary))).toEqual([]);

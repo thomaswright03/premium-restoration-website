@@ -98,6 +98,11 @@
     return { side: c.side / 12, front: c.front / 12 };
   }
 
+  // Fixtures that need to be on a wall carrying the plumbing stack. Kept
+  // local (not read from js/bathroom-pricing.js's needsPlumbing flags) so
+  // this module keeps its existing no-cross-file-dependency convention.
+  var PLUMBING_FIXTURE_KEYS = ["Toilet_Quantity", "Sink_Quantity", "Bathtub_Quantity", "Shower_Quantity"];
+
   // Fixed priority order for the floor-standing wall scan. Each type scans
   // from its OWN fixed wall index (priorityIndex % 4), not a shared cursor
   // — so changing one fixture type's count never relocates an already
@@ -286,6 +291,23 @@
     };
   }
 
+  // Half-width of an entry point's clearance envelope, exposed so the 3D
+  // module can clamp its nudge-left/right UI to a wall's real span without
+  // needing to know FIXTURE_LAYOUT/CLEARANCE_IN internals itself.
+  function entryPointHalfWidth() {
+    return expandedHalfWidth(FIXTURE_LAYOUT.Door_Quantity, "Door_Quantity");
+  }
+
+  // Clamps an entry point's along-wall offset so its clearance envelope
+  // stays on the wall. Mirrors how automatic wall-scan placement is always
+  // kept on-wall by construction; entry points are user-positioned, so this
+  // is the equivalent guard for them.
+  function clampEntryOffset(wallSpanFt, offsetFt) {
+    var halfWidth = entryPointHalfWidth();
+    var maxOffset = Math.max(halfWidth, wallSpanFt - halfWidth);
+    return clamp(offsetFt, halfWidth, maxOffset);
+  }
+
   // Deterministic, pure: the same (widthFt, lengthFt, fixtureCounts) triple
   // always produces byte-identical placements. No Math.random, no
   // object-iteration-order dependence.
@@ -294,6 +316,16 @@
     var widthFt = input.widthFt || DEFAULT_ROOM.widthFt;
     var lengthFt = input.lengthFt || DEFAULT_ROOM.lengthFt;
     var fixtureCounts = input.fixtureCounts || {};
+    // Wall ids restricting the plumbing-needing fixtures (empty/omitted =
+    // unrestricted, today's behavior). Multiple walls can carry the stack.
+    var plumbingWallIds = Array.isArray(input.plumbingWallIds) ? input.plumbingWallIds : null;
+    // Customer-picked entry points, each {wallId, offsetFt, hasDoor}. When
+    // given, these REPLACE the automatic Door_Quantity wall-scan entirely —
+    // still validated through the same clearance/overlap/room-boundary
+    // checks as every other placement, so an entry point that would
+    // conflict is dropped just like any other fixture that doesn't fit.
+    var explicitEntryPoints =
+      Array.isArray(input.entryPoints) && input.entryPoints.length > 0 ? input.entryPoints : null;
     var walls = wallsFor(widthFt, lengthFt);
     var placements = [];
     var droppedCounts = {};
@@ -322,7 +354,54 @@
     // fixture on an adjacent wall that would clip into a shared corner,
     // which a same-wall-only check (the old wallFits()) could not.
     var placedRects = [];
+
+    // Reserved first (before the automatic scan below) so auto-placed
+    // fixtures never land on top of a door the customer explicitly
+    // positioned — the same way a wall itself is a fixed constraint.
+    if (explicitEntryPoints) {
+      var doorFootprint = FIXTURE_LAYOUT.Door_Quantity;
+      var doorClearance = clearanceFt("Door_Quantity");
+      var doorHalfWidth = expandedHalfWidth(doorFootprint, "Door_Quantity");
+      placedByType.Door_Quantity = [];
+      explicitEntryPoints.forEach(function (ep, i) {
+        var wall = wallByIdOrder([ep.wallId])[0];
+        if (!wall) {
+          droppedCounts.Door_Quantity = (droppedCounts.Door_Quantity || 0) + 1;
+          return;
+        }
+        if (wall.span < 2 * doorHalfWidth) {
+          droppedCounts.Door_Quantity = (droppedCounts.Door_Quantity || 0) + 1;
+          return;
+        }
+        var depthExtent = doorFootprint.depth + doorClearance.front;
+        if (depthExtent > wall.roomDepth) {
+          droppedCounts.Door_Quantity = (droppedCounts.Door_Quantity || 0) + 1;
+          return;
+        }
+        var rawOffset = ep.offsetFt != null ? ep.offsetFt : wall.span / 2;
+        var alongOffset = clampEntryOffset(wall.span, rawOffset);
+        var rect = clearanceRect(wall, alongOffset, doorHalfWidth, depthExtent);
+        var conflict = placedRects.some(function (r) {
+          return rectsOverlap(rect, r);
+        });
+        if (conflict) {
+          droppedCounts.Door_Quantity = (droppedCounts.Door_Quantity || 0) + 1;
+          return;
+        }
+        var placement = placeAt(wall, alongOffset, doorFootprint);
+        placement.fixtureKey = "Door_Quantity";
+        placement.index = i;
+        placement.hasDoor = ep.hasDoor !== false;
+        wall.used = Math.max(wall.used, alongOffset + doorHalfWidth);
+        placedRects.push(rect);
+        placements.push(placement);
+        placedByType.Door_Quantity.push(placement);
+      });
+    }
+
     FLOOR_PRIORITY.forEach(function (fixtureKey, priorityIdx) {
+      // Handled above instead, when the customer picked explicit points.
+      if (fixtureKey === "Door_Quantity" && explicitEntryPoints) return;
       var footprint = FIXTURE_LAYOUT[fixtureKey];
       var clearance = clearanceFt(fixtureKey);
       var halfWidth = expandedHalfWidth(footprint, fixtureKey);
@@ -330,11 +409,17 @@
       var depthExtent = footprint.depth + clearance.front;
       var count = clamp(Math.floor(fixtureCounts[fixtureKey] || 0), 0, MAX_FIXTURE_COUNT);
       placedByType[fixtureKey] = [];
+      var isPlumbing = plumbingWallIds && plumbingWallIds.length && PLUMBING_FIXTURE_KEYS.indexOf(fixtureKey) !== -1;
       for (var i = 0; i < count; i++) {
         var candidateWalls = scanOrderFor(priorityIdx, i);
         if (footprint.preferWall) {
           var preferred = wallByIdOrder([footprint.preferWall])[0];
           if (preferred && preferred.used === 0) candidateWalls = [preferred];
+        }
+        if (isPlumbing) {
+          candidateWalls = candidateWalls.filter(function (w) {
+            return plumbingWallIds.indexOf(w.id) !== -1;
+          });
         }
         var chosen = null;
         var chosenRect = null;
@@ -485,6 +570,8 @@
     MAX_FIXTURE_COUNT: MAX_FIXTURE_COUNT,
     FIXTURE_LAYOUT: FIXTURE_LAYOUT,
     CLEARANCE_IN: CLEARANCE_IN,
+    PLUMBING_FIXTURE_KEYS: PLUMBING_FIXTURE_KEYS,
+    clampEntryOffset: clampEntryOffset,
     applyDimensionInput: applyDimensionInput,
     applyFixtureInput: applyFixtureInput,
     computeRoomDimensions: computeRoomDimensions,

@@ -719,6 +719,33 @@ body.ai-chat-locked {
   color: var(--color-selected-ink);
 }
 
+/* Walk-in POV toggle + (when more than one entry point exists) the entry
+   switcher row beneath it — built and shown/hidden entirely by
+   js/bathroom-room-3d.js once at least one entry point is placed. */
+.ai-chat-room-3d-camera-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ai-chat-room-3d-camera-toggle {
+  align-self: flex-start;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ai-chat-room-3d-camera-toggle[aria-pressed="true"] {
+  background: var(--color-selected-bg);
+  border-color: var(--color-selected-bg);
+  color: var(--color-selected-ink);
+}
+
 /* Toolbar: estimate progress on the left, close button on the right — they
    share one row so the close button never covers the progress label. */
 .ai-chat-toolbar {

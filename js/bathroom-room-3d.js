@@ -35,6 +35,16 @@ function shellWalls(widthFt, lengthFt) {
   ];
 }
 
+// Inward-facing normal per wall id — mirrors js/bathroom-room-layout.js's
+// wallsFor() normalX/normalZ (kept as a small local literal here rather
+// than importing that module's internals, matching this file's existing
+// convention of duplicating the tiny bits of wall geometry it needs).
+var WALL_INWARD_NORMAL = { N: { x: 0, z: 1 }, E: { x: -1, z: 0 }, S: { x: 0, z: -1 }, W: { x: 1, z: 0 } };
+
+function wallSpanFor(wallId, widthFt, lengthFt) {
+  return wallId === "N" || wallId === "S" ? widthFt : lengthFt;
+}
+
 function isDarkTheme() {
   var attr = document.documentElement.getAttribute("data-theme");
   if (attr === "dark") return true;
@@ -457,7 +467,15 @@ var state = {
   dims: { widthFt: null, lengthFt: null, heightFt: null },
   fixtures: {},
   selectedToiletStyle: "A",
+  plumbingWallIds: [],
+  entryPoints: [], // [{ wallId, offsetFt, hasDoor }]
+  cameraMode: "orbit", // "orbit" | "walkin"
+  walkInEntryIndex: 0,
 };
+// Transient wall-click picking session, entirely separate from `state`
+// (the room's own data) — null when no picking UI is active.
+var picking = null; // { mode: "multi" | "single", onPick, selected: [wallId,...] }
+var hoveredWallId = null;
 var dirty = true;
 // Redrawing every frame at full PBR+shadow cost even while the scene is
 // completely static (no typing, camera settled) is wasted GPU/CPU on every
@@ -494,6 +512,98 @@ function buildToiletStyleSwitch(panel, wrap) {
   });
   panel.insertBefore(container, wrap);
   return container;
+}
+
+// The walk-in POV toggle, plus (when more than one entry point is placed) a
+// button row to pick which one to stand at — same reusable button-row
+// pattern as buildToiletStyleSwitch above.
+function buildCameraModeControls(panel, wrap) {
+  var container = document.createElement("div");
+  container.className = "ai-chat-room-3d-camera-controls";
+  container.hidden = true;
+
+  var toggleBtn = document.createElement("button");
+  toggleBtn.type = "button";
+  toggleBtn.className = "ai-chat-room-3d-camera-toggle";
+  toggleBtn.textContent = "Walk in";
+  toggleBtn.addEventListener("click", function () {
+    window.BathroomRoom3D.setCameraMode(state.cameraMode === "walkin" ? "orbit" : "walkin");
+  });
+  container.appendChild(toggleBtn);
+
+  var entrySwitch = document.createElement("div");
+  entrySwitch.className = "ai-chat-room-3d-style-switch";
+  entrySwitch.hidden = true;
+  container.appendChild(entrySwitch);
+
+  panel.insertBefore(container, wrap);
+  return { container: container, toggleBtn: toggleBtn, entrySwitch: entrySwitch };
+}
+
+// Rebuilds the entry-point picker buttons from whichever entry points the
+// layout actually placed (not the raw, possibly-dropped, state.entryPoints)
+// and refreshes the toggle button's label/pressed state.
+function syncCameraControls(s) {
+  if (!s.cameraControls) return;
+  var placed = s.lastEntryPlacements || [];
+  s.cameraControls.container.hidden = placed.length === 0;
+  s.cameraControls.toggleBtn.textContent = state.cameraMode === "walkin" ? "Overview" : "Walk in";
+  s.cameraControls.toggleBtn.setAttribute("aria-pressed", state.cameraMode === "walkin" ? "true" : "false");
+
+  var wrap = s.cameraControls.entrySwitch;
+  wrap.hidden = placed.length < 2;
+  while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
+  placed.forEach(function (p, i) {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ai-chat-room-3d-style-btn";
+    btn.textContent = "Entry " + (i + 1);
+    var isSelected = p.index === state.walkInEntryIndex;
+    btn.classList.toggle("selected", isSelected);
+    btn.setAttribute("aria-pressed", isSelected ? "true" : "false");
+    btn.addEventListener("click", function () {
+      window.BathroomRoom3D.setWalkInEntryIndex(p.index);
+    });
+    wrap.appendChild(btn);
+  });
+}
+
+// Tints each wall's highlight overlay: gold + brighter while hovered during
+// an active picking session, a dimmer persistent gold for walls already
+// picked (plumbing multi-select, or the entry point's own wall in single
+// mode), transparent otherwise. Safe to call with any threeState, including
+// false/null (before the scene exists) or mid-rebuild.
+function applyWallHighlightState(s) {
+  if (!s || !s.wallHighlightMaterials) return;
+  var selected = picking ? picking.selected : [];
+  Object.keys(s.wallHighlightMaterials).forEach(function (id) {
+    var mat = s.wallHighlightMaterials[id];
+    if (picking && id === hoveredWallId) {
+      mat.opacity = 0.4;
+    } else if (selected.indexOf(id) !== -1) {
+      mat.opacity = 0.22;
+    } else {
+      mat.opacity = 0;
+    }
+  });
+  needsRender = true;
+}
+
+// Resolves one wall click during an active picking session: toggles it in
+// "multi" mode (plumbing walls), replaces the single selection in "single"
+// mode (one entry point's wall), then reports the updated selection back to
+// whoever called beginWallPicking so the chat UI can reflect it live.
+function handleWallPick(wallId) {
+  if (!picking) return;
+  if (picking.mode === "multi") {
+    var idx = picking.selected.indexOf(wallId);
+    if (idx === -1) picking.selected.push(wallId);
+    else picking.selected.splice(idx, 1);
+  } else {
+    picking.selected = [wallId];
+  }
+  applyWallHighlightState(threeState);
+  if (picking.onPick) picking.onPick(picking.selected.slice(), wallId);
 }
 
 function ensureScene() {
@@ -568,6 +678,56 @@ function ensureScene() {
     scene.add(shellGroup);
 
     var toiletStyleSwitch = buildToiletStyleSwitch(panel, wrap);
+    var cameraControls = buildCameraModeControls(panel, wrap);
+
+    // Persistent (not recreated per rebuildShell call, unlike wall geometry
+    // itself) so highlight state survives a dimension change without
+    // leaking materials — rebuildShell only repositions/resizes the
+    // highlight mesh for each wall, it never replaces these.
+    var wallHighlightMaterials = {
+      N: new THREE.MeshBasicMaterial({ color: 0xcda15f, transparent: true, opacity: 0, depthWrite: false }),
+      E: new THREE.MeshBasicMaterial({ color: 0xcda15f, transparent: true, opacity: 0, depthWrite: false }),
+      S: new THREE.MeshBasicMaterial({ color: 0xcda15f, transparent: true, opacity: 0, depthWrite: false }),
+      W: new THREE.MeshBasicMaterial({ color: 0xcda15f, transparent: true, opacity: 0, depthWrite: false }),
+    };
+    var raycaster = new THREE.Raycaster();
+    var pointerDownPos = null;
+
+    function raycastWall(clientX, clientY) {
+      var rect = renderer.domElement.getBoundingClientRect();
+      if (!rect.width || !rect.height) return null;
+      var ndc = new THREE.Vector2(
+        ((clientX - rect.left) / rect.width) * 2 - 1,
+        -((clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      raycaster.setFromCamera(ndc, camera);
+      var meshes = threeState && threeState.wallMeshesById ? Object.values(threeState.wallMeshesById) : [];
+      var hits = raycaster.intersectObjects(meshes, false);
+      return hits.length ? hits[0].object : null;
+    }
+
+    renderer.domElement.addEventListener("pointerdown", function (e) {
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+    });
+    renderer.domElement.addEventListener("pointermove", function (e) {
+      if (!picking) return;
+      var hit = raycastWall(e.clientX, e.clientY);
+      var next = hit ? hit.userData.wallId : null;
+      if (next !== hoveredWallId) {
+        hoveredWallId = next;
+        applyWallHighlightState(threeState);
+      }
+    });
+    renderer.domElement.addEventListener("pointerup", function (e) {
+      var down = pointerDownPos;
+      pointerDownPos = null;
+      if (!picking || !down) return;
+      var dx = e.clientX - down.x;
+      var dy = e.clientY - down.y;
+      if (Math.sqrt(dx * dx + dy * dy) > 6) return; // a drag/orbit, not a click
+      var hit = raycastWall(e.clientX, e.clientY);
+      if (hit) handleWallPick(hit.userData.wallId);
+    });
 
     var resizeObserver = null;
     if (typeof ResizeObserver !== "undefined") {
@@ -600,9 +760,13 @@ function ensureScene() {
       shellMaterials: shellMaterials,
       shellGroup: shellGroup,
       shellGeometries: [],
+      wallMeshesById: {},
+      wallHighlightMaterials: wallHighlightMaterials,
       lastDims: null,
+      lastEntryPlacements: [],
       dirLight: dir,
       toiletStyleSwitch: toiletStyleSwitch,
+      cameraControls: cameraControls,
       applySize: applySize,
       cameraLerp: null, // { from, to, target, start } while animating, else null
       running: false,
@@ -648,14 +812,32 @@ function rebuildShell(s, widthFt, lengthFt, heightFt) {
   s.shellGroup.add(ceiling);
   s.shellGeometries.push(ceilingGeo);
 
+  s.wallMeshesById = {};
   shellWalls(widthFt, lengthFt).forEach(function (w) {
     var wallGeo = new THREE.PlaneGeometry(w.spanFt, heightFt);
     var wall = new THREE.Mesh(wallGeo, s.shellMaterials.wall);
     wall.rotation.y = w.rotY;
     wall.position.set(w.x, heightFt / 2, w.z);
     wall.receiveShadow = true;
+    wall.userData.wallId = w.id;
     s.shellGroup.add(wall);
     s.shellGeometries.push(wallGeo);
+    s.wallMeshesById[w.id] = wall;
+
+    // A thin, normally-invisible overlay nudged toward the room interior so
+    // it never z-fights with the wall itself — brightened by
+    // applyWallHighlightState() while wall-click picking is active.
+    if (s.wallHighlightMaterials && s.wallHighlightMaterials[w.id]) {
+      var highlightGeo = new THREE.PlaneGeometry(w.spanFt, heightFt);
+      var highlight = new THREE.Mesh(highlightGeo, s.wallHighlightMaterials[w.id]);
+      highlight.rotation.y = w.rotY;
+      var normal = WALL_INWARD_NORMAL[w.id];
+      var nudge = 0.02;
+      highlight.position.set(w.x + normal.x * nudge, heightFt / 2, w.z + normal.z * nudge);
+      highlight.renderOrder = 1;
+      s.shellGroup.add(highlight);
+      s.shellGeometries.push(highlightGeo);
+    }
   });
 }
 
@@ -702,9 +884,21 @@ function rebuildFixtures(s, widthFt, lengthFt) {
   while (s.fixtureGroup.children.length) {
     s.fixtureGroup.remove(s.fixtureGroup.children[0]);
   }
-  var layout = Layout.computeLayout({ widthFt: widthFt, lengthFt: lengthFt, fixtureCounts: state.fixtures });
+  var layout = Layout.computeLayout({
+    widthFt: widthFt,
+    lengthFt: lengthFt,
+    fixtureCounts: state.fixtures,
+    plumbingWallIds: state.plumbingWallIds,
+    entryPoints: state.entryPoints,
+  });
+  s.lastEntryPlacements = layout.placements.filter(function (p) {
+    return p.fixtureKey === "Door_Quantity";
+  });
   var toiletCount = 0;
   layout.placements.forEach(function (p) {
+    // An entry point without a door renders as an open archway — no slab or
+    // knob, just the wall opening the placement already reserved.
+    if (p.fixtureKey === "Door_Quantity" && p.hasDoor === false) return;
     var template =
       p.fixtureKey === "Toilet_Quantity"
         ? s.toiletTemplates[state.selectedToiletStyle]
@@ -728,6 +922,7 @@ function rebuildFixtures(s, widthFt, lengthFt) {
     s.fixtureGroup.add(instance);
   });
   if (s.toiletStyleSwitch) s.toiletStyleSwitch.hidden = toiletCount === 0;
+  syncCameraControls(s);
 }
 
 function startCameraLerp(s, newTarget, newDistance) {
@@ -743,6 +938,59 @@ function applyCameraLerp(s) {
   var eased = easeOutCubic(t);
   s.camera.position.lerpVectors(s.cameraLerp.from, s.cameraLerp.to, eased);
   if (t >= 1) s.cameraLerp = null;
+}
+
+// Walk-in POV: puts the camera at the chosen entry point's exact position
+// (eye height) and reuses the existing OrbitControls instance for look-
+// around, by pointing its target an imperceptible epsilon into the room and
+// clamping min/maxDistance to that same epsilon — this keeps the camera
+// pinned in place (it can't orbit away or zoom) while still letting the
+// existing drag/damping code rotate the view, since OrbitControls always
+// re-derives camera.position from camera/target offset on every update().
+function applyCameraMode(s) {
+  if (!s) return;
+  var dims = Layout.computeRoomDimensions(state.dims);
+  if (state.cameraMode === "walkin") {
+    var ep = (s.lastEntryPlacements || []).filter(function (p) {
+      return p.index === state.walkInEntryIndex;
+    })[0];
+    if (!ep) {
+      // The chosen entry point isn't currently placed (e.g. a room resize
+      // dropped it) — nowhere to stand, fall back to the overview instead
+      // of leaving the camera stranded at a stale position.
+      state.cameraMode = "orbit";
+    } else {
+      var normal = WALL_INWARD_NORMAL[ep.wallId] || { x: 0, z: 1 };
+      var eyeHeight = 5.5;
+      var epsilon = 0.05;
+      s.cameraLerp = null;
+      s.camera.position.set(ep.x, eyeHeight, ep.z);
+      s.controls.target.set(ep.x + normal.x * epsilon, eyeHeight, ep.z + normal.z * epsilon);
+      s.controls.minDistance = epsilon;
+      s.controls.maxDistance = epsilon;
+      s.controls.update();
+      needsRender = true;
+      syncCameraControls(s);
+      return;
+    }
+  }
+
+  // Orbit / overview — same framing math as rebuild()'s dimsChanged branch,
+  // reused here so leaving walk-in mode (with dims unchanged, so rebuild()
+  // itself wouldn't otherwise touch the camera) still returns smoothly.
+  var target = new THREE.Vector3(dims.widthFt / 2, dims.heightFt * 0.4, dims.lengthFt / 2);
+  var diag = Math.sqrt(dims.widthFt * dims.widthFt + dims.lengthFt * dims.lengthFt);
+  s.controls.minDistance = clamp(diag * 0.5, 3, 20);
+  s.controls.maxDistance = clamp(diag * 1.9, 12, 160);
+  s.controls.target.copy(target);
+  startCameraLerp(
+    s,
+    target,
+    clamp(s.camera.position.distanceTo(target) || diag, s.controls.minDistance, s.controls.maxDistance),
+  );
+  s.controls.update();
+  needsRender = true;
+  syncCameraControls(s);
 }
 
 function rebuild() {
@@ -798,6 +1046,9 @@ function rebuild() {
 
   rebuildFinishes(s);
   rebuildFixtures(s, dims.widthFt, dims.lengthFt);
+  // Follows the room if it resizes while walking in, or if the layout's
+  // entry-point placement shifted; a no-op re-pin when nothing moved.
+  if (state.cameraMode === "walkin") applyCameraMode(s);
 }
 
 // ---------------------------------------------------------------------
@@ -861,9 +1112,16 @@ window.BathroomRoom3D = {
       dims: { widthFt: null, lengthFt: null, heightFt: null },
       fixtures: {},
       selectedToiletStyle: "A",
+      plumbingWallIds: [],
+      entryPoints: [],
+      cameraMode: "orbit",
+      walkInEntryIndex: 0,
     };
+    picking = null;
+    hoveredWallId = null;
     if (threeState) {
       threeState.lastDims = null;
+      threeState.lastEntryPlacements = [];
       if (threeState.toiletStyleSwitch) {
         Array.prototype.forEach.call(threeState.toiletStyleSwitch.children, function (btn, i) {
           var isDefault = i === 0;
@@ -871,6 +1129,7 @@ window.BathroomRoom3D = {
           btn.setAttribute("aria-pressed", isDefault ? "true" : "false");
         });
       }
+      applyWallHighlightState(threeState);
     }
     markDirty();
   },
@@ -890,5 +1149,81 @@ window.BathroomRoom3D = {
   setFixtureCount: function (fixtureKey, rawValue) {
     state.fixtures = Layout.applyFixtureInput(state.fixtures, fixtureKey, rawValue);
     markDirty();
+  },
+
+  // --- Wall-click picking (plumbing walls + entry points) ---------------
+
+  // mode: "multi" (plumbing walls — click to toggle any number) or "single"
+  // (one entry point's wall — click replaces the selection). onPick(ids,
+  // justClickedId) fires after every click with the running selection so
+  // the chat UI can render it live; the caller reads the final selection
+  // from its own last onPick call, there's nothing to "commit" here.
+  beginWallPicking: function (mode, onPick) {
+    var s = ensureScene();
+    if (!s) return;
+    picking = { mode: mode === "multi" ? "multi" : "single", onPick: onPick || null, selected: [] };
+    hoveredWallId = null;
+    applyWallHighlightState(s);
+  },
+
+  endWallPicking: function () {
+    picking = null;
+    hoveredWallId = null;
+    applyWallHighlightState(threeState);
+  },
+
+  setPlumbingWalls: function (wallIds) {
+    state.plumbingWallIds = Array.isArray(wallIds) ? wallIds.slice() : [];
+    markDirty();
+  },
+
+  // --- Entry points -------------------------------------------------
+
+  // Merges onto the existing entry point at this index when the wall id is
+  // unchanged (e.g. re-calling this to flip hasDoor after the customer
+  // already nudged the position) instead of resetting offsetFt back to
+  // center — only a genuinely new wall pick re-centers it.
+  setEntryPoint: function (index, data) {
+    if (!data || !data.wallId) return;
+    var dims = Layout.computeRoomDimensions(state.dims);
+    var span = wallSpanFor(data.wallId, dims.widthFt, dims.lengthFt);
+    var existing = state.entryPoints[index];
+    var sameWall = existing && existing.wallId === data.wallId;
+    var offsetFt = data.offsetFt != null ? data.offsetFt : sameWall ? existing.offsetFt : span / 2;
+    state.entryPoints[index] = {
+      wallId: data.wallId,
+      offsetFt: Layout.clampEntryOffset(span, offsetFt),
+      hasDoor: data.hasDoor != null ? data.hasDoor !== false : sameWall ? existing.hasDoor : true,
+    };
+    markDirty();
+  },
+
+  removeEntryPoint: function (index) {
+    state.entryPoints.splice(index, 1);
+    markDirty();
+  },
+
+  nudgeEntryPoint: function (index, deltaFt) {
+    var ep = state.entryPoints[index];
+    if (!ep) return;
+    var dims = Layout.computeRoomDimensions(state.dims);
+    var span = wallSpanFor(ep.wallId, dims.widthFt, dims.lengthFt);
+    ep.offsetFt = Layout.clampEntryOffset(span, ep.offsetFt + (deltaFt || 0));
+    markDirty();
+  },
+
+  // --- Walk-in POV camera -------------------------------------------
+
+  setCameraMode: function (mode) {
+    var s = ensureScene();
+    if (!s) return;
+    state.cameraMode = mode === "walkin" ? "walkin" : "orbit";
+    applyCameraMode(s);
+  },
+
+  setWalkInEntryIndex: function (index) {
+    state.walkInEntryIndex = index;
+    if (threeState && state.cameraMode === "walkin") applyCameraMode(threeState);
+    else if (threeState) syncCameraControls(threeState);
   },
 };
