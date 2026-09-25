@@ -41,4 +41,13 @@ module.exports = [
       globals: { ...globals.node },
     },
   },
+  {
+    // Vercel serverless functions: run in Node, never loaded by the browser.
+    files: ["api/**/*.js"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "commonjs",
+      globals: { ...globals.node },
+    },
+  },
 ];

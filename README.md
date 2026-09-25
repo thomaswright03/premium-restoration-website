@@ -27,6 +27,8 @@ The site says "Get a Quote" / "Request a Quote", not "Free Quote": nothing confi
 ```
 ├── index.html, about.html, faq.html, contact.html, privacy.html, terms.html, gallery.html, 404.html
 ├── admin/index.html
+├── api/materials-options.js  Vercel serverless function stub for live materials pricing (not implemented yet)
+├── .env.example               env vars api/ expects (copy to .env.local; real values are gitignored)
 ├── site-config.json          owner-editable settings (see "Site settings")
 ├── favicon.svg, favicon.ico, apple-touch-icon.png
 ├── css/style.css             design tokens (colours incl. dark theme, type and spacing scales) + public styles
@@ -96,6 +98,8 @@ The public estimate always uses the published `DEFAULT_PRICES` in `js/bathroom-p
 - **Category icons, not product photos.** Each option shows a plain inline SVG glyph for its category (toilet, tile, paint roller, etc.), defined in `js/script.js` as `MATERIAL_ICON_SVG`. This is deliberate while the catalog is mock data: there's no real per-SKU image to show, and hot-linking a retailer's product photos without an actual data/affiliate agreement would be both fragile (URLs move, get blocked) and outside what's licensed. Real photos go in at the same time as real prices — see "To go live" below.
 
 To go live with real prices (and real photos) later: sign up for the Home Depot and/or Lowe's affiliate/data-feed programs (self-serve, free — both include an image URL per product in the feed), replace `getOptionsForCategory()` with a server-side lookup (a Vercel serverless function, so no retailer API key is ever exposed in this public file) that returns each option's real `imageUrl` alongside its price, swap the category `<span>` icon in `appendMaterialCategoryForm()` (`js/script.js`) for an `<img>` using that URL, replace `mockRegionalFactor()` with a real location adjustment (e.g. BEA Regional Price Parities), and set `IS_MOCK_DATA` to `false`. Nothing else needs to change — `js/script.js` only calls the functions `js/materials-pricing.js` already exposes.
+
+**In progress:** a Lowe's Developer Hub app (Product Discovery solution, Product Catalog capability) has been submitted for approval. `api/materials-options.js` is a not-yet-implemented Vercel serverless function stub for this — it validates its inputs and env vars and returns a clear "not configured" error, but makes no real API call yet, since Lowe's exact endpoint path, auth header, and response field names aren't visible until the app is approved and its interactive docs unlock. `.env.example` lists the environment variables it expects (`LOWES_API_KEY`, `LOWES_API_BASE_URL`) — copy it to `.env.local` for local testing, or set them as real Environment Variables in the Vercel project dashboard for production; both are gitignored so a real key never gets committed. Once the account is approved, the API docs will confirm the exact request/response shape needed to finish this function and switch `js/materials-pricing.js` over to calling it.
 
 ## One calculation, one set of prices
 
