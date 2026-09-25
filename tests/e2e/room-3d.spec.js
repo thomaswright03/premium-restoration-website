@@ -1,7 +1,7 @@
 "use strict";
 
 const { test, expect } = require("@playwright/test");
-const { startEstimate, answerScope, fillGroup, useConfig, sendChat } = require("./helpers");
+const { startEstimate, answerScope, fillGroup, useConfig, sendChat, skipRoomInteractionSteps } = require("./helpers");
 
 const NEEDS_WALLS = { demolition: "No", floorFinish: "Tile", walls: "Tile (full height)", paintCeiling: "Yes" };
 
@@ -29,9 +29,12 @@ test.describe("3D bathroom room preview", () => {
 
     const stillAvailable = await page.evaluate(() => window.BathroomRoom3D.available);
     expect(stillAvailable).toBe(true);
-    // The whole flow finished (fixtures is the last group), so the estimate
-    // card is up and the 3D panel is no longer part of an in-progress form —
-    // the scene object itself must simply have survived every live update.
+    // A plumbing fixture was listed, so the plumbing-walls and entry-points
+    // wall-click steps come next (see the dedicated describe block below
+    // for that flow) — skip through them here since this test is only
+    // about the scene surviving every live update, not that flow.
+    await skipRoomInteractionSteps(page);
+    // The scene object itself must simply have survived every live update.
     await expect(page.getByTestId("estimate-card")).toBeVisible();
   });
 
@@ -54,5 +57,121 @@ test.describe("3D bathroom room preview", () => {
     await useConfig(page, { bathroomVisualizer: { enabled: false } });
     await startEstimate(page);
     await expect(page.locator("#ai-chat-room-3d")).toBeHidden();
+  });
+});
+
+// Real canvas click coordinates, fixed to a point already confirmed (against
+// the default overview camera framing for a 10x8x8 room) to land on a wall
+// mesh rather than the floor/ceiling — see the fraction-of-canvas grid probe
+// used while writing this test. Any point in that region works; this one is
+// comfortably inside it.
+const WALL_CLICK_FRACTION = { x: 0.3, y: 0.3 };
+
+async function clickCanvasWall(page) {
+  const box = await page.locator("#ai-chat-room-3d-canvas-wrap canvas").boundingBox();
+  await page.mouse.click(box.x + box.width * WALL_CLICK_FRACTION.x, box.y + box.height * WALL_CLICK_FRACTION.y);
+}
+
+test.describe("3D room preview: wall-click plumbing walls, entry points, walk-in POV", () => {
+  async function reachFixturesStep(page, fixtures) {
+    await startEstimate(page);
+    await answerScope(page, NEEDS_WALLS);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 10, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 });
+    await page.waitForFunction(() => window.BathroomRoom3D && window.BathroomRoom3D.available === true);
+    await fillGroup(page, "fixtures", fixtures);
+  }
+
+  test("a plumbing fixture triggers the plumbing-walls step; clicking a wall enables Continue", async ({ page }) => {
+    await reachFixturesStep(page, { Toilet_Quantity: 1 });
+
+    const intro = page.locator(".ai-chat-group-intro", { hasText: "Which wall(s) carry the plumbing stack" });
+    await expect(intro).toBeVisible();
+    const status = page.locator(".ai-chat-group-intro", { hasText: /selected/ }).last();
+    await expect(status).toHaveText("No walls selected yet.");
+
+    const continueBtn = page.locator(".ai-chat-group-continue", { hasText: "Continue" }).last();
+    await expect(continueBtn).toBeDisabled();
+
+    await clickCanvasWall(page);
+    await expect(status).toHaveText("1 wall selected.");
+    await expect(continueBtn).toBeEnabled();
+
+    await continueBtn.click();
+    // Next step is entry points, not another plumbing-walls prompt.
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "How many entry points" })).toBeVisible();
+  });
+
+  test("no plumbing fixtures skips straight to the entry-points step", async ({ page }) => {
+    await reachFixturesStep(page, { Cabinet_Quantity: 1 });
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "carry the plumbing stack" })).toHaveCount(0);
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "How many entry points" })).toBeVisible();
+  });
+
+  test("skipping the plumbing-walls and entry-points steps still reaches the estimate", async ({ page }) => {
+    await reachFixturesStep(page, { Toilet_Quantity: 1 });
+    await page.locator(".ai-chat-group-cancel", { hasText: "Skip" }).last().click();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "How many entry points" })).toBeVisible();
+    await page.locator(".ai-chat-group-cancel", { hasText: "Skip" }).last().click();
+    await expect(page.getByTestId("estimate-card")).toBeVisible();
+  });
+
+  test("placing an entry point: pick a wall, nudge it, answer the door question, confirm, reach the estimate", async ({
+    page,
+  }) => {
+    await reachFixturesStep(page, { Cabinet_Quantity: 1 });
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "How many entry points" })).toBeVisible();
+    await page.locator('input[type="text"][inputmode="numeric"]').last().fill("1");
+    await page.locator(".ai-chat-group-continue", { hasText: "Continue" }).last().click();
+
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "click its wall" })).toBeVisible();
+    const confirmBtn = page.locator(".ai-chat-group-continue", { hasText: "Confirm entry point" });
+    await expect(confirmBtn).toBeDisabled();
+
+    await clickCanvasWall(page);
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Wall selected" })).toBeVisible();
+    await expect(confirmBtn).toBeEnabled();
+
+    await page.locator("button", { hasText: "Move right →" }).click();
+    await page.locator("button", { hasText: "No — open archway" }).click();
+    await confirmBtn.click();
+
+    await expect(page.getByTestId("estimate-card")).toBeVisible();
+
+    // The walk-in POV toggle appears once a real entry point is placed.
+    const walkInBtn = page.locator(".ai-chat-room-3d-camera-toggle");
+    await expect(walkInBtn).toBeVisible();
+    await expect(walkInBtn).toHaveText("Walk in");
+    await walkInBtn.click();
+    await expect(walkInBtn).toHaveText("Overview");
+    await expect(walkInBtn).toHaveAttribute("aria-pressed", "true");
+    await walkInBtn.click();
+    await expect(walkInBtn).toHaveText("Walk in");
+  });
+
+  test("multiple entry points show a per-entry switcher row once placed", async ({ page }) => {
+    await reachFixturesStep(page, { Cabinet_Quantity: 1 });
+    await page.locator('input[type="text"][inputmode="numeric"]').last().fill("2");
+    await page.locator(".ai-chat-group-continue", { hasText: "Continue" }).last().click();
+
+    for (let i = 0; i < 2; i++) {
+      await expect(page.locator(".ai-chat-group-intro", { hasText: "click its wall" }).last()).toBeVisible();
+      await clickCanvasWall(page);
+      const confirmBtn = page.locator(".ai-chat-group-continue", { hasText: /Confirm/ }).last();
+      await expect(confirmBtn).toBeEnabled();
+      if (i === 1) {
+        // Both points land on the same wall by clicking the same canvas
+        // spot — nudge the second one clear of the first's clearance
+        // envelope so both actually get placed instead of the second
+        // being dropped as an overlap.
+        const rightBtn = page.locator("button", { hasText: "Move right →" }).last();
+        for (let n = 0; n < 6; n++) await rightBtn.click();
+      }
+      await confirmBtn.click();
+    }
+
+    await expect(page.getByTestId("estimate-card")).toBeVisible();
+    const entrySwitch = page.locator(".ai-chat-room-3d-camera-controls .ai-chat-room-3d-style-switch");
+    await expect(entrySwitch).toBeVisible();
+    await expect(entrySwitch.locator(".ai-chat-room-3d-style-btn")).toHaveCount(2);
   });
 });

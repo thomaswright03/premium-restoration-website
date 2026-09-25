@@ -2,7 +2,7 @@
 
 const { test, expect } = require("@playwright/test");
 const fs = require("node:fs");
-const { useConfig, sendChat, startEstimate, answerScope, fillGroup } = require("./helpers");
+const { useConfig, sendChat, startEstimate, answerScope, fillGroup, skipRoomInteractionSteps } = require("./helpers");
 
 const NOTHING_BUT_FLOORING = { demolition: "No", floorFinish: "Other flooring", walls: "Neither", paintCeiling: "No" };
 
@@ -31,6 +31,7 @@ test.describe("chat estimate", () => {
     await answerScope(page, NOTHING_BUT_FLOORING);
     await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8 });
     await fillGroup(page, "fixtures", { Cabinet_Quantity: 3 });
+    await skipRoomInteractionSteps(page);
 
     const card = page.getByTestId("estimate-card");
     await expect(card).toBeVisible();
@@ -58,6 +59,11 @@ test.describe("chat estimate", () => {
   });
 
   test("a long estimate with everything chosen spills onto more pages, each with a footer", async ({ page }) => {
+    // Every field gets filled here, each firing a live 3D-room rebuild — the
+    // realistic toilet's heavier PBR materials/shadows make this the single
+    // slowest path in the suite, especially under this environment's
+    // software-rendered (no real GPU) WebGL.
+    test.setTimeout(60000);
     await startEstimate(page);
     await answerScope(page, {
       demolition: "Yes",
@@ -83,6 +89,7 @@ test.describe("chat estimate", () => {
       counts[key] = 2;
     }
     await fillGroup(page, "fixtures", counts);
+    await skipRoomInteractionSteps(page);
     const card = page.getByTestId("estimate-card");
     await expect(card.locator(".ai-chat-estimate-total-label")).toHaveText("Estimated Labor Total, before plumbing");
     const [download] = await Promise.all([
@@ -114,6 +121,7 @@ test.describe("chat estimate", () => {
     await startEstimate(page);
     await answerScope(page, { demolition: "No", floorFinish: "None", walls: "Neither", paintCeiling: "No" });
     await fillGroup(page, "fixtures", { Vanity_Quantity: 1 });
+    await skipRoomInteractionSteps(page);
     const card = page.getByTestId("estimate-card");
     await card.getByRole("button", { name: "Export as PDF" }).click();
     await expect(card.locator(".ai-chat-estimate-pdf-status")).toContainText("couldn't be prepared");
@@ -151,6 +159,7 @@ test.describe("chat estimate", () => {
 
     await fixtures.locator('input[name="Toilet_Quantity"]').fill("1");
     await fixtures.locator(".ai-chat-group-continue").click();
+    await skipRoomInteractionSteps(page);
     const card = page.getByTestId("estimate-card");
     await expect(card).toContainText("Demolition");
     await expect(card.locator(".ai-chat-estimate-total-value")).toHaveText("$1,700.00");
@@ -168,6 +177,7 @@ test.describe("chat estimate", () => {
     await answerScope(page, NOTHING_BUT_FLOORING);
     await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8 });
     await fillGroup(page, "fixtures", { Cabinet_Quantity: 3 });
+    await skipRoomInteractionSteps(page);
     await page.getByRole("link", { name: "Contact Us About This →" }).click();
     await expect(page).toHaveURL(/contact\.html\?from=estimate/);
     const message = page.locator("#message");

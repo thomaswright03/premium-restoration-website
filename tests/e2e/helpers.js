@@ -55,6 +55,23 @@ async function fillGroup(page, group, values) {
   await form.locator(".ai-chat-group-continue").click();
 }
 
+// When the 3D room preview is on, submitting "fixtures" is followed by the
+// wall-click plumbing-walls (only if a plumbing fixture was listed) and
+// entry-points steps — see room-3d.spec.js for dedicated coverage of that
+// flow. Tests that only care about reaching the estimate afterward call
+// this to skip through whichever of the two actually appeared.
+async function skipRoomInteractionSteps(page) {
+  for (let i = 0; i < 2; i++) {
+    const skip = page.locator(".ai-chat-group-cancel", { hasText: "Skip" }).last();
+    // isVisible() alone isn't enough: when only one of the two steps was
+    // inserted, the second loop iteration re-resolves to that SAME Skip
+    // button, now disabled after the first click — still visible, but
+    // clicking it again would just hang waiting for it to re-enable.
+    const usable = (await skip.isVisible().catch(() => false)) && (await skip.isEnabled().catch(() => false));
+    if (usable) await skip.click();
+  }
+}
+
 async function loginAdmin(page) {
   await page.goto("/admin/");
   await page.fill("#login-password", "templein26)");
@@ -90,6 +107,7 @@ module.exports = {
   startEstimate,
   answerScope,
   fillGroup,
+  skipRoomInteractionSteps,
   loginAdmin,
   chooseAdmin,
   fillAdminQuote,

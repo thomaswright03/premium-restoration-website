@@ -298,10 +298,36 @@ document.addEventListener("DOMContentLoaded", function () {
       chatInput.focus();
     }
 
+    // Whether the room-interaction steps (wall-click plumbing walls / entry
+    // points) make sense to offer: the 3D preview must be on AND actually
+    // up and running (ensureScene() succeeded) — otherwise there is nothing
+    // for the customer to click, and the steps would strand them on a
+    // "no wall selected yet" screen that can never resolve.
+    function room3dInteractive() {
+      return !!(bathroomRoom3dEnabled() && window.BathroomRoom3D && window.BathroomRoom3D.available);
+    }
+
+    // Fixture counts aren't known until the "fixtures" group is submitted,
+    // so whether to ask about plumbing walls can only be decided then —
+    // this splices the follow-up groups in right after it, once.
+    function insertRoomInteractionGroups() {
+      if (!room3dInteractive()) return;
+      var hasPlumbingFixture = Pricing.FIXTURES.some(function (f) {
+        return f.needsPlumbing && (parseFloat(quoteState.values[f.key]) || 0) > 0;
+      });
+      var extra = [];
+      if (hasPlumbingFixture) extra.push({ id: "plumbing-walls" });
+      extra.push({ id: "entry-points" });
+      var insertAt = quoteState.index + 1;
+      quoteState.groups.splice.apply(quoteState.groups, [insertAt, 0].concat(extra));
+    }
+
     function advance() {
       if (quoteState.index === 0) {
         // The scope decides which measurements are asked for.
         quoteState.groups = buildGroups(quoteState.scope);
+      } else if (quoteState.groups[quoteState.index].id === "fixtures") {
+        insertRoomInteractionGroups();
       }
       quoteState.index++;
       if (quoteState.index < quoteState.groups.length) {
@@ -321,6 +347,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function appendGroupForm() {
       var group = quoteState.groups[quoteState.index];
+      if (group.id === "plumbing-walls") {
+        appendPlumbingWallsStep();
+        return;
+      }
+      if (group.id === "entry-points") {
+        appendEntryPointsStep();
+        return;
+      }
       var parts = botRow();
       var content = document.createElement("div");
       content.className = "ai-chat-text";
@@ -481,6 +515,245 @@ document.addEventListener("DOMContentLoaded", function () {
       scrollToEnd();
       var first = formEl.querySelector("input, .ai-chat-choice");
       if (first) first.focus({ preventScroll: true });
+    }
+
+    // ---------- room interaction: plumbing walls ----------
+    // Which wall(s) carry the plumbing stack, picked by clicking directly
+    // on the 3D preview (multi-select) — restricts where toilet/sink/tub/
+    // shower can be placed. Skippable: skipping (or picking nothing) just
+    // leaves those fixtures unrestricted, same as before this step existed.
+    function appendPlumbingWallsStep() {
+      var parts = botRow();
+      var content = document.createElement("div");
+      content.className = "ai-chat-text";
+
+      var introEl = document.createElement("p");
+      introEl.className = "ai-chat-group-intro";
+      introEl.textContent =
+        "Which wall(s) carry the plumbing stack? Click them directly in the 3D preview — pick as many as apply. " +
+        "The toilet, sink, tub, and shower will only be placed on the wall(s) you choose.";
+      content.appendChild(introEl);
+
+      var statusEl = document.createElement("p");
+      statusEl.className = "ai-chat-group-intro";
+      statusEl.textContent = "No walls selected yet.";
+      content.appendChild(statusEl);
+
+      var actionsWrap = document.createElement("div");
+      actionsWrap.className = "ai-chat-group-actions";
+      var skipBtn = document.createElement("button");
+      skipBtn.type = "button";
+      skipBtn.className = "ai-chat-group-cancel";
+      skipBtn.textContent = "Skip";
+      var continueBtn = document.createElement("button");
+      continueBtn.type = "button";
+      continueBtn.className = "ai-chat-group-continue";
+      continueBtn.textContent = "Continue →";
+      continueBtn.disabled = true;
+      actionsWrap.appendChild(skipBtn);
+      actionsWrap.appendChild(continueBtn);
+      content.appendChild(actionsWrap);
+      parts.inner.appendChild(content);
+      chatMessages.appendChild(parts.row);
+      scrollToEnd();
+
+      var selectedIds = [];
+      function finish(ids) {
+        skipBtn.disabled = true;
+        continueBtn.disabled = true;
+        window.BathroomRoom3D.endWallPicking();
+        window.BathroomRoom3D.setPlumbingWalls(ids);
+        advance();
+      }
+      skipBtn.addEventListener("click", function () {
+        finish([]);
+      });
+      continueBtn.addEventListener("click", function () {
+        finish(selectedIds);
+      });
+
+      window.BathroomRoom3D.beginWallPicking("multi", function (ids) {
+        selectedIds = ids;
+        continueBtn.disabled = ids.length === 0;
+        statusEl.textContent =
+          ids.length === 0
+            ? "No walls selected yet."
+            : ids.length + " wall" + (ids.length === 1 ? "" : "s") + " selected.";
+      });
+    }
+
+    // ---------- room interaction: entry points ----------
+    // How many doors/openings into the bathroom, and for each: which wall
+    // (click to pick), nudge left/right along it, and whether it has a
+    // door. Skippable at the count step; the default (unrestricted, no
+    // explicit entry point) layout still works fine without it.
+    function appendEntryPointsStep() {
+      var parts = botRow();
+      var content = document.createElement("div");
+      content.className = "ai-chat-text";
+
+      var introEl = document.createElement("p");
+      introEl.className = "ai-chat-group-intro";
+      introEl.textContent = "How many entry points (doors or openings) does this bathroom have?";
+      content.appendChild(introEl);
+
+      var formEl = document.createElement("form");
+      formEl.noValidate = true;
+      var fieldWrap = document.createElement("div");
+      fieldWrap.className = "ai-chat-group-field";
+      var input = document.createElement("input");
+      input.type = "text";
+      input.inputMode = "numeric";
+      input.autocomplete = "off";
+      input.placeholder = "1";
+      input.value = "1";
+      fieldWrap.appendChild(input);
+      formEl.appendChild(fieldWrap);
+
+      var actionsWrap = document.createElement("div");
+      actionsWrap.className = "ai-chat-group-actions";
+      var skipBtn = document.createElement("button");
+      skipBtn.type = "button";
+      skipBtn.className = "ai-chat-group-cancel";
+      skipBtn.textContent = "Skip";
+      var continueBtn = document.createElement("button");
+      continueBtn.type = "submit";
+      continueBtn.className = "ai-chat-group-continue";
+      continueBtn.textContent = "Continue →";
+      actionsWrap.appendChild(skipBtn);
+      actionsWrap.appendChild(continueBtn);
+      formEl.appendChild(actionsWrap);
+      content.appendChild(formEl);
+      parts.inner.appendChild(content);
+      chatMessages.appendChild(parts.row);
+      scrollToEnd();
+
+      function disableAll(root) {
+        Array.prototype.forEach.call(root.querySelectorAll("input, button"), function (el) {
+          el.disabled = true;
+        });
+      }
+
+      skipBtn.addEventListener("click", function () {
+        disableAll(content);
+        advance();
+      });
+
+      formEl.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var n = Math.round(parseFloat(input.value));
+        if (!isFinite(n) || n < 1) n = 1;
+        if (n > 4) n = 4;
+        disableAll(content);
+        collectEntryPoint(n, 0);
+      });
+
+      function collectEntryPoint(total, i) {
+        if (i >= total) {
+          window.BathroomRoom3D.endWallPicking();
+          advance();
+          return;
+        }
+        appendOneEntryPoint(total, i);
+      }
+
+      function appendOneEntryPoint(total, i) {
+        var epParts = botRow();
+        var epContent = document.createElement("div");
+        epContent.className = "ai-chat-text";
+
+        var epIntro = document.createElement("p");
+        epIntro.className = "ai-chat-group-intro";
+        epIntro.textContent =
+          (total > 1 ? "Entry point " + (i + 1) + " of " + total + ": " : "") + "click its wall in the 3D preview.";
+        epContent.appendChild(epIntro);
+
+        var wallStatus = document.createElement("p");
+        wallStatus.className = "ai-chat-group-intro";
+        wallStatus.textContent = "No wall selected yet.";
+        epContent.appendChild(wallStatus);
+
+        var detailsWrap = document.createElement("div");
+        detailsWrap.hidden = true;
+
+        var nudgeWrap = document.createElement("div");
+        nudgeWrap.className = "ai-chat-group-actions";
+        var leftBtn = document.createElement("button");
+        leftBtn.type = "button";
+        leftBtn.className = "ai-chat-group-cancel";
+        leftBtn.textContent = "← Move left";
+        var rightBtn = document.createElement("button");
+        rightBtn.type = "button";
+        rightBtn.className = "ai-chat-group-cancel";
+        rightBtn.textContent = "Move right →";
+        nudgeWrap.appendChild(leftBtn);
+        nudgeWrap.appendChild(rightBtn);
+        detailsWrap.appendChild(nudgeWrap);
+
+        var doorLabel = document.createElement("p");
+        doorLabel.className = "ai-chat-field-label";
+        doorLabel.textContent = "Does this entry point have a door?";
+        detailsWrap.appendChild(doorLabel);
+
+        var doorChoices = document.createElement("div");
+        doorChoices.className = "ai-chat-choices";
+        var hasDoor = true;
+        var chosenWallId = null;
+        var doorButtons = [];
+        [
+          { label: "Yes", value: true },
+          { label: "No — open archway", value: false },
+        ].forEach(function (option) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "ai-chat-choice";
+          btn.textContent = option.label;
+          btn.setAttribute("aria-pressed", option.value === hasDoor ? "true" : "false");
+          btn.addEventListener("click", function () {
+            hasDoor = option.value;
+            doorButtons.forEach(function (other) {
+              var isThis = other === btn;
+              other.classList.toggle("selected", isThis);
+              other.setAttribute("aria-pressed", isThis ? "true" : "false");
+            });
+            window.BathroomRoom3D.setEntryPoint(i, { wallId: chosenWallId, hasDoor: hasDoor });
+          });
+          btn.classList.toggle("selected", option.value === hasDoor);
+          doorButtons.push(btn);
+          doorChoices.appendChild(btn);
+        });
+        detailsWrap.appendChild(doorChoices);
+
+        var confirmBtn = document.createElement("button");
+        confirmBtn.type = "button";
+        confirmBtn.className = "ai-chat-group-continue";
+        confirmBtn.textContent = i === total - 1 ? "Confirm entry point" : "Confirm & next →";
+        confirmBtn.disabled = true;
+        detailsWrap.appendChild(confirmBtn);
+        epContent.appendChild(detailsWrap);
+        epParts.inner.appendChild(epContent);
+        chatMessages.appendChild(epParts.row);
+        scrollToEnd();
+
+        leftBtn.addEventListener("click", function () {
+          window.BathroomRoom3D.nudgeEntryPoint(i, -0.5);
+        });
+        rightBtn.addEventListener("click", function () {
+          window.BathroomRoom3D.nudgeEntryPoint(i, 0.5);
+        });
+        confirmBtn.addEventListener("click", function () {
+          disableAll(epContent);
+          collectEntryPoint(total, i + 1);
+        });
+
+        window.BathroomRoom3D.beginWallPicking("single", function (ids, justClicked) {
+          chosenWallId = justClicked;
+          wallStatus.textContent = "Wall selected — nudge it into place and confirm below.";
+          detailsWrap.hidden = false;
+          confirmBtn.disabled = false;
+          window.BathroomRoom3D.setEntryPoint(i, { wallId: chosenWallId, hasDoor: hasDoor });
+        });
+      }
     }
 
     // ---------- estimate card ----------

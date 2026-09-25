@@ -4,9 +4,14 @@
 // fixture stand-ins. No DOM, no Three.js — js/bathroom-room-3d.js owns all
 // rendering; this module only ever returns plain data.
 //
-// This is a stylized preview, not a real floor plan: the layout algorithm
-// is a simple deterministic first-fit around the room's walls, not a
-// plumbing-aware or code-compliant design.
+// The layout algorithm is a deterministic first-fit around the room's
+// walls (still no backtracking/optimization, still not a substitute for an
+// actual code review), but it now checks REAL clearance: every candidate
+// placement's footprint, expanded by its own required side/front clearance
+// (see CLEARANCE_IN below), must not overlap any already-placed fixture's
+// own expanded footprint — not just "is there unused linear space on this
+// one wall" like before, so two fixtures on adjacent walls that would
+// physically clip into a shared corner are correctly rejected too.
 (function (root, factory) {
   var api = factory();
   if (typeof module !== "undefined" && module.exports) {
@@ -22,32 +27,6 @@
   var DEFAULT_ROOM = { widthFt: 8, lengthFt: 5, heightFt: 8 };
   var DIMENSION_BOUNDS = { widthFt: 50, lengthFt: 50, heightFt: 20 };
   var RENDER_MIN_DIM = 2; // floor for a sane, non-degenerate rendered room
-
-  // Real-world size of a standard two-piece elongated toilet, in inches —
-  // the 3D module builds its toilet mesh from these same numbers.
-  // clearWidthIn/clearFrontIn are the IRC R307 minimums: 15 in from the
-  // centerline to any side wall or fixture (30 in total) and 21 in of open
-  // floor in front of the bowl.
-  var TOILET = {
-    depthIn: 29, // wall to front of bowl
-    roughInIn: 12, // wall to drain centerline
-    bowlWidthIn: 15,
-    bowlLengthIn: 18.5, // elongated bowl, rim front-to-back
-    rimHeightIn: 15,
-    seatHeightIn: 16,
-    tankWidthIn: 20,
-    tankDepthIn: 8,
-    tankTopIn: 30,
-    clearWidthIn: 30,
-    clearFrontIn: 21,
-  };
-
-  // Before the visitor has answered the toilet count, the preview shows
-  // sample toilets so the room reads as a bathroom at a believable scale:
-  // one per ~60 sq ft of floor (a home bath gets one, a big commercial
-  // restroom a row of them), capped, and only as many as actually fit.
-  var SAMPLE_TOILET_SQFT_EACH = 60;
-  var SAMPLE_TOILET_MAX = 6;
   var MAX_FIXTURE_COUNT = 20; // mirrors Pricing.MAX_FIXTURE_COUNT
 
   // Per-fixture footprint, in feet, used by the layout algorithm below.
@@ -58,20 +37,10 @@
   // mount: "floor" (walks the wall scan), "attach" (rides along with
   // another floor fixture instance by index), or "wall" (attaches to a
   // placed floor fixture from its anchors list).
-  // clearFront: open floor the fixture needs in front of it; a wall whose
-  // room depth can't hold depth + clearFront is skipped for that fixture.
-  // sameWall: every instance scans from the same starting wall, so several
-  // of them line up in a row (restroom-style) instead of spreading around
-  // the room.
   var FIXTURE_LAYOUT = {
-    Toilet_Quantity: {
-      wallSpan: TOILET.clearWidthIn / 12,
-      depth: TOILET.depthIn / 12,
-      height: TOILET.tankTopIn / 12,
-      clearFront: TOILET.clearFrontIn / 12,
-      mount: "floor",
-      sameWall: true,
-    },
+    // Real-world elongated-bowl toilet: ~20in wall clearance, ~28in front
+    // projection (tank back to bowl front), ~30in to the tank lid.
+    Toilet_Quantity: { wallSpan: 1.7, depth: 2.3, height: 2.5, mount: "floor" },
     Bathtub_Quantity: { wallSpan: 5.2, depth: 2.6, height: 1.6, mount: "floor" },
     Shower_Quantity: { wallSpan: 3.2, depth: 3.2, height: 6.5, mount: "floor" },
     Shower_Door_Quantity: { wallSpan: 2.5, depth: 0.1, height: 6.5, mount: "attach", attachTo: "Shower_Quantity" },
@@ -105,6 +74,35 @@
     },
   };
 
+  // Representative residential code-minimum clearances, in inches — typical
+  // values, not a substitute for an actual code review (same spirit as the
+  // rest of this preview). side: how far from the fixture's own centerline
+  // (toilet) or edge (everything else) must stay clear of any obstruction
+  // on either side, along the wall. front: clear floor space required in
+  // front of the fixture, beyond its own physical depth, so a person can
+  // actually use it (includes shower/door swing clearance). Wall-mounted
+  // fixtures (mirrors, shelf) and attached ones (shower door) need no
+  // floor-clearance entry — they don't independently consume floor space.
+  var CLEARANCE_IN = {
+    Toilet_Quantity: { side: 15, front: 21 },
+    Sink_Quantity: { side: 4, front: 21 },
+    Bathtub_Quantity: { side: 0, front: 21 },
+    Shower_Quantity: { side: 0, front: 24 },
+    Vanity_Quantity: { side: 3, front: 21 },
+    Cabinet_Quantity: { side: 2, front: 12 },
+    Door_Quantity: { side: 0, front: 24 },
+  };
+
+  function clearanceFt(fixtureKey) {
+    var c = CLEARANCE_IN[fixtureKey] || { side: 0, front: 0 };
+    return { side: c.side / 12, front: c.front / 12 };
+  }
+
+  // Fixtures that need to be on a wall carrying the plumbing stack. Kept
+  // local (not read from js/bathroom-pricing.js's needsPlumbing flags) so
+  // this module keeps its existing no-cross-file-dependency convention.
+  var PLUMBING_FIXTURE_KEYS = ["Toilet_Quantity", "Sink_Quantity", "Bathtub_Quantity", "Shower_Quantity"];
+
   // Fixed priority order for the floor-standing wall scan. Each type scans
   // from its OWN fixed wall index (priorityIndex % 4), not a shared cursor
   // — so changing one fixture type's count never relocates an already
@@ -122,7 +120,6 @@
     "Door_Quantity",
   ];
   var WALL_MOUNT_PRIORITY = ["Mirror_Quantity", "Mirror_Huge_Quantity", "Shower_Shelf_Quantity"];
-  var MARGIN = 0.35; // reserved gap before/after each placed item, in feet
 
   function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
@@ -176,11 +173,6 @@
   // starts, since the dimensions chat group is only asked when the chosen
   // scope needs floor/wall area (see scopeNeeds() in bathroom-pricing.js) —
   // a fixtures-only job never asks for width/length/height at all.
-  function sampleToiletCount(widthFt, lengthFt) {
-    var areaSqFt = (widthFt || DEFAULT_ROOM.widthFt) * (lengthFt || DEFAULT_ROOM.lengthFt);
-    return clamp(Math.floor(areaSqFt / SAMPLE_TOILET_SQFT_EACH), 1, SAMPLE_TOILET_MAX);
-  }
-
   function computeRoomDimensions(dims) {
     dims = dims || {};
     return {
@@ -192,17 +184,36 @@
 
   // The 4 walls of a widthFt x lengthFt room, in a fixed order, each with a
   // start point/direction so a fixture's wall-local offset can be turned
-  // into (x, z, rotationY). "used" tracks how much of the wall's span is
-  // already spoken for during one computeLayout() call.
+  // into (x, z, rotationY), plus its inward-facing normal (normalX/normalZ)
+  // for projecting a fixture's depth+front-clearance into the room. "used"
+  // tracks how much of the wall's span is already spoken for during one
+  // computeLayout() call.
   function wallsFor(widthFt, lengthFt) {
     return [
-      { id: "N", originX: 0, originZ: 0, dirX: 1, dirZ: 0, span: widthFt, roomDepth: lengthFt, facingY: 0, used: 0 },
+      {
+        id: "N",
+        originX: 0,
+        originZ: 0,
+        dirX: 1,
+        dirZ: 0,
+        normalX: 0,
+        normalZ: 1,
+        span: widthFt,
+        // How far the room actually extends in this wall's inward
+        // direction — a fixture's depth+clearance can never exceed this,
+        // or it would poke through the opposite wall.
+        roomDepth: lengthFt,
+        facingY: 0,
+        used: 0,
+      },
       {
         id: "E",
         originX: widthFt,
         originZ: 0,
         dirX: 0,
         dirZ: 1,
+        normalX: -1,
+        normalZ: 0,
         span: lengthFt,
         roomDepth: widthFt,
         facingY: -Math.PI / 2,
@@ -214,6 +225,8 @@
         originZ: lengthFt,
         dirX: -1,
         dirZ: 0,
+        normalX: 0,
+        normalZ: -1,
         span: widthFt,
         roomDepth: lengthFt,
         facingY: Math.PI,
@@ -225,6 +238,8 @@
         originZ: lengthFt,
         dirX: 0,
         dirZ: -1,
+        normalX: 1,
+        normalZ: 0,
         span: lengthFt,
         roomDepth: widthFt,
         facingY: Math.PI / 2,
@@ -233,35 +248,84 @@
     ];
   }
 
-  function placeOnWall(wall, footprint) {
-    var offset = wall.used + MARGIN + footprint.wallSpan / 2;
+  // Half-width of the clearance envelope a fixture needs along its wall:
+  // its own physical half-width, or its code-required side clearance,
+  // whichever is larger (e.g. a toilet's 15in centerline clearance exceeds
+  // half its ~20in physical width, so the clearance rule dominates).
+  function expandedHalfWidth(footprint, fixtureKey) {
+    return Math.max(footprint.wallSpan / 2, clearanceFt(fixtureKey).side);
+  }
+
+  // The world-space axis-aligned rectangle a fixture's clearance envelope
+  // occupies: centered on `alongOffset` along the wall (±halfWidth), and
+  // from the wall (0) to `depthExtent` into the room along the wall's
+  // normal. Every wall is axis-aligned in this room's coordinate system
+  // (tangent and normal are each purely X or purely Z), so this is always
+  // a real axis-aligned rectangle, never a rotated one.
+  function clearanceRect(wall, alongOffset, halfWidth, depthExtent) {
+    var cx = wall.originX + wall.dirX * alongOffset;
+    var cz = wall.originZ + wall.dirZ * alongOffset;
+    var halfX = Math.abs(wall.dirX) * halfWidth;
+    var halfZ = Math.abs(wall.dirZ) * halfWidth;
+    var depthX = Math.abs(wall.normalX) * depthExtent;
+    var depthZ = Math.abs(wall.normalZ) * depthExtent;
     return {
-      x: wall.originX + wall.dirX * offset,
-      z: wall.originZ + wall.dirZ * offset,
+      minX: cx - halfX - (wall.normalX < 0 ? depthX : 0),
+      maxX: cx + halfX + (wall.normalX > 0 ? depthX : 0),
+      minZ: cz - halfZ - (wall.normalZ < 0 ? depthZ : 0),
+      maxZ: cz + halfZ + (wall.normalZ > 0 ? depthZ : 0),
+    };
+  }
+
+  function rectsOverlap(a, b) {
+    return a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ;
+  }
+
+  function placeAt(wall, alongOffset, footprint) {
+    return {
+      x: wall.originX + wall.dirX * alongOffset,
+      z: wall.originZ + wall.dirZ * alongOffset,
       y: footprint.height / 2,
       rotationY: wall.facingY,
       wallId: wall.id,
     };
   }
 
-  function wallFits(wall, footprint) {
-    if (footprint.clearFront != null && wall.roomDepth < footprint.depth + footprint.clearFront) return false;
-    return wall.span - wall.used >= footprint.wallSpan + 2 * MARGIN;
+  // Half-width of an entry point's clearance envelope, exposed so the 3D
+  // module can clamp its nudge-left/right UI to a wall's real span without
+  // needing to know FIXTURE_LAYOUT/CLEARANCE_IN internals itself.
+  function entryPointHalfWidth() {
+    return expandedHalfWidth(FIXTURE_LAYOUT.Door_Quantity, "Door_Quantity");
+  }
+
+  // Clamps an entry point's along-wall offset so its clearance envelope
+  // stays on the wall. Mirrors how automatic wall-scan placement is always
+  // kept on-wall by construction; entry points are user-positioned, so this
+  // is the equivalent guard for them.
+  function clampEntryOffset(wallSpanFt, offsetFt) {
+    var halfWidth = entryPointHalfWidth();
+    var maxOffset = Math.max(halfWidth, wallSpanFt - halfWidth);
+    return clamp(offsetFt, halfWidth, maxOffset);
   }
 
   // Deterministic, pure: the same (widthFt, lengthFt, fixtureCounts) triple
   // always produces byte-identical placements. No Math.random, no
   // object-iteration-order dependence.
-  //
-  // A Toilet_Quantity that is missing (not yet answered, as opposed to an
-  // explicit 0) gets sampleToiletCount() toilets, flagged sample: true;
-  // samples that don't fit are left out quietly rather than reported in
-  // droppedCounts, since the visitor never asked for them.
   function computeLayout(input) {
     input = input || {};
     var widthFt = input.widthFt || DEFAULT_ROOM.widthFt;
     var lengthFt = input.lengthFt || DEFAULT_ROOM.lengthFt;
     var fixtureCounts = input.fixtureCounts || {};
+    // Wall ids restricting the plumbing-needing fixtures (empty/omitted =
+    // unrestricted, today's behavior). Multiple walls can carry the stack.
+    var plumbingWallIds = Array.isArray(input.plumbingWallIds) ? input.plumbingWallIds : null;
+    // Customer-picked entry points, each {wallId, offsetFt, hasDoor}. When
+    // given, these REPLACE the automatic Door_Quantity wall-scan entirely —
+    // still validated through the same clearance/overlap/room-boundary
+    // checks as every other placement, so an entry point that would
+    // conflict is dropped just like any other fixture that doesn't fit.
+    var explicitEntryPoints =
+      Array.isArray(input.entryPoints) && input.entryPoints.length > 0 ? input.entryPoints : null;
     var walls = wallsFor(widthFt, lengthFt);
     var placements = [];
     var droppedCounts = {};
@@ -284,36 +348,106 @@
       return walls.slice(start).concat(walls.slice(0, start));
     }
 
-    // Pass 1: floor-standing fixtures.
+    // Pass 1: floor-standing fixtures. placedRects accumulates every placed
+    // fixture's clearance envelope, checked against every NEW candidate
+    // regardless of which wall either one is on — this is what catches a
+    // fixture on an adjacent wall that would clip into a shared corner,
+    // which a same-wall-only check (the old wallFits()) could not.
+    var placedRects = [];
+
+    // Reserved first (before the automatic scan below) so auto-placed
+    // fixtures never land on top of a door the customer explicitly
+    // positioned — the same way a wall itself is a fixed constraint.
+    if (explicitEntryPoints) {
+      var doorFootprint = FIXTURE_LAYOUT.Door_Quantity;
+      var doorClearance = clearanceFt("Door_Quantity");
+      var doorHalfWidth = expandedHalfWidth(doorFootprint, "Door_Quantity");
+      placedByType.Door_Quantity = [];
+      explicitEntryPoints.forEach(function (ep, i) {
+        var wall = wallByIdOrder([ep.wallId])[0];
+        if (!wall) {
+          droppedCounts.Door_Quantity = (droppedCounts.Door_Quantity || 0) + 1;
+          return;
+        }
+        if (wall.span < 2 * doorHalfWidth) {
+          droppedCounts.Door_Quantity = (droppedCounts.Door_Quantity || 0) + 1;
+          return;
+        }
+        var depthExtent = doorFootprint.depth + doorClearance.front;
+        if (depthExtent > wall.roomDepth) {
+          droppedCounts.Door_Quantity = (droppedCounts.Door_Quantity || 0) + 1;
+          return;
+        }
+        var rawOffset = ep.offsetFt != null ? ep.offsetFt : wall.span / 2;
+        var alongOffset = clampEntryOffset(wall.span, rawOffset);
+        var rect = clearanceRect(wall, alongOffset, doorHalfWidth, depthExtent);
+        var conflict = placedRects.some(function (r) {
+          return rectsOverlap(rect, r);
+        });
+        if (conflict) {
+          droppedCounts.Door_Quantity = (droppedCounts.Door_Quantity || 0) + 1;
+          return;
+        }
+        var placement = placeAt(wall, alongOffset, doorFootprint);
+        placement.fixtureKey = "Door_Quantity";
+        placement.index = i;
+        placement.hasDoor = ep.hasDoor !== false;
+        wall.used = Math.max(wall.used, alongOffset + doorHalfWidth);
+        placedRects.push(rect);
+        placements.push(placement);
+        placedByType.Door_Quantity.push(placement);
+      });
+    }
+
     FLOOR_PRIORITY.forEach(function (fixtureKey, priorityIdx) {
+      // Handled above instead, when the customer picked explicit points.
+      if (fixtureKey === "Door_Quantity" && explicitEntryPoints) return;
       var footprint = FIXTURE_LAYOUT[fixtureKey];
-      var isSample = fixtureKey === "Toilet_Quantity" && fixtureCounts[fixtureKey] == null;
-      var count = isSample
-        ? sampleToiletCount(widthFt, lengthFt)
-        : clamp(Math.floor(fixtureCounts[fixtureKey] || 0), 0, MAX_FIXTURE_COUNT);
+      var clearance = clearanceFt(fixtureKey);
+      var halfWidth = expandedHalfWidth(footprint, fixtureKey);
+      var requiredSpan = 2 * halfWidth;
+      var depthExtent = footprint.depth + clearance.front;
+      var count = clamp(Math.floor(fixtureCounts[fixtureKey] || 0), 0, MAX_FIXTURE_COUNT);
       placedByType[fixtureKey] = [];
+      var isPlumbing = plumbingWallIds && plumbingWallIds.length && PLUMBING_FIXTURE_KEYS.indexOf(fixtureKey) !== -1;
       for (var i = 0; i < count; i++) {
-        var candidateWalls = scanOrderFor(priorityIdx, footprint.sameWall ? 0 : i);
+        var candidateWalls = scanOrderFor(priorityIdx, i);
         if (footprint.preferWall) {
           var preferred = wallByIdOrder([footprint.preferWall])[0];
           if (preferred && preferred.used === 0) candidateWalls = [preferred];
         }
+        if (isPlumbing) {
+          candidateWalls = candidateWalls.filter(function (w) {
+            return plumbingWallIds.indexOf(w.id) !== -1;
+          });
+        }
         var chosen = null;
+        var chosenRect = null;
+        var chosenOffset = 0;
         for (var w = 0; w < candidateWalls.length; w++) {
-          if (wallFits(candidateWalls[w], footprint)) {
-            chosen = candidateWalls[w];
-            break;
-          }
+          var wall = candidateWalls[w];
+          if (wall.span - wall.used < requiredSpan) continue;
+          if (depthExtent > wall.roomDepth) continue; // would poke through the opposite wall
+          var alongOffset = wall.used + halfWidth;
+          var rect = clearanceRect(wall, alongOffset, halfWidth, depthExtent);
+          var conflict = placedRects.some(function (r) {
+            return rectsOverlap(rect, r);
+          });
+          if (conflict) continue;
+          chosen = wall;
+          chosenRect = rect;
+          chosenOffset = alongOffset;
+          break;
         }
         if (!chosen) {
-          if (!isSample) droppedCounts[fixtureKey] = (droppedCounts[fixtureKey] || 0) + 1;
+          droppedCounts[fixtureKey] = (droppedCounts[fixtureKey] || 0) + 1;
           continue;
         }
-        var placement = placeOnWall(chosen, footprint);
+        var placement = placeAt(chosen, chosenOffset, footprint);
         placement.fixtureKey = fixtureKey;
         placement.index = i;
-        if (isSample) placement.sample = true;
-        chosen.used += footprint.wallSpan + MARGIN;
+        chosen.used = chosenOffset + halfWidth;
+        placedRects.push(chosenRect);
         placements.push(placement);
         placedByType[fixtureKey].push(placement);
       }
@@ -435,8 +569,9 @@
     RENDER_MIN_DIM: RENDER_MIN_DIM,
     MAX_FIXTURE_COUNT: MAX_FIXTURE_COUNT,
     FIXTURE_LAYOUT: FIXTURE_LAYOUT,
-    TOILET: TOILET,
-    sampleToiletCount: sampleToiletCount,
+    CLEARANCE_IN: CLEARANCE_IN,
+    PLUMBING_FIXTURE_KEYS: PLUMBING_FIXTURE_KEYS,
+    clampEntryOffset: clampEntryOffset,
     applyDimensionInput: applyDimensionInput,
     applyFixtureInput: applyFixtureInput,
     computeRoomDimensions: computeRoomDimensions,

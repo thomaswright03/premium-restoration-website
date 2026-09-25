@@ -85,9 +85,78 @@ test("computeLayout: two large fixtures genuinely competing for wall space still
   assert.equal(placedCount + (a.droppedCounts.Bathtub_Quantity || 0), 2);
 });
 
+test("computeLayout: a fixture is dropped rather than poking through the opposite wall when the room is too shallow for its depth+clearance", () => {
+  // A shower needs 3.2ft depth + 24in front clearance = 5.2ft into the
+  // room, in whichever direction it projects. A 4x4 room is too shallow in
+  // BOTH directions — every wall's span has room for the shower's 3.2ft
+  // width, but no wall's opposite-side room depth reaches 5.2ft, so it
+  // must be dropped everywhere rather than placed poking through a wall.
+  var result = L.computeLayout({ widthFt: 4, lengthFt: 4, fixtureCounts: { Shower_Quantity: 1 } });
+  assert.equal(result.placements.filter((p) => p.fixtureKey === "Shower_Quantity").length, 0);
+  assert.equal(result.droppedCounts.Shower_Quantity, 1);
+});
+
+test("computeLayout: the same fixture placed on a wall whose span is short but whose room-depth (the perpendicular dimension) is ample still fits", () => {
+  // 10ft wide x 4ft long: the N/S walls run along the 10ft span but only
+  // project 4ft into the room (too shallow for the shower) — while the E/W
+  // walls run along the shorter 4ft span but project a full 10ft into the
+  // room, ample depth. A correct algorithm places it there, not drops it.
+  var result = L.computeLayout({ widthFt: 10, lengthFt: 4, fixtureCounts: { Shower_Quantity: 1 } });
+  var placed = result.placements.filter((p) => p.fixtureKey === "Shower_Quantity");
+  assert.equal(placed.length, 1);
+  assert.ok(["E", "W"].indexOf(placed[0].wallId) !== -1);
+});
+
+test("computeLayout: a fixture that fits the room's depth is still placed normally", () => {
+  var result = L.computeLayout({ widthFt: 10, lengthFt: 8, fixtureCounts: { Shower_Quantity: 1 } });
+  assert.equal(result.placements.filter((p) => p.fixtureKey === "Shower_Quantity").length, 1);
+  assert.equal(result.droppedCounts.Shower_Quantity, undefined);
+});
+
+test("computeLayout: a fixture on one wall is rejected for clipping another's clearance on an adjacent wall, even though each wall alone has room", () => {
+  // 6x6ft: every wall's own span (6ft) comfortably exceeds one bathtub's
+  // 5.2ft wall-span, so the OLD same-wall-only fit test would have placed
+  // both (on two different walls, independently). With real front-clearance
+  // (depth 2.6ft + 21in code clearance = 4.35ft projected into the room),
+  // any second wall's clearance zone clips the first bathtub's near this
+  // room's shared corners — only one can actually fit.
+  var result = L.computeLayout({ widthFt: 6, lengthFt: 6, fixtureCounts: { Bathtub_Quantity: 2 } });
+  var placed = result.placements.filter((p) => p.fixtureKey === "Bathtub_Quantity");
+  assert.equal(placed.length, 1);
+  assert.equal(result.droppedCounts.Bathtub_Quantity, 1);
+});
+
+test("computeLayout: toilet spacing reflects real centerline clearance (15in), not just its own physical width", () => {
+  // Toilet wallSpan is 1.7ft (half = 0.85ft), but CLEARANCE_IN.Toilet_Quantity.side
+  // is 15in (1.25ft) — the code clearance is the larger of the two and must
+  // be what actually determines placement, not the fixture's own half-width.
+  var result = L.computeLayout({ widthFt: 10, lengthFt: 8, fixtureCounts: { Toilet_Quantity: 1 } });
+  var toilet = result.placements[0];
+  assert.equal(toilet.wallId, "N");
+  assert.equal(toilet.x, 1.25); // originX(0) + dirX(1) * halfWidth(max(0.85, 15/12) = 1.25)
+});
+
+test("CLEARANCE_IN exposes representative code-minimum side/front clearances for every floor-standing fixture", () => {
+  [
+    "Toilet_Quantity",
+    "Sink_Quantity",
+    "Bathtub_Quantity",
+    "Shower_Quantity",
+    "Vanity_Quantity",
+    "Cabinet_Quantity",
+    "Door_Quantity",
+  ].forEach((key) => {
+    var c = L.CLEARANCE_IN[key];
+    assert.ok(c, `${key} should have a clearance entry`);
+    assert.equal(typeof c.side, "number");
+    assert.equal(typeof c.front, "number");
+    assert.ok(c.side >= 0 && c.front >= 0);
+  });
+});
+
 test("computeLayout: entry door prefers the South wall when it is empty", () => {
   var result = L.computeLayout({ widthFt: 10, lengthFt: 8, fixtureCounts: { Door_Quantity: 1 } });
-  var door = result.placements.filter((p) => p.fixtureKey === "Door_Quantity")[0];
+  var door = result.placements[0];
   assert.equal(door.wallId, "S");
 });
 
@@ -187,61 +256,8 @@ test("computeLayout: an oversized request (max count of one fixture) in the tiny
   assert.ok(placed > 0);
 });
 
-test("computeLayout handles the default footprint (8x5) with no fixtures answered: one sample toilet", () => {
+test("computeLayout handles the default footprint (8x5) with no fixtures", () => {
   var result = L.computeLayout({ widthFt: 8, lengthFt: 5, fixtureCounts: {} });
-  assert.equal(result.placements.length, 1);
-  assert.equal(result.placements[0].fixtureKey, "Toilet_Quantity");
-  assert.equal(result.placements[0].sample, true);
-  assert.deepEqual(result.droppedCounts, {});
-});
-
-test("computeLayout: an explicit toilet count of 0 shows no toilets at all", () => {
-  var result = L.computeLayout({ widthFt: 8, lengthFt: 5, fixtureCounts: { Toilet_Quantity: 0 } });
-  assert.deepEqual(result.placements, []);
-  assert.deepEqual(result.droppedCounts, {});
-});
-
-test("computeLayout: an answered toilet count replaces the samples and is not flagged sample", () => {
-  var result = L.computeLayout({ widthFt: 24, lengthFt: 14, fixtureCounts: { Toilet_Quantity: 1 } });
-  var toilets = result.placements.filter((p) => p.fixtureKey === "Toilet_Quantity");
-  assert.equal(toilets.length, 1);
-  assert.equal(toilets[0].sample, undefined);
-});
-
-test("sampleToiletCount scales with floor area: one in a home bath, a capped row in a big restroom", () => {
-  assert.equal(L.sampleToiletCount(8, 5), 1);
-  assert.equal(L.sampleToiletCount(10, 8), 1);
-  assert.equal(L.sampleToiletCount(14, 10), 2);
-  assert.equal(L.sampleToiletCount(24, 14), 5);
-  assert.equal(L.sampleToiletCount(50, 50), 6);
-});
-
-test("toilet footprint uses real-world size and IRC clearances", () => {
-  var t = L.FIXTURE_LAYOUT.Toilet_Quantity;
-  assert.equal(t.depth, 29 / 12);
-  assert.equal(t.wallSpan, 30 / 12);
-  assert.equal(t.clearFront, 21 / 12);
-});
-
-test("computeLayout: sample toilets line up on one wall at 30 in or more on center", () => {
-  var result = L.computeLayout({ widthFt: 24, lengthFt: 14, fixtureCounts: {} });
-  var toilets = result.placements.filter((p) => p.fixtureKey === "Toilet_Quantity");
-  assert.equal(toilets.length, 5);
-  toilets.forEach((p) => assert.equal(p.wallId, "N"));
-  for (var i = 1; i < toilets.length; i++) assert.ok(toilets[i].x - toilets[i - 1].x >= 2.5);
-  // First centerline at least 15 in off the side wall.
-  assert.ok(toilets[0].x >= 15 / 12);
-});
-
-test("computeLayout: a toilet is never placed where it lacks 21 in of floor in front", () => {
-  // 10 x 3: the long walls face only 3 ft of floor, the short walls are too narrow.
-  var result = L.computeLayout({ widthFt: 10, lengthFt: 3, fixtureCounts: { Toilet_Quantity: 1 } });
-  assert.equal(result.placements.length, 0);
-  assert.equal(result.droppedCounts.Toilet_Quantity, 1);
-});
-
-test("computeLayout: sample toilets that don't fit are left out without being reported as dropped", () => {
-  var result = L.computeLayout({ widthFt: 2, lengthFt: 2, fixtureCounts: {} });
   assert.deepEqual(result.placements, []);
   assert.deepEqual(result.droppedCounts, {});
 });
@@ -280,4 +296,162 @@ test("textureKindForFloorFinish / textureKindForWalls map to a pattern only for 
 
 test("demolition has no fixture-layout or finish-color entry point, same convention as the materials picker", () => {
   assert.equal(Object.prototype.hasOwnProperty.call(L.FIXTURE_LAYOUT, "demolition"), false);
+});
+
+// --- plumbingWallIds -------------------------------------------------
+
+test("PLUMBING_FIXTURE_KEYS exposes exactly the fixtures that need to be on a plumbing wall", () => {
+  assert.deepEqual(
+    L.PLUMBING_FIXTURE_KEYS.slice().sort(),
+    ["Bathtub_Quantity", "Shower_Quantity", "Sink_Quantity", "Toilet_Quantity"].sort(),
+  );
+});
+
+test("computeLayout: plumbingWallIds omitted is unrestricted (back-compat) — toilet lands on its normal default wall", () => {
+  var result = L.computeLayout({ widthFt: 10, lengthFt: 8, fixtureCounts: { Toilet_Quantity: 1 } });
+  assert.equal(result.placements[0].wallId, "N");
+});
+
+test("computeLayout: plumbingWallIds restricts a plumbing fixture to only the named wall(s)", () => {
+  var result = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    fixtureCounts: { Toilet_Quantity: 1 },
+    plumbingWallIds: ["S"],
+  });
+  assert.equal(result.placements[0].wallId, "S");
+});
+
+test("computeLayout: plumbingWallIds accepts multiple walls, and a fixture that fits none of them is dropped", () => {
+  var restricted = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    fixtureCounts: { Toilet_Quantity: 1 },
+    plumbingWallIds: ["E", "W"],
+  });
+  assert.ok(["E", "W"].indexOf(restricted.placements[0].wallId) !== -1);
+
+  var impossible = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    fixtureCounts: { Toilet_Quantity: 1 },
+    plumbingWallIds: ["nonexistent-wall-id"],
+  });
+  assert.equal(impossible.placements.filter((p) => p.fixtureKey === "Toilet_Quantity").length, 0);
+  assert.equal(impossible.droppedCounts.Toilet_Quantity, 1);
+});
+
+test("computeLayout: plumbingWallIds does not affect non-plumbing fixtures (door still uses the normal preferWall/scan)", () => {
+  var result = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    fixtureCounts: { Toilet_Quantity: 1, Door_Quantity: 1 },
+    plumbingWallIds: ["N"],
+  });
+  var door = result.placements.filter((p) => p.fixtureKey === "Door_Quantity")[0];
+  assert.equal(door.wallId, "S"); // South-preferred, unaffected by the toilet's restriction
+});
+
+// --- entryPoints -------------------------------------------------
+
+test("computeLayout: entryPoints places a door at the customer's exact wall + offset", () => {
+  var result = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    fixtureCounts: {},
+    entryPoints: [{ wallId: "E", offsetFt: 3, hasDoor: true }],
+  });
+  var doors = result.placements.filter((p) => p.fixtureKey === "Door_Quantity");
+  assert.equal(doors.length, 1);
+  assert.equal(doors[0].wallId, "E");
+  assert.equal(doors[0].hasDoor, true);
+});
+
+test("computeLayout: entryPoints entirely replaces the automatic Door_Quantity scan, ignoring the fixture count", () => {
+  var result = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    fixtureCounts: { Door_Quantity: 5 },
+    entryPoints: [
+      { wallId: "N", offsetFt: 2 },
+      { wallId: "E", offsetFt: 2 },
+    ],
+  });
+  assert.equal(result.placements.filter((p) => p.fixtureKey === "Door_Quantity").length, 2);
+});
+
+test("computeLayout: hasDoor defaults to true and can be explicitly false (an open archway)", () => {
+  var result = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    entryPoints: [
+      { wallId: "N", offsetFt: 2 },
+      { wallId: "E", offsetFt: 2, hasDoor: false },
+    ],
+  });
+  var doors = result.placements.filter((p) => p.fixtureKey === "Door_Quantity");
+  assert.equal(doors.filter((d) => d.wallId === "N")[0].hasDoor, true);
+  assert.equal(doors.filter((d) => d.wallId === "E")[0].hasDoor, false);
+});
+
+test("computeLayout: an entry point is reserved before the automatic scan, so auto-placed fixtures avoid it", () => {
+  var result = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    fixtureCounts: { Toilet_Quantity: 1 },
+    entryPoints: [{ wallId: "N", offsetFt: 1.25 }], // exactly where the toilet would otherwise land
+  });
+  var toilet = result.placements.filter((p) => p.fixtureKey === "Toilet_Quantity")[0];
+  var door = result.placements.filter((p) => p.fixtureKey === "Door_Quantity")[0];
+  assert.ok(toilet, "toilet should still be placed, just not at the door's spot");
+  assert.ok(door);
+  assert.notEqual(toilet.wallId + ":" + toilet.x, door.wallId + ":" + door.x);
+});
+
+test("computeLayout: two entry points that would overlap on the same wall — the second is dropped, held to the same rules as any other fixture", () => {
+  var result = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    entryPoints: [
+      { wallId: "N", offsetFt: 2 },
+      { wallId: "N", offsetFt: 2.2 }, // well within the door's own clearance envelope
+    ],
+  });
+  var doors = result.placements.filter((p) => p.fixtureKey === "Door_Quantity");
+  assert.equal(doors.length, 1);
+  assert.equal(result.droppedCounts.Door_Quantity, 1);
+});
+
+test("computeLayout: an entry point on a wall too narrow for the door's footprint is dropped", () => {
+  var result = L.computeLayout({
+    widthFt: 2,
+    lengthFt: 8,
+    entryPoints: [{ wallId: "N", offsetFt: 1 }], // N/S span is widthFt=2, less than the door's ~2.5ft requirement
+  });
+  assert.equal(result.placements.filter((p) => p.fixtureKey === "Door_Quantity").length, 0);
+  assert.equal(result.droppedCounts.Door_Quantity, 1);
+});
+
+test("computeLayout: an entry point whose wall id doesn't exist is dropped rather than throwing", () => {
+  var result = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    entryPoints: [{ wallId: "bogus", offsetFt: 2 }],
+  });
+  assert.equal(result.placements.filter((p) => p.fixtureKey === "Door_Quantity").length, 0);
+  assert.equal(result.droppedCounts.Door_Quantity, 1);
+});
+
+// --- clampEntryOffset -------------------------------------------------
+
+test("clampEntryOffset keeps an offset within the door's clearance envelope on the given wall span", () => {
+  var halfWidth = 1.25; // max(Door wallSpan/2 = 1.25, side clearance 0)
+  assert.equal(L.clampEntryOffset(10, -5), halfWidth);
+  assert.equal(L.clampEntryOffset(10, 0), halfWidth);
+  assert.equal(L.clampEntryOffset(10, 5), 5);
+  assert.equal(L.clampEntryOffset(10, 50), 10 - halfWidth);
+});
+
+test("clampEntryOffset never goes below the half-width even on a wall shorter than the door's own span", () => {
+  assert.equal(L.clampEntryOffset(1, 0.5), 1.25);
 });
