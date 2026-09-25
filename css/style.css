@@ -694,6 +694,31 @@ body.ai-chat-locked {
   height: 100%;
 }
 
+/* Toilet style switcher, built and shown/hidden entirely by
+   js/bathroom-room-3d.js once at least one toilet is placed. */
+.ai-chat-room-3d-style-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.ai-chat-room-3d-style-btn {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ai-chat-room-3d-style-btn.selected {
+  background: var(--color-selected-bg);
+  border-color: var(--color-selected-bg);
+  color: var(--color-selected-ink);
+}
+
 /* Toolbar: estimate progress on the left, close button on the right — they
    share one row so the close button never covers the progress label. */
 .ai-chat-toolbar {

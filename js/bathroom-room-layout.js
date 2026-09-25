@@ -33,7 +33,9 @@
   // another floor fixture instance by index), or "wall" (attaches to a
   // placed floor fixture from its anchors list).
   var FIXTURE_LAYOUT = {
-    Toilet_Quantity: { wallSpan: 0.9, depth: 1.1, height: 1.0, mount: "floor" },
+    // Real-world elongated-bowl toilet: ~20in wall clearance, ~28in front
+    // projection (tank back to bowl front), ~30in to the tank lid.
+    Toilet_Quantity: { wallSpan: 1.7, depth: 2.3, height: 2.5, mount: "floor" },
     Bathtub_Quantity: { wallSpan: 5.2, depth: 2.6, height: 1.6, mount: "floor" },
     Shower_Quantity: { wallSpan: 3.2, depth: 3.2, height: 6.5, mount: "floor" },
     Shower_Door_Quantity: { wallSpan: 2.5, depth: 0.1, height: 6.5, mount: "attach", attachTo: "Shower_Quantity" },
