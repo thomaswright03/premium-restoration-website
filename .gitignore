@@ -5,3 +5,4 @@ playwright-report/
 blob-report/
 .env
 .env.local
+tools/scrapers/*.json
