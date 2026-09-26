@@ -6,3 +6,5 @@ blob-report/
 .env
 .env.local
 tools/scrapers/homedepot-products-*.json
+__pycache__/
+*.pyc

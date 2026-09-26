@@ -646,28 +646,28 @@
         ],
       },
       {
-        id: "hd-205853483",
-        name: "BEHR PRO 5 gal. i300 White Eggshell Interior Paint (per gallon)",
+        id: "hd-205853475",
+        name: "BEHR PRO 5 gal. i100 White Base Semi-Gloss Interior Paint (per gallon)",
         imageUrl:
-          "https://images.thdstatic.com/productImages/eb428f32-538c-4c3e-9f40-90dc64693064/svn/white-behr-pro-paint-colors-pr33005-64_600.jpg",
+          "https://images.thdstatic.com/productImages/1c5b67c3-5de3-4eec-a035-22007fb1ff88/svn/white-behr-pro-paint-colors-pr17005-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
-            price: 23.8,
-            url: "https://www.homedepot.com/p/BEHR-PRO-5-gal-i300-White-Eggshell-Interior-Paint-PR33005/205853483",
+            price: 23.2,
+            url: "https://www.homedepot.com/p/BEHR-PRO-5-gal-i100-White-Base-Semi-Gloss-Interior-Paint-PR17005/205853475",
           },
         ],
       },
       {
-        id: "hd-204405959",
-        name: "BEHR PREMIUM PLUS 12 Swiss Coffee Paint (per gallon)",
+        id: "hd-206755810",
+        name: "Glidden Premium 5 gal. Pure White Base 1 Semi-Gloss Interior Paint (per gallon)",
         imageUrl:
-          "https://images.thdstatic.com/catalog/productImages/600/a3/a3d1f5d4-2b67-4aa7-bd28-9258ce2de6fc_600.jpg",
+          "https://images.thdstatic.com/productImages/4f605649-e45d-417a-becb-07d698b9f956/svn/white-glidden-premium-paint-colors-gln6411n-05-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
-            price: 43.98,
-            url: "https://www.homedepot.com/p/BEHR-PREMIUM-PLUS-1-gal-12-Swiss-Coffee-Semi-Gloss-Enamel-Low-Odor-Interior-Paint-Primer-305001/204405959",
+            price: 32,
+            url: "https://www.homedepot.com/p/Glidden-Premium-5-gal-Pure-White-Base-1-Semi-Gloss-Interior-Paint-GLN6411N-05/206755810",
           },
         ],
       },
@@ -687,15 +687,15 @@
         ],
       },
       {
-        id: "hd-202188704",
-        name: "Glidden Premium Ceiling 1 gal. Bright White Interior Flat EZ Track Ceiling Paint (per gallon)",
+        id: "hd-307298172",
+        name: "Glidden Diamond 1 gal. White Flat Interior One-Coat Ceiling Paint with Primer (per gallon)",
         imageUrl:
-          "https://images.thdstatic.com/productImages/46e7a530-1c8f-4397-8be6-4fdd864cec6f/svn/white-glidden-premium-ceiling-ceiling-paint-gcn3070-01-64_600.jpg",
+          "https://images.thdstatic.com/productImages/783e1c28-55ca-478f-931a-cb23a079c3a1/svn/white-glidden-diamond-ceiling-paint-ppg83-610-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
             price: 34.98,
-            url: "https://www.homedepot.com/p/Glidden-Premium-Ceiling-1-gal-Bright-White-Interior-Flat-EZ-Track-Ceiling-Paint-GCN3070-01/202188704",
+            url: "https://www.homedepot.com/p/Glidden-Diamond-1-gal-White-Flat-Interior-One-Coat-Ceiling-Paint-with-Primer-PPG83-610/307298172",
           },
         ],
       },

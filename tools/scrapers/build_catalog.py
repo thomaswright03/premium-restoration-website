@@ -89,9 +89,14 @@ CATEGORIES = [
 COVERAGE_RE = re.compile(r"\(([\d.]+)\s*sq\.?\s*ft\.?\s*/\s*case\)", re.I)
 # Not anchored to the title's start: a "N gal." pack-size mention can sit
 # anywhere (e.g. "KILZ ... 5 gal. Primer Sealer and ... 5 gal. Flat..." —
-# verified against real scraped titles while building this).
-GALLON_PACK_RE = re.compile(r"(\d+(?:\.\d+)?)\s*gal\.?\s+", re.I)
-GALLON_STRIP_RE = re.compile(r"^(\d+(?:\.\d+)?)\s*gal\.?\s+", re.I)
+# verified against real scraped titles while building this). The
+# trailing (?:\s+|$) — not just \s+ — matters: a real scraped title can
+# end right after the pack size ("Rust-Oleum Zinsser 5 gal."), and
+# requiring more text to follow silently failed to match those, which fed
+# normalize() below a false "no pack size found" that it used to paper
+# over by guessing 1 gallon instead of dropping the listing.
+GALLON_PACK_RE = re.compile(r"(\d+(?:\.\d+)?)\s*gal\.?(?:\s+|$)", re.I)
+GALLON_STRIP_RE = re.compile(r"^(\d+(?:\.\d+)?)\s*gal\.?(?:\s+|$)", re.I)
 
 OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "materials-catalog.json")
 
@@ -141,7 +146,11 @@ def normalize(raw_product, unit_kind):
 
     if unit_kind == "gallon":
         match = GALLON_PACK_RE.search(title)
-        gallons = float(match.group(1)) if match else 1.0
+        if not match:
+            return None  # no parseable pack size — too risky to guess (same policy as sqft above)
+        gallons = float(match.group(1))
+        if gallons <= 0:
+            return None
         name = GALLON_STRIP_RE.sub("", display_name).strip() or display_name
         return round(price / gallons, 2), f"{name} (per gallon)", image_url
 
