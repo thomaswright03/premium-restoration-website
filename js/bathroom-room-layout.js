@@ -493,8 +493,12 @@
     }
 
     // Pass 2: wall-mounted attachments (mirrors, shower shelf), index-paired
-    // to their anchor fixture's placement order, clamped to the last anchor
-    // if there are more wall items than anchors.
+    // to their anchor fixture's placement order. One anchor holds at most
+    // one attachment — an extra item beyond the anchor count is dropped
+    // (droppedCounts), the same honest accounting every other fixture in
+    // this file gets, rather than stacked exactly on top of the last
+    // anchor's attachment where it would render fully overlapping/
+    // z-fighting and checkFit() would still wrongly report it as fitting.
     WALL_MOUNT_PRIORITY.forEach(function (fixtureKey) {
       var footprint = FIXTURE_LAYOUT[fixtureKey];
       var count = clamp(Math.floor(fixtureCounts[fixtureKey] || 0), 0, MAX_FIXTURE_COUNT);
@@ -507,11 +511,11 @@
         }
       }
       for (var i2 = 0; i2 < count; i2++) {
-        if (!anchorPool.length) {
+        if (i2 >= anchorPool.length) {
           droppedCounts[fixtureKey] = (droppedCounts[fixtureKey] || 0) + 1;
           continue;
         }
-        var anchor = anchorPool[Math.min(i2, anchorPool.length - 1)];
+        var anchor = anchorPool[i2];
         placements.push({
           fixtureKey: fixtureKey,
           index: i2,

@@ -432,6 +432,20 @@ test("computeLayout: an entry point on a wall too narrow for the door's footprin
   assert.equal(result.droppedCounts.Door_Quantity, 1);
 });
 
+test("computeLayout: wall-mounted fixtures beyond the anchor count are dropped, not stacked on the last anchor", () => {
+  // Regression: an extra mirror beyond the vanity/sink anchor count used to
+  // clamp to the last anchor's exact position instead of being dropped,
+  // rendering as a fully overlapping duplicate with no dropped-count signal.
+  var result = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 10,
+    fixtureCounts: { Vanity_Quantity: 1, Mirror_Quantity: 3 },
+  });
+  var mirrors = result.placements.filter((p) => p.fixtureKey === "Mirror_Quantity");
+  assert.equal(mirrors.length, 1, "only one anchor (the vanity) is available");
+  assert.equal(result.droppedCounts.Mirror_Quantity, 2);
+});
+
 test("computeLayout: an entry point placed away from a plumbing wall's start doesn't falsely claim the free space before it", () => {
   // Regression: wall.used was being jumped straight to the door's far edge
   // regardless of how much genuinely free space sat before it on the wall,
