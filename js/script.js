@@ -1374,7 +1374,13 @@ document.addEventListener("DOMContentLoaded", function () {
       input.inputMode = "numeric";
       input.autocomplete = "postal-code";
       input.placeholder = "84101";
-      input.maxLength = 5;
+      // Not 5 — a stray leading/trailing space (autofill, a pasted value
+      // with whitespace) would eat one of only 5 slots and silently
+      // truncate a real digit before the trim+regex check below ever runs,
+      // rejecting an otherwise-valid ZIP with no obvious reason why. The
+      // real validation is that check, not this attribute; this is just
+      // loose headroom against pasting something absurdly long.
+      input.maxLength = 10;
       fieldWrap.appendChild(input);
       var errorEl = el("p", "ai-chat-field-error");
       errorEl.hidden = true;

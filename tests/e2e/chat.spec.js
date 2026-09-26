@@ -297,6 +297,24 @@ test.describe("the merged fixtures + real-product-pick flow", () => {
     expect(pdf).toContain("Estimated Total \\(Labor + Materials\\), before plumbing");
   });
 
+  test("a ZIP typed with a stray leading space is not truncated below 5 real digits", async ({ page }) => {
+    // Regression: maxlength=5 counted a leading space as one of the 5
+    // slots, so typing " 84101" real-character-by-character (as a browser
+    // actually enforces maxlength, not a raw .value assignment) left only
+    // " 8410" — 4 real digits after trim — silently rejected as invalid
+    // with no obvious reason why a visibly-5-character ZIP didn't work.
+    await startEstimate(page);
+    await answerScope(page, NOTHING_BUT_FIXTURES);
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Toilet_Quantity: 1 });
+
+    const zipInput = page.locator('input[autocomplete="postal-code"]').last();
+    await zipInput.pressSequentially(" 84101");
+    await expect(zipInput).toHaveValue(" 84101");
+    await page.locator(".ai-chat-group-continue").last().click();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Which toilets" })).toBeVisible();
+  });
+
   test("a scope needing no real products (no fixtures, no tile/paint) still ends in a plain labor-only card", async ({
     page,
   }) => {
