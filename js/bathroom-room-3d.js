@@ -303,7 +303,15 @@ function frameStrips(edgeGeometry, mat, width, height) {
   var group = new THREE.Group();
   var top = new THREE.Mesh(edgeGeometry, mat);
   top.rotation.z = Math.PI / 2;
-  top.scale.set(width / 0.06, 1, 1);
+  // edgeGeometry is a thin bar authored along its own local Y axis, length
+  // `height` (its own vertical-edge length — see the *FrameEdge geometries
+  // above, always built and called with the same value). Rotating 90° about
+  // Z swaps local X/Y into world Y/X, so to land a `width`-long horizontal
+  // bar the LENGTH axis (local Y) needs rescaling to `width` — scaling
+  // local X instead (the bar's thin cross-section) leaves the unscaled
+  // length axis, now `height` long, swapped onto world X: a slab roughly
+  // `height` wide by `width` thick instead of a thin `width`-long strip.
+  top.scale.set(1, width / height, 1);
   top.position.set(0, height / 2, 0);
   var bottom = top.clone();
   bottom.position.set(0, -height / 2, 0);
