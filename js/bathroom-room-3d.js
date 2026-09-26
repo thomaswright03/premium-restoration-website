@@ -578,6 +578,9 @@ var state = {
   // works today (one product choice covers however many units of that
   // category were ordered, not a different product per unit).
   fixtureFinishes: {},
+  // materials-picker categoryKey (floorTile, wallPaint, ...) -> the picked
+  // product's surface spec (js/surface-finishes.js), see setSurfaceFinish().
+  surfacePicks: {},
 };
 // Transient wall-click picking session, entirely separate from `state`
 // (the room's own data) — null when no picking UI is active.
@@ -900,10 +903,20 @@ function disposeShellGeometries(s) {
   }
 }
 
+function feetUVs(geometry, uFt, vFt) {
+  var uv = geometry.attributes.uv;
+  for (var i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * uFt, uv.getY(i) * vFt);
+  uv.needsUpdate = true;
+  return geometry;
+}
+
 function rebuildShell(s, widthFt, lengthFt, heightFt) {
   disposeShellGeometries(s);
 
-  var floorGeo = new THREE.PlaneGeometry(widthFt, lengthFt);
+  // UVs are rescaled to feet on the floor and walls, so a picked product's
+  // texture (see applySurfaceFinish()) lands at its real size whatever the
+  // room's dimensions — one shared repeat per material instead of one per wall.
+  var floorGeo = feetUVs(new THREE.PlaneGeometry(widthFt, lengthFt), widthFt, lengthFt);
   var floor = new THREE.Mesh(floorGeo, s.shellMaterials.floor);
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(widthFt / 2, 0, lengthFt / 2);
@@ -921,7 +934,7 @@ function rebuildShell(s, widthFt, lengthFt, heightFt) {
 
   s.wallMeshesById = {};
   shellWalls(widthFt, lengthFt).forEach(function (w) {
-    var wallGeo = new THREE.PlaneGeometry(w.spanFt, heightFt);
+    var wallGeo = feetUVs(new THREE.PlaneGeometry(w.spanFt, heightFt), w.spanFt, heightFt);
     var wall = new THREE.Mesh(wallGeo, s.shellMaterials.wall);
     wall.rotation.y = w.rotY;
     wall.position.set(w.x, heightFt / 2, w.z);
@@ -948,6 +961,325 @@ function rebuildShell(s, widthFt, lengthFt, heightFt) {
   });
 }
 
+// ---------------------------------------------------------------------
+// Real-product surface finishes
+// ---------------------------------------------------------------------
+// A picked floor tile / wall tile / flooring / paint (see
+// js/surface-finishes.js for the per-product specs) renders as PBR texture
+// maps generated here on a canvas at the product's true unit size: albedo
+// (tone-varied tiles or planks, grout, stone/wood/motif character), a
+// normal map (grout joints recessed, subtle surface relief) and a
+// roughness map (grout rougher than a glazed face). Shell UVs are in feet
+// (see rebuildShell()), so repeat = 12 / repeat-unit-inches puts one real
+// inch of product on one real inch of room. Generated once per product
+// and cached; a spec with real `maps` files loads those instead.
+var Surfaces = window.SurfaceFinishes;
+var SURFACE_TEXTURE_MAX_PX = 1024;
+// Aim for a repeat unit about this big so tile-to-tile tone variation
+// doesn't visibly repeat every tile or two.
+var SURFACE_UNIT_TARGET_IN = 36;
+var surfaceTextureCache = {}; // spec.id -> { map, normalMap, roughnessMap }
+
+// Deterministic per-product PRNG (mulberry32 over a string hash), so a
+// product's generated texture is the same on every load.
+function seededRandom(seedText) {
+  var h = 2166136261;
+  for (var i = 0; i < seedText.length; i++) {
+    h ^= seedText.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return function () {
+    h = (h + 0x6d2b79f5) | 0;
+    var t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// "#rrggbb" scaled by (1 + f), still as "#rrggbb" (canvas takes it as-is).
+function shadeHex(hex, f) {
+  var n = parseInt(hex.slice(1), 16);
+  var out = "#";
+  [16, 8, 0].forEach(function (shift) {
+    var c = clamp(Math.round(((n >> shift) & 255) * (1 + f)), 0, 255);
+    out += ("0" + c.toString(16)).slice(-2);
+  });
+  return out;
+}
+
+function grayCss(v01) {
+  var v = clamp(Math.round(v01 * 255), 0, 255);
+  return "rgb(" + v + "," + v + "," + v + ")";
+}
+
+// Long side of the tile/plank runs along U (horizontally on walls, along
+// the room's width on the floor), which is how these products are
+// normally laid.
+function surfaceRepeatUnit(spec) {
+  var tileW = Math.max(spec.sizeIn[0], spec.sizeIn[1]);
+  var tileH = Math.min(spec.sizeIn[0], spec.sizeIn[1]);
+  var cols = Math.max(1, Math.round(SURFACE_UNIT_TARGET_IN / tileW));
+  var rows = Math.max(2, Math.round(SURFACE_UNIT_TARGET_IN / tileH));
+  if (spec.layout === "offset" && rows % 2) rows++; // half-bond needs pairs
+  return { tileW: tileW, tileH: tileH, cols: cols, rows: rows, unitW: cols * tileW, unitH: rows * tileH };
+}
+
+function drawTileCharacter(ctx, spec, rand, x, y, w, h, base) {
+  var i;
+  if (spec.character === "stone") {
+    for (i = 0; i < 26; i++) {
+      var cx = x + rand() * w;
+      var cy = y + rand() * h;
+      var rad = (0.15 + rand() * 0.45) * h;
+      var grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+      // Fades to the SAME tone at zero alpha — fading to transparent black
+      // would drag a dark ring into every blob.
+      var blob = shadeHex(base, (rand() - 0.5) * 0.1);
+      grad.addColorStop(0, blob);
+      grad.addColorStop(1, blob + "00");
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = grad;
+      ctx.fillRect(x, y, w, h);
+    }
+    ctx.globalAlpha = 0.22;
+    ctx.strokeStyle = shadeHex(base, 0.12);
+    for (i = 0; i < 3; i++) {
+      ctx.lineWidth = 0.5 + rand() * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x, y + rand() * h);
+      ctx.bezierCurveTo(x + w * 0.33, y + rand() * h, x + w * 0.66, y + rand() * h, x + w, y + rand() * h);
+      ctx.stroke();
+    }
+  } else if (spec.character === "wood") {
+    // Grain runs along the plank's length (U).
+    ctx.strokeStyle = spec.accent || shadeHex(base, -0.2);
+    for (i = 0; i < 22; i++) {
+      var gy = y + rand() * h;
+      var amp = rand() * h * 0.08;
+      var phase = rand() * Math.PI * 2;
+      ctx.globalAlpha = 0.12 + rand() * 0.25;
+      ctx.lineWidth = 0.4 + rand() * 1.4;
+      ctx.beginPath();
+      for (var sx = 0; sx <= w; sx += Math.max(2, w / 40)) {
+        var sy = gy + Math.sin(phase + (sx / w) * Math.PI * 2 * (1 + rand() * 0.3)) * amp;
+        if (sx === 0) ctx.moveTo(x + sx, sy);
+        else ctx.lineTo(x + sx, sy);
+      }
+      ctx.stroke();
+    }
+  } else if (spec.character === "handmade") {
+    // Glaze pooling toward the edges, a touch darker than the face.
+    var edge = ctx.createRadialGradient(x + w / 2, y + h / 2, h * 0.2, x + w / 2, y + h / 2, w * 0.6);
+    var pooled = shadeHex(base, -0.06);
+    edge.addColorStop(0, pooled + "00");
+    edge.addColorStop(1, pooled);
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = edge;
+    ctx.fillRect(x, y, w, h);
+  } else if (spec.character === "encaustic") {
+    // A printed quatrefoil: a center ring, quarter rings at each corner
+    // (which join into full rings across neighboring tiles), and a center
+    // diamond — the same repeat-across-the-grid read the real tile has.
+    var s = Math.min(w, h);
+    ctx.globalAlpha = 0.95;
+    ctx.strokeStyle = spec.accent;
+    ctx.fillStyle = spec.accent;
+    ctx.lineWidth = s * 0.07;
+    ctx.beginPath();
+    ctx.arc(x + w / 2, y + h / 2, s * 0.26, 0, Math.PI * 2);
+    ctx.stroke();
+    [
+      [x, y],
+      [x + w, y],
+      [x, y + h],
+      [x + w, y + h],
+    ].forEach(function (c) {
+      ctx.beginPath();
+      ctx.arc(c[0], c[1], s * 0.2, 0, Math.PI * 2);
+      ctx.stroke();
+    });
+    ctx.beginPath();
+    ctx.moveTo(x + w / 2, y + h / 2 - s * 0.1);
+    ctx.lineTo(x + w / 2 + s * 0.1, y + h / 2);
+    ctx.lineTo(x + w / 2, y + h / 2 + s * 0.1);
+    ctx.lineTo(x + w / 2 - s * 0.1, y + h / 2);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// Tangent-space normal map from a grayscale height canvas (Sobel). Canvas
+// rows run down while V runs up (CanvasTexture flips Y), hence the sign
+// on the V gradient.
+function normalCanvasFromHeight(heightCanvas, strength) {
+  var w = heightCanvas.width;
+  var h = heightCanvas.height;
+  var src = heightCanvas.getContext("2d").getImageData(0, 0, w, h).data;
+  var out = document.createElement("canvas");
+  out.width = w;
+  out.height = h;
+  var octx = out.getContext("2d");
+  var img = octx.createImageData(w, h);
+  var d = img.data;
+  function at(px, py) {
+    px = (px + w) % w;
+    py = (py + h) % h;
+    return src[(py * w + px) * 4] / 255;
+  }
+  for (var py = 0; py < h; py++) {
+    for (var px = 0; px < w; px++) {
+      var du = (at(px + 1, py) - at(px - 1, py)) * strength;
+      var dv = -(at(px, py + 1) - at(px, py - 1)) * strength;
+      var len = Math.sqrt(du * du + dv * dv + 1);
+      var i = (py * w + px) * 4;
+      d[i] = Math.round(((-du / len) * 0.5 + 0.5) * 255);
+      d[i + 1] = Math.round(((-dv / len) * 0.5 + 0.5) * 255);
+      d[i + 2] = Math.round(((1 / len) * 0.5 + 0.5) * 255);
+      d[i + 3] = 255;
+    }
+  }
+  octx.putImageData(img, 0, 0);
+  return out;
+}
+
+function makeCanvas(w, h) {
+  var c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  return c;
+}
+
+function generateSurfaceCanvases(spec) {
+  var unit = surfaceRepeatUnit(spec);
+  var pxPerIn = Math.min(SURFACE_TEXTURE_MAX_PX / unit.unitW, SURFACE_TEXTURE_MAX_PX / unit.unitH);
+  var W = Math.max(2, Math.round(unit.unitW * pxPerIn));
+  var H = Math.max(2, Math.round(unit.unitH * pxPerIn));
+  var albedo = makeCanvas(W, H);
+  var height = makeCanvas(W, H);
+  var rough = makeCanvas(W, H);
+  var a = albedo.getContext("2d");
+  var hctx = height.getContext("2d");
+  var r = rough.getContext("2d");
+  var rand = seededRandom(spec.id || spec.color);
+  var grout = spec.grout || shadeHex(spec.color, -0.2);
+  var groutPx = Math.max(1, (spec.groutIn || 0.0625) * pxPerIn);
+  var tileW = unit.tileW * pxPerIn;
+  var tileH = unit.tileH * pxPerIn;
+
+  // Background = the joints: grout color, recessed, rough.
+  a.fillStyle = grout;
+  a.fillRect(0, 0, W, H);
+  hctx.fillStyle = grayCss(0.1);
+  hctx.fillRect(0, 0, W, H);
+  r.fillStyle = grayCss(0.95);
+  r.fillRect(0, 0, W, H);
+
+  for (var row = 0; row < unit.rows; row++) {
+    var rowOffset = 0;
+    if (spec.layout === "offset") rowOffset = (row % 2) * (tileW / 2);
+    else if (spec.layout === "stagger") rowOffset = rand() * tileW;
+    for (var col = 0; col < unit.cols; col++) {
+      var tone = shadeHex(spec.color, (rand() - 0.5) * 2 * (spec.variation || 0));
+      var tileSeed = rand();
+      var x0 = col * tileW + rowOffset;
+      var y0 = row * tileH;
+      // Drawn again one repeat unit to the left when it spills past the
+      // right edge, so the texture wraps seamlessly.
+      [x0, x0 - W].forEach(function (x) {
+        if (x >= W || x + tileW <= 0) return;
+        var gx = x + groutPx / 2;
+        var gy = y0 + groutPx / 2;
+        var gw = tileW - groutPx;
+        var gh = tileH - groutPx;
+        a.save();
+        a.beginPath();
+        a.rect(gx, gy, gw, gh);
+        a.clip();
+        a.fillStyle = tone;
+        a.fillRect(gx, gy, gw, gh);
+        drawTileCharacter(a, spec, seededRandom(String(tileSeed)), gx, gy, gw, gh, tone);
+        a.restore();
+
+        // Face raised above the joint, with a one-joint-wide eased edge.
+        var bevel = Math.max(1, groutPx);
+        for (var b = 0; b < 3; b++) {
+          hctx.fillStyle = grayCss(0.55 + b * 0.2);
+          hctx.fillRect(gx + (b * bevel) / 3, gy + (b * bevel) / 3, gw - (2 * b * bevel) / 3, gh - (2 * b * bevel) / 3);
+        }
+        r.fillStyle = grayCss(clamp(spec.roughness + (tileSeed - 0.5) * 0.06, 0.02, 1));
+        r.fillRect(gx, gy, gw, gh);
+      });
+    }
+  }
+  return {
+    albedo: albedo,
+    normal: normalCanvasFromHeight(height, spec.kind === "plank" ? 1.5 : 3),
+    rough: rough,
+    unit: unit,
+  };
+}
+
+function configureSurfaceTexture(s, tex, unitWIn, unitHIn, isColor) {
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(12 / unitWIn, 12 / unitHIn);
+  tex.anisotropy = s.renderer.capabilities.getMaxAnisotropy();
+  if (isColor) tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function getSurfaceTextures(s, spec) {
+  if (surfaceTextureCache[spec.id]) return surfaceTextureCache[spec.id];
+  var textures;
+  if (spec.maps) {
+    var loader = new THREE.TextureLoader();
+    var onLoad = function () {
+      needsRender = true;
+    };
+    var mw = spec.maps.sizeIn[0];
+    var mh = spec.maps.sizeIn[1];
+    textures = {
+      map: configureSurfaceTexture(s, loader.load(spec.maps.albedo, onLoad), mw, mh, true),
+      normalMap: spec.maps.normal ? configureSurfaceTexture(s, loader.load(spec.maps.normal, onLoad), mw, mh) : null,
+      roughnessMap: spec.maps.roughness
+        ? configureSurfaceTexture(s, loader.load(spec.maps.roughness, onLoad), mw, mh)
+        : null,
+    };
+  } else {
+    var c = generateSurfaceCanvases(spec);
+    textures = {
+      map: configureSurfaceTexture(s, new THREE.CanvasTexture(c.albedo), c.unit.unitW, c.unit.unitH, true),
+      normalMap: configureSurfaceTexture(s, new THREE.CanvasTexture(c.normal), c.unit.unitW, c.unit.unitH),
+      roughnessMap: configureSurfaceTexture(s, new THREE.CanvasTexture(c.rough), c.unit.unitW, c.unit.unitH),
+    };
+  }
+  surfaceTextureCache[spec.id] = textures;
+  return textures;
+}
+
+// Dresses one shell material with a picked product's spec, or (spec null)
+// back to the generic scope-driven color/roughness it had before.
+function applySurfaceFinish(s, material, spec, fallbackHex, fallbackRoughness) {
+  var hadMaps = !!material.map;
+  if (spec && spec.kind !== "paint") {
+    var t = getSurfaceTextures(s, spec);
+    material.color.setHex(0xffffff);
+    material.roughness = 1; // the roughness map carries the real values
+    material.map = t.map;
+    material.normalMap = t.normalMap;
+    material.roughnessMap = t.roughnessMap;
+  } else {
+    if (spec) material.color.set(spec.color);
+    else material.color.setHex(fallbackHex);
+    material.roughness = spec ? spec.roughness : fallbackRoughness;
+    material.map = null;
+    material.normalMap = null;
+    material.roughnessMap = null;
+  }
+  if (hadMaps !== !!material.map) material.needsUpdate = true;
+}
+
 // Roughness per finish — tile reads glossier/more reflective, paint and
 // bare flooring read more matte, so the same scope-driven colors respond
 // believably under the new image-based lighting instead of looking like
@@ -970,12 +1302,30 @@ function roughnessForCeiling(paintCeilingBool) {
 
 function rebuildFinishes(s) {
   var isDark = s.isDark;
-  s.shellMaterials.floor.color.setHex(Layout.colorForFloorFinish(state.scope.floorFinish, isDark));
-  s.shellMaterials.floor.roughness = roughnessForFloorFinish(state.scope.floorFinish);
-  s.shellMaterials.wall.color.setHex(Layout.colorForWalls(state.scope.walls, isDark));
-  s.shellMaterials.wall.roughness = roughnessForWalls(state.scope.walls);
-  s.shellMaterials.ceiling.color.setHex(Layout.colorForCeiling(state.scope.paintCeiling, isDark));
-  s.shellMaterials.ceiling.roughness = roughnessForCeiling(state.scope.paintCeiling);
+  var picked = Surfaces
+    ? Surfaces.resolveSurfaces(state.scope, state.surfacePicks)
+    : { floor: null, walls: null, ceiling: null };
+  applySurfaceFinish(
+    s,
+    s.shellMaterials.floor,
+    picked.floor,
+    Layout.colorForFloorFinish(state.scope.floorFinish, isDark),
+    roughnessForFloorFinish(state.scope.floorFinish),
+  );
+  applySurfaceFinish(
+    s,
+    s.shellMaterials.wall,
+    picked.walls,
+    Layout.colorForWalls(state.scope.walls, isDark),
+    roughnessForWalls(state.scope.walls),
+  );
+  applySurfaceFinish(
+    s,
+    s.shellMaterials.ceiling,
+    picked.ceiling,
+    Layout.colorForCeiling(state.scope.paintCeiling, isDark),
+    roughnessForCeiling(state.scope.paintCeiling),
+  );
 }
 
 function setShadowFlags(object3d) {
@@ -1236,6 +1586,7 @@ window.BathroomRoom3D = {
       cameraMode: "orbit",
       walkInEntryIndex: 0,
       fixtureFinishes: {},
+      surfacePicks: {},
     };
     picking = null;
     hoveredWallId = null;
@@ -1312,6 +1663,38 @@ window.BathroomRoom3D = {
     } else {
       markDirty();
     }
+  },
+
+  // Applies once a real floor tile / wall tile / flooring / paint product is
+  // picked in the chat's materials flow (categoryKey is the picker's
+  // category key; product is the catalog option). The room's floor, walls
+  // or ceiling then render as that product — its real tile size, layout,
+  // color, grout and sheen — for as long as the matching scope answer
+  // holds (see SurfaceFinishes.resolveSurfaces()). A product with no
+  // surface spec, or product null, clears back to the generic finish.
+  setSurfaceFinish: function (categoryKey, product) {
+    var spec = Surfaces ? Surfaces.specFor(product) : null;
+    if (spec) state.surfacePicks[categoryKey] = spec;
+    else delete state.surfacePicks[categoryKey];
+    if (threeState) {
+      rebuildFinishes(threeState);
+      needsRender = true;
+    } else {
+      markDirty();
+    }
+  },
+
+  // Which picked product (by catalog id) each surface currently shows —
+  // null where the generic scope color is showing instead. For tests.
+  getSurfaceFinishes: function () {
+    var picked = Surfaces
+      ? Surfaces.resolveSurfaces(state.scope, state.surfacePicks)
+      : { floor: null, walls: null, ceiling: null };
+    return {
+      floor: picked.floor ? picked.floor.id : null,
+      walls: picked.walls ? picked.walls.id : null,
+      ceiling: picked.ceiling ? picked.ceiling.id : null,
+    };
   },
 
   // --- Wall-click picking (plumbing walls + entry points) ---------------
