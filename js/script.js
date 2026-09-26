@@ -1503,8 +1503,16 @@ document.addEventListener("DOMContentLoaded", function () {
           // (best-effort — see MaterialsPricing.guessFinishColor()), the
           // same "see it as you pick it" pattern every other live-updating
           // field in this flow already follows.
+          // Floor/wall/ceiling products render as the real product itself
+          // (true tile size, layout, color, sheen — see
+          // js/surface-finishes.js) rather than a single tint.
           if (window.BathroomRoom3D) {
-            window.BathroomRoom3D.setFixtureFinish(category.key, window.MaterialsPricing.guessFinishColor(opt.name));
+            var surfaces = window.SurfaceFinishes;
+            if (surfaces && surfaces.CATEGORY_SURFACE[category.key]) {
+              window.BathroomRoom3D.setSurfaceFinish(category.key, opt);
+            } else {
+              window.BathroomRoom3D.setFixtureFinish(category.key, window.MaterialsPricing.guessFinishColor(opt.name));
+            }
           }
         });
         buttons.push(btn);
