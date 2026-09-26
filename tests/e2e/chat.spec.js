@@ -2,7 +2,15 @@
 
 const { test, expect } = require("@playwright/test");
 const fs = require("node:fs");
-const { useConfig, sendChat, startEstimate, answerScope, fillGroup, skipRoomInteractionSteps } = require("./helpers");
+const {
+  useConfig,
+  sendChat,
+  startEstimate,
+  answerScope,
+  fillGroup,
+  skipRoomInteractionSteps,
+  disableMaterials,
+} = require("./helpers");
 
 const NOTHING_BUT_FLOORING = { demolition: "No", floorFinish: "Other flooring", walls: "Neither", paintCeiling: "No" };
 
@@ -27,6 +35,7 @@ test.describe("chat estimate", () => {
   });
 
   test("5 x 8 x 8 room, other flooring and 3 cabinets comes to $380.00, and the PDF exports", async ({ page }) => {
+    await disableMaterials(page);
     await startEstimate(page);
     await answerScope(page, NOTHING_BUT_FLOORING);
     await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8 });
@@ -64,6 +73,7 @@ test.describe("chat estimate", () => {
     // slowest path in the suite, especially under this environment's
     // software-rendered (no real GPU) WebGL.
     test.setTimeout(60000);
+    await disableMaterials(page);
     await startEstimate(page);
     await answerScope(page, {
       demolition: "Yes",
@@ -118,6 +128,7 @@ test.describe("chat estimate", () => {
       dialogs++;
       d.dismiss();
     });
+    await disableMaterials(page);
     await startEstimate(page);
     await answerScope(page, { demolition: "No", floorFinish: "None", walls: "Neither", paintCeiling: "No" });
     await skipRoomInteractionSteps(page);
@@ -135,6 +146,7 @@ test.describe("chat estimate", () => {
   });
 
   test("chosen area work needs valid dimensions: no estimate until they are fixed", async ({ page }) => {
+    await disableMaterials(page);
     await startEstimate(page);
     await answerScope(page, { demolition: "Yes", floorFinish: "None", walls: "Neither", paintCeiling: "No" });
     const dims = page.locator('form[data-group="dimensions"]');
@@ -173,6 +185,7 @@ test.describe("chat estimate", () => {
   });
 
   test("Contact Us About This carries the estimate into the contact form and the email", async ({ page }) => {
+    await disableMaterials(page);
     await startEstimate(page);
     await answerScope(page, NOTHING_BUT_FLOORING);
     await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8 });
@@ -203,6 +216,86 @@ test.describe("chat estimate", () => {
     await expect(page.locator(".ai-chat-suggestion").last()).toBeVisible();
     await sendChat(page, "Do you do fireplaces?");
     await expect(page.locator(".ai-chat-row.bot .ai-chat-text").last()).toContainText("only take on bathroom");
+  });
+});
+
+// The one-continuous-flow feature: fixtures -> real product picks (no
+// separate "Pick Your Materials" button/step) -> one combined labor +
+// materials card. materialsEstimator is on by default (site-config.json),
+// so these run with the real scraped catalog these tests don't override.
+test.describe("the merged fixtures + real-product-pick flow", () => {
+  const NOTHING_BUT_FIXTURES = { demolition: "No", floorFinish: "None", walls: "Neither", paintCeiling: "No" };
+
+  test("moves straight from fixtures into product picks with real photos, retints the 3D view, and ends in one combined card", async ({
+    page,
+  }) => {
+    await startEstimate(page);
+    await answerScope(page, NOTHING_BUT_FIXTURES);
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Toilet_Quantity: 1, Shower_Quantity: 1, Shower_Door_Quantity: 1 });
+
+    // The old two-step flow (separate button, separate card) is gone.
+    await expect(page.getByRole("button", { name: /Pick Your Materials/ })).toHaveCount(0);
+
+    // No click needed to get from fixtures into the product picks.
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Now let's pick the exact product" })).toBeVisible();
+    await page.locator('input[autocomplete="postal-code"]').fill("84101");
+    await page.locator(".ai-chat-group-continue").last().click();
+
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Which toilets" })).toBeVisible();
+    const toiletChoice = page.locator(".ai-chat-choice--material").last();
+    await expect(toiletChoice.locator(".ai-chat-material-thumb")).toHaveCount(1);
+    await toiletChoice.click();
+    await page.locator(".ai-chat-group-continue").last().click();
+
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Which showers" })).toBeVisible();
+    await page.locator(".ai-chat-choice--material").last().click();
+    await page.locator(".ai-chat-group-continue").last().click();
+
+    // Every real catalog option here is "Matte Black" — picking one proves
+    // the 3D proxy's best-effort finish retint (guessFinishColor() in
+    // js/materials-pricing.js) actually fires against real product names,
+    // not just in isolation.
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Which shower doors" })).toBeVisible();
+    const doorChoice = page.locator(".ai-chat-choice--material").last();
+    await expect(doorChoice).toContainText(/Matte Black/i);
+    await doorChoice.click();
+    await page.locator(".ai-chat-group-continue").last().click();
+
+    const card = page.getByTestId("estimate-card");
+    await expect(card).toBeVisible();
+    await expect(card).toContainText("Labor Subtotal");
+    await expect(card).toContainText("Materials Subtotal");
+    await expect(card).toContainText(/Matte Black/i);
+    await expect(card.locator(".ai-chat-material-thumb").first()).toBeVisible();
+    await expect(card.locator(".ai-chat-estimate-total-label")).toHaveText(
+      "Estimated Total (Labor + Materials), before plumbing",
+    );
+
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      card.getByRole("button", { name: "Export as PDF" }).click(),
+    ]);
+    const pdf = fs.readFileSync(await download.path(), "latin1");
+    expect(pdf.startsWith("%PDF")).toBe(true);
+    expect(pdf).toContain("Labor Subtotal");
+    expect(pdf).toContain("Materials Subtotal");
+    // jsPDF escapes parentheses as \( \) inside its own PDF text strings.
+    expect(pdf).toContain("Estimated Total \\(Labor + Materials\\), before plumbing");
+  });
+
+  test("a scope needing no real products (no fixtures, no tile/paint) still ends in a plain labor-only card", async ({
+    page,
+  }) => {
+    await startEstimate(page);
+    await answerScope(page, NOTHING_BUT_FIXTURES);
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", {});
+
+    const card = page.getByTestId("estimate-card");
+    await expect(card).toBeVisible();
+    await expect(card.locator(".ai-chat-estimate-total-label")).toHaveText("Estimated Labor Total");
+    await expect(card).not.toContainText("Materials Subtotal");
   });
 });
 

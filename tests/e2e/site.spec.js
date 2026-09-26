@@ -171,6 +171,22 @@ test.describe("accessibility", () => {
       await fixtures.locator('input[name="Toilet_Quantity"]').fill("1");
       await fixtures.locator(".ai-chat-group-continue").click();
 
+      // materialsEstimator is on by default, so this scope's one fixture
+      // (a real materials category) moves straight into the ZIP + product
+      // pick screens — new UI (real photo thumbnails, choice buttons) that
+      // needs its own contrast check before reaching the combined card.
+      await expect(page.locator(".ai-chat-group-intro", { hasText: "Now let's pick the exact product" })).toBeVisible();
+      results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
+      expect(results.violations.flatMap((v) => v.nodes.map((n) => n.target + " " + n.failureSummary))).toEqual([]);
+      await page.locator('input[autocomplete="postal-code"]').fill("84101");
+      await page.locator(".ai-chat-group-continue").last().click();
+
+      await expect(page.locator(".ai-chat-group-intro", { hasText: "Which toilets" })).toBeVisible();
+      results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
+      expect(results.violations.flatMap((v) => v.nodes.map((n) => n.target + " " + n.failureSummary))).toEqual([]);
+      await page.locator(".ai-chat-choice--material").last().click();
+      await page.locator(".ai-chat-group-continue").last().click();
+
       await expect(page.getByTestId("estimate-card")).toBeVisible();
       results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
       expect(results.violations.flatMap((v) => v.nodes.map((n) => n.target + " " + n.failureSummary))).toEqual([]);

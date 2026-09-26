@@ -238,6 +238,11 @@ document.addEventListener("DOMContentLoaded", function () {
     // needs, then fixture counts. Every step is validated before moving on,
     // so no chosen work can be silently dropped from the estimate.
     var quoteState = null; // { groups, index, values, scope }
+    // Active only between "fixtures" finishing and the combined card
+    // rendering — the ZIP + per-category real-product-pick steps that now
+    // follow fixtures automatically, no separate button/gate. See
+    // startProductPicks()/advanceProductPick() below.
+    var pickState = null; // { values, scope, laborResult, categories, categoryIndex, zip, picks, mainSteps, totalSteps }
 
     function buildGroups(scope) {
       var needs = Pricing.scopeNeeds(scope || {});
@@ -278,7 +283,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       groups.push({
         id: "fixtures",
-        intro: "Last step — how many of each should we install? Leave blank or enter 0 for any that don't apply.",
+        intro: "How many of each should we install? Leave blank or enter 0 for any that don't apply.",
         fields: Pricing.FIXTURES.map(function (f) {
           return { key: f.key, label: f.plural, type: "number", inputmode: "numeric", target: "values" };
         }),
@@ -288,6 +293,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function startEstimate() {
       quoteState = { groups: buildGroups(null), index: 0, values: {}, scope: {} };
+      pickState = null;
       chatForm.hidden = true;
       setProgress(0);
       if (window.BathroomRoom3D) {
@@ -298,8 +304,13 @@ document.addEventListener("DOMContentLoaded", function () {
       appendGroupForm();
     }
 
-    function cancelEstimate() {
+    // Shared Cancel handler for every step of the one continuous flow —
+    // scope/dimensions/room-shape/fixtures (quoteState) and the product-pick
+    // steps that follow them (pickState). Whichever is active gets cleared;
+    // the other is already null.
+    function cancelFlow() {
       quoteState = null;
+      pickState = null;
       if (window.BathroomRoom3D) window.BathroomRoom3D.hide();
       hideProgress();
       chatForm.hidden = false;
@@ -331,12 +342,13 @@ document.addEventListener("DOMContentLoaded", function () {
         appendGroupForm();
         return;
       }
-      setProgress(100);
+      // Fixtures (always the last group here) just finished — move
+      // straight into per-category real-product picks, no separate
+      // button/gate. startProductPicks() takes over progress tracking and
+      // eventually renders the one combined estimate card.
       var state = quoteState;
       quoteState = null;
-      chatForm.hidden = false;
-      appendEstimateCard(state.values, state.scope);
-      setTimeout(hideProgress, 1200);
+      startProductPicks(state.values, state.scope, state.groups.length);
     }
 
     var fieldCounter = 0;
@@ -466,7 +478,7 @@ document.addEventListener("DOMContentLoaded", function () {
       cancelBtn.textContent = "Cancel";
       cancelBtn.addEventListener("click", function () {
         disableForm();
-        cancelEstimate();
+        cancelFlow();
       });
       var continueBtn = document.createElement("button");
       continueBtn.type = "submit";
@@ -758,16 +770,36 @@ document.addEventListener("DOMContentLoaded", function () {
       "so if you listed any, or your job needs other plumbing or electrical work, expect it to add to the cost. " +
       "We'll tell you how it will be handled and priced before any work is agreed.";
 
-    var ESTIMATE_DISCLAIMER =
-      "This is an automated, non-binding estimate of labor only, based only on the measurements, counts, and " +
-      "choices you entered and the assumptions listed with it. It is not a quote, offer, or contract. It excludes " +
-      "plumbing and electrical work (including the plumbing any toilets, sinks, showers, or bathtubs need), " +
-      "materials, permits, and any applicable taxes, which will add to the cost where your job needs them. " +
-      "Prices are current as of the date generated and may change. Your actual price is set only in a " +
-      "written agreement after we review your project in person.";
+    // hasMaterials is true once at least one real product was picked in the
+    // product-pick steps that follow fixtures (see startProductPicks()) —
+    // false when that never happened (materials estimator off, or no
+    // category applied), in which case the total/disclaimer/etc. describe a
+    // labor-only estimate exactly as before that feature existed.
+    function estimateDisclaimer(hasMaterials) {
+      if (hasMaterials) {
+        return (
+          "This is an automated, non-binding estimate combining labor at our current rates with current Home " +
+          "Depot prices for the exact products you picked, based only on what you entered and the assumptions " +
+          "listed with it. It is not a quote, offer, or contract. It excludes plumbing and electrical " +
+          "installation work (the labor to hook up any toilets, sinks, showers, or bathtubs listed), permits, " +
+          "and any applicable taxes, which will add to the cost where your job needs them. Product prices were " +
+          "current as of when they were last refreshed and may have changed since — confirm before buying. " +
+          "Your actual price is set only in a written agreement after we review your project in person."
+        );
+      }
+      return (
+        "This is an automated, non-binding estimate of labor only, based only on the measurements, counts, and " +
+        "choices you entered and the assumptions listed with it. It is not a quote, offer, or contract. It " +
+        "excludes plumbing and electrical work (including the plumbing any toilets, sinks, showers, or bathtubs " +
+        "need), materials, permits, and any applicable taxes, which will add to the cost where your job needs " +
+        "them. Prices are current as of the date generated and may change. Your actual price is set only in a " +
+        "written agreement after we review your project in person."
+      );
+    }
 
-    function totalLabel(fixtureCount) {
-      return fixtureCount > 0 ? "Estimated Labor Total, before plumbing" : "Estimated Labor Total";
+    function totalLabel(fixtureCount, hasMaterials) {
+      var base = hasMaterials ? "Estimated Total (Labor + Materials)" : "Estimated Labor Total";
+      return fixtureCount > 0 ? base + ", before plumbing" : base;
     }
 
     function plumbingTotalNote(fixtureCount) {
@@ -778,7 +810,7 @@ document.addEventListener("DOMContentLoaded", function () {
       );
     }
 
-    function excludedLines(fixtureCount) {
+    function excludedLines(fixtureCount, hasMaterials) {
       var list = [];
       if (fixtureCount > 0) {
         list.push({
@@ -791,14 +823,20 @@ document.addEventListener("DOMContentLoaded", function () {
         label: (fixtureCount > 0 ? "Any other plumbing" : "Plumbing") + " & electrical work",
         value: "Extra — not included",
       });
-      list.push({ label: "Materials, permits & any applicable taxes", value: "Not included" });
+      list.push({
+        label: hasMaterials ? "Permits & any applicable taxes" : "Materials, permits & any applicable taxes",
+        value: "Not included",
+      });
       return list;
     }
 
-    function allAssumptions(values, scope, result) {
+    function allAssumptions(values, scope, result, hasMaterials) {
       return Pricing.estimateAssumptions(values, scope, result).concat([
         PLUMBING_NOTE,
-        "Also not included: materials, permits, and any applicable taxes.",
+        hasMaterials
+          ? "Materials shown are priced at current Home Depot rates as of when they were last refreshed — " +
+            "confirm before buying. Also not included: permits and any applicable taxes."
+          : "Also not included: materials, permits, and any applicable taxes.",
       ]);
     }
 
@@ -816,10 +854,26 @@ document.addEventListener("DOMContentLoaded", function () {
       return node;
     }
 
-    function appendEstimateCard(values, scope) {
-      var result = Pricing.computePublicEstimate(values, scope);
+    // The single card that ends the flow — labor lines, then (if any real
+    // products were picked in the product-pick steps) material lines, one
+    // grand total, and the usual disclaimers/actions. hasMaterials controls
+    // which copy/labels are used throughout (see totalLabel()/
+    // excludedLines()/allAssumptions()/estimateDisclaimer() above).
+    function appendCombinedCard(values, scope, result, categories, picks) {
       var fixtureCount = result.plumbingFixtureCount;
-      var assumptions = allAssumptions(values, scope, result);
+      var pickList = categories
+        .map(function (c) {
+          return picks[c.key];
+        })
+        .filter(Boolean);
+      var materialsSubtotal = Pricing.roundCents(
+        pickList.reduce(function (sum, p) {
+          return sum + p.cost;
+        }, 0),
+      );
+      var grandTotal = Pricing.roundCents(result.subtotal + materialsSubtotal);
+      var hasMaterials = pickList.length > 0;
+      var assumptions = allAssumptions(values, scope, result, hasMaterials);
 
       var parts = botRow();
       var content = el("div", "ai-chat-text");
@@ -829,7 +883,15 @@ document.addEventListener("DOMContentLoaded", function () {
       var head = el("div", "ai-chat-estimate-header");
       head.appendChild(el("p", "eyebrow", "Your Estimate"));
       head.appendChild(el("h3", null, "Bathroom Restoration"));
-      head.appendChild(el("p", "ai-chat-estimate-lede", "Rough, non-binding labor estimate — details below."));
+      head.appendChild(
+        el(
+          "p",
+          "ai-chat-estimate-lede",
+          hasMaterials
+            ? "Rough, non-binding estimate — labor plus real current prices for the exact products you picked."
+            : "Rough, non-binding labor estimate — details below.",
+        ),
+      );
       card.appendChild(head);
 
       var lines = el("div", "ai-chat-estimate-lines");
@@ -849,8 +911,45 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       card.appendChild(lines);
 
+      if (hasMaterials) {
+        var laborSubtotalWrap = el("div", "ai-chat-estimate-line muted");
+        laborSubtotalWrap.appendChild(el("span", null, "Labor Subtotal"));
+        laborSubtotalWrap.appendChild(el("span", null, Pricing.money(result.subtotal)));
+        card.appendChild(laborSubtotalWrap);
+
+        var materialLines = el("div", "ai-chat-estimate-lines");
+        pickList.forEach(function (p) {
+          var line = el("div", "ai-chat-estimate-line");
+          // A single left-side group (photo + label) keeps the line's own
+          // two-child space-between layout (left group, amount) intact —
+          // appending the thumbnail as its own third flex child would
+          // break that instead of sitting next to the label.
+          var leftGroup = el("span", "ai-chat-estimate-line-label");
+          if (p.imageUrl) {
+            var thumb = document.createElement("img");
+            thumb.className = "ai-chat-material-thumb";
+            thumb.src = p.imageUrl;
+            thumb.alt = "";
+            thumb.loading = "lazy";
+            leftGroup.appendChild(thumb);
+          }
+          var textWrap = el("span", null, p.categoryLabel + ": " + p.productName + " ");
+          textWrap.appendChild(el("small", "ai-chat-estimate-detail", p.quantityLabel + " · " + p.retailer));
+          leftGroup.appendChild(textWrap);
+          line.appendChild(leftGroup);
+          line.appendChild(el("span", "ai-chat-estimate-amount", Pricing.money(p.cost)));
+          materialLines.appendChild(line);
+        });
+        card.appendChild(materialLines);
+
+        var materialsSubtotalWrap = el("div", "ai-chat-estimate-line muted");
+        materialsSubtotalWrap.appendChild(el("span", null, "Materials Subtotal"));
+        materialsSubtotalWrap.appendChild(el("span", null, Pricing.money(materialsSubtotal)));
+        card.appendChild(materialsSubtotalWrap);
+      }
+
       var excluded = el("div", "ai-chat-estimate-excluded");
-      excludedLines(fixtureCount).forEach(function (x) {
+      excludedLines(fixtureCount, hasMaterials).forEach(function (x) {
         var line = el("div", "ai-chat-estimate-line muted");
         line.appendChild(el("span", null, x.label));
         line.appendChild(el("span", null, x.value));
@@ -859,13 +958,13 @@ document.addEventListener("DOMContentLoaded", function () {
       card.appendChild(excluded);
 
       var totalWrap = el("div", "ai-chat-estimate-total");
-      totalWrap.appendChild(el("span", "ai-chat-estimate-total-label", totalLabel(fixtureCount)));
-      totalWrap.appendChild(el("span", "ai-chat-estimate-total-value", Pricing.money(result.subtotal)));
+      totalWrap.appendChild(el("span", "ai-chat-estimate-total-label", totalLabel(fixtureCount, hasMaterials)));
+      totalWrap.appendChild(el("span", "ai-chat-estimate-total-value", Pricing.money(grandTotal)));
       card.appendChild(totalWrap);
 
       if (fixtureCount > 0) card.appendChild(el("p", "ai-chat-estimate-total-note", plumbingTotalNote(fixtureCount)));
 
-      card.appendChild(el("p", "ai-chat-estimate-disclaimer", ESTIMATE_DISCLAIMER));
+      card.appendChild(el("p", "ai-chat-estimate-disclaimer", estimateDisclaimer(hasMaterials)));
 
       var assumptionsWrap = el("div", "ai-chat-estimate-assumptions");
       assumptionsWrap.appendChild(el("p", "ai-chat-estimate-assumptions-title", "What this estimate assumes"));
@@ -876,6 +975,26 @@ document.addEventListener("DOMContentLoaded", function () {
       assumptionsWrap.appendChild(list);
       card.appendChild(assumptionsWrap);
 
+      if (hasMaterials) {
+        var shoppingWrap = el("div", "ai-chat-estimate-assumptions ai-chat-materials-shopping");
+        shoppingWrap.appendChild(el("p", "ai-chat-estimate-assumptions-title", "Where to buy the materials"));
+        var shopList = document.createElement("ul");
+        pickList.forEach(function (p) {
+          var item = document.createElement("li");
+          item.appendChild(document.createTextNode(p.categoryLabel + ": " + p.productName + " — "));
+          var link = document.createElement("a");
+          link.href = p.url;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = p.retailer;
+          item.appendChild(link);
+          item.appendChild(document.createTextNode(" — " + Pricing.money(p.cost)));
+          shopList.appendChild(item);
+        });
+        shoppingWrap.appendChild(shopList);
+        card.appendChild(shoppingWrap);
+      }
+
       var actions = el("div", "ai-chat-estimate-actions");
       var exportBtn = el("button", "ai-chat-estimate-export", "Export as PDF");
       exportBtn.type = "button";
@@ -883,27 +1002,27 @@ document.addEventListener("DOMContentLoaded", function () {
       pdfStatus.setAttribute("role", "status");
       pdfStatus.hidden = true;
       exportBtn.addEventListener("click", function () {
-        exportPdf(exportBtn, pdfStatus, values, scope, result, assumptions);
+        exportCombinedPdf(
+          exportBtn,
+          pdfStatus,
+          result,
+          assumptions,
+          pickList,
+          materialsSubtotal,
+          grandTotal,
+          hasMaterials,
+        );
       });
       actions.appendChild(exportBtn);
-
-      if (materialsEstimatorEnabled() && window.MaterialsPricing) {
-        var materialCategories = window.MaterialsPricing.categoriesFromLines(result.lines);
-        if (materialCategories.length) {
-          var materialsBtn = el("button", "ai-chat-estimate-export", "Pick Your Materials →");
-          materialsBtn.type = "button";
-          materialsBtn.addEventListener("click", function () {
-            startMaterialsFlow(values, scope, result);
-          });
-          actions.appendChild(materialsBtn);
-        }
-      }
 
       var cta = el("a", "ai-chat-estimate-cta", "Contact Us About This →");
       cta.href = "contact.html?from=estimate";
       cta.addEventListener("click", function () {
         try {
-          sessionStorage.setItem("pr_estimate_summary", Pricing.buildEstimateSummary(values, scope, result));
+          sessionStorage.setItem(
+            "pr_estimate_summary",
+            buildCombinedSummary(values, scope, result, pickList, materialsSubtotal, grandTotal),
+          );
         } catch (e) {
           /* storage blocked: the contact form just starts empty */
         }
@@ -919,7 +1038,30 @@ document.addEventListener("DOMContentLoaded", function () {
       chatInput.focus({ preventScroll: true });
     }
 
-    function exportPdf(button, status, values, scope, result, assumptions) {
+    function buildCombinedSummary(values, scope, result, pickList, materialsSubtotal, grandTotal) {
+      var out = [Pricing.buildEstimateSummary(values, scope, result)];
+      if (pickList.length) {
+        out.push("");
+        out.push("Materials picked (real current Home Depot prices):");
+        pickList.forEach(function (p) {
+          out.push("- " + p.categoryLabel + ": " + p.productName + " (" + p.retailer + ") — " + Pricing.money(p.cost));
+        });
+        out.push("- Materials subtotal: " + Pricing.money(materialsSubtotal));
+        out.push("- Labor + materials total: " + Pricing.money(grandTotal));
+      }
+      return out.join("\n");
+    }
+
+    function exportCombinedPdf(
+      button,
+      status,
+      result,
+      assumptions,
+      pickList,
+      materialsSubtotal,
+      grandTotal,
+      hasMaterials,
+    ) {
       if (button.disabled) return;
       var label = button.textContent;
       button.disabled = true;
@@ -929,16 +1071,55 @@ document.addEventListener("DOMContentLoaded", function () {
       window.EstimatePdf.load()
         .then(function () {
           var fixtureCount = result.plumbingFixtureCount;
+          var lines = result.lines.map(function (r) {
+            return { label: r.label, detail: r.detail, amount: Pricing.money(r.cost) };
+          });
+          if (hasMaterials) {
+            pickList.forEach(function (p) {
+              lines.push({
+                label: p.categoryLabel + ": " + p.productName,
+                detail: p.quantityLabel + " · " + p.retailer,
+                amount: Pricing.money(p.cost),
+              });
+            });
+          }
+          var totals = hasMaterials
+            ? [
+                { label: "Labor Subtotal", value: Pricing.money(result.subtotal) },
+                { label: "Materials Subtotal", value: Pricing.money(materialsSubtotal) },
+                { label: totalLabel(fixtureCount, true), value: Pricing.money(grandTotal), strong: true },
+              ]
+            : [{ label: totalLabel(fixtureCount, false), value: Pricing.money(grandTotal), strong: true }];
+          var sections = [{ title: "What this estimate assumes", items: assumptions }];
+          if (hasMaterials) {
+            sections.push({
+              title: "Where to buy the materials",
+              items: pickList.map(function (p) {
+                return (
+                  p.categoryLabel +
+                  ": " +
+                  p.productName +
+                  " — " +
+                  p.retailer +
+                  " (" +
+                  p.url +
+                  ") — " +
+                  Pricing.money(p.cost)
+                );
+              }),
+            });
+          }
           var doc = window.EstimatePdf.build({
-            title: "Bathroom Restoration — Labor Estimate",
-            intro: "Rough, non-binding labor estimate.",
-            lines: result.lines.map(function (r) {
-              return { label: r.label, detail: r.detail, amount: Pricing.money(r.cost) };
-            }),
-            excluded: excludedLines(fixtureCount),
-            totals: [{ label: totalLabel(fixtureCount), value: Pricing.money(result.subtotal), strong: true }],
-            afterTotal: (fixtureCount > 0 ? [plumbingTotalNote(fixtureCount)] : []).concat([ESTIMATE_DISCLAIMER]),
-            sections: [{ title: "What this estimate assumes", items: assumptions }],
+            title: hasMaterials
+              ? "Bathroom Restoration — Estimate (Labor + Materials)"
+              : "Bathroom Restoration — Labor Estimate",
+            lines: lines,
+            excluded: excludedLines(fixtureCount, hasMaterials),
+            totals: totals,
+            afterTotal: (fixtureCount > 0 ? [plumbingTotalNote(fixtureCount)] : []).concat([
+              estimateDisclaimer(hasMaterials),
+            ]),
+            sections: sections,
             footer: {
               business: businessLine(),
               phone: PHONE,
@@ -960,19 +1141,20 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // =====================================================================
-    // Materials picker — real Home Depot prices (js/materials-pricing.js,
-    // see its own header comment for how they're kept up to date). Starts
-    // only after the labor estimate is finished, from the "Pick Your
-    // Materials" button on its card. Reuses the same fullscreen/progress-
-    // bar/group-form UI as the labor estimate.
+    // Product picks — real Home Depot prices (js/materials-pricing.js, see
+    // its own header comment for how they're kept up to date). Runs right
+    // after "fixtures" finishes, automatically — see startProductPicks()
+    // above (called from advance()) — as the next steps in the same one
+    // continuous flow, not a separate mode behind a button. Reuses the same
+    // fullscreen/progress-bar/group-form UI as the rest of the flow.
     // =====================================================================
 
-    // Generic category glyphs, not real product photos. The scraped Home
-    // Depot data (see tools/scrapers/build_catalog.py) does carry a real
-    // image URL per product, but CATALOG in js/materials-pricing.js
-    // doesn't currently keep it — wiring up real per-product <img> tags is
-    // a follow-up, not done here. Single-stroke, currentColor so they
-    // follow the button's text colour (and the site's dark theme) for free.
+    // Fallback category glyph shown until a real product's photo is picked
+    // (MaterialsPricing.getOptionsForCategory()'s imageUrl) — used as the
+    // choice-button icon before a pick is made, and for any category whose
+    // scraped options happen to have no image. Single-stroke, currentColor
+    // so they follow the button's text colour (and the site's dark theme)
+    // for free.
     var MATERIAL_ICON_SVG = {
       Toilet_Quantity:
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h7v5H7z"/><path d="M6 9h9c1 0 1.6.8 1.4 1.8l-1 5.2A3 3 0 0 1 12.5 18.5h-1A3 3 0 0 1 8.6 16l-1-5.2C7.4 9.8 8 9 9 9"/><path d="M8.5 18.5 8 21m7-2.5.5 2.5"/></svg>',
@@ -1010,41 +1192,58 @@ document.addEventListener("DOMContentLoaded", function () {
       return MATERIAL_ICON_SVG[categoryKey] || "";
     }
 
-    var materialsState = null; // null when inactive, else { categories, categoryIndex, zip, picks, laborResult }
-
-    function startMaterialsFlow(values, scope, laborResult) {
-      if (materialsState || !window.MaterialsPricing) return;
-      var categories = window.MaterialsPricing.categoriesFromLines(laborResult.lines);
-      if (!categories.length) return;
-      materialsState = { categories: categories, categoryIndex: -1, zip: "", picks: {}, laborResult: laborResult };
-      chatForm.hidden = true;
-      setProgress(0);
+    // Called from advance() once "fixtures" finishes. Computes the labor
+    // result right away (needed to know which categories even apply) and,
+    // if there's anything to pick a real product for, moves straight into
+    // the ZIP + per-category steps; otherwise the flow ends here exactly
+    // like it always did, with a labor-only card.
+    function startProductPicks(values, scope, mainSteps) {
+      var result = Pricing.computePublicEstimate(values, scope);
+      var categories =
+        materialsEstimatorEnabled() && window.MaterialsPricing
+          ? window.MaterialsPricing.categoriesFromLines(result.lines)
+          : [];
+      if (!categories.length) {
+        finishEstimate(values, scope, result, [], {});
+        return;
+      }
+      pickState = {
+        values: values,
+        scope: scope,
+        laborResult: result,
+        categories: categories,
+        categoryIndex: -1,
+        zip: "",
+        picks: {},
+        mainSteps: mainSteps,
+        totalSteps: mainSteps + 1 + categories.length, // +1 for the ZIP step
+      };
+      setProgress(Math.round((mainSteps / pickState.totalSteps) * 100));
       appendMaterialsZipForm();
     }
 
-    function cancelMaterialsFlow() {
-      materialsState = null;
-      hideProgress();
-      chatForm.hidden = false;
-      appendChatRow("bot", "No problem, I've stopped the materials picker. Ask me anything else.");
-      chatInput.focus();
-    }
-
-    function advanceMaterialsCategory() {
-      materialsState.categoryIndex++;
-      var totalSteps = materialsState.categories.length + 1; // +1 for the ZIP step
-      if (materialsState.categoryIndex < materialsState.categories.length) {
-        setProgress(Math.round(((materialsState.categoryIndex + 1) / totalSteps) * 100));
-        appendMaterialCategoryForm(materialsState.categoryIndex);
+    function advanceProductPick() {
+      pickState.categoryIndex++;
+      if (pickState.categoryIndex < pickState.categories.length) {
+        var stepIndex = pickState.mainSteps + 1 + pickState.categoryIndex;
+        setProgress(Math.round((stepIndex / pickState.totalSteps) * 100));
+        appendMaterialCategoryForm(pickState.categoryIndex);
         return;
       }
+      var state = pickState;
+      pickState = null;
+      finishEstimate(state.values, state.scope, state.laborResult, state.categories, state.picks);
+    }
+
+    // The one true end of the flow, reached whether or not any product
+    // picks happened — renders the combined card and restores the chat
+    // input, matching what advance() used to do directly before product
+    // picks were folded into this same continuous flow.
+    function finishEstimate(values, scope, result, categories, picks) {
       setProgress(100);
-      var state = materialsState;
-      materialsState = null;
       chatForm.hidden = false;
-      appendMaterialsCard(state);
+      appendCombinedCard(values, scope, result, categories, picks);
       setTimeout(hideProgress, 1200);
-      chatInput.focus();
     }
 
     function appendMaterialsZipForm() {
@@ -1054,7 +1253,8 @@ document.addEventListener("DOMContentLoaded", function () {
         el(
           "p",
           "ai-chat-group-intro",
-          "Now let's pick your materials. What ZIP code is the job in? (Prices can vary a little by area.)",
+          "Now let's pick the exact product for each item, at real current prices — starting with your ZIP code. " +
+            "(Prices can vary a little by area.)",
         ),
       );
 
@@ -1096,7 +1296,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       cancelBtn.addEventListener("click", function () {
         disableForm();
-        cancelMaterialsFlow();
+        cancelFlow();
       });
 
       formEl.addEventListener("submit", function (e) {
@@ -1109,9 +1309,9 @@ document.addEventListener("DOMContentLoaded", function () {
           input.focus();
           return;
         }
-        materialsState.zip = zip;
+        pickState.zip = zip;
         disableForm();
-        advanceMaterialsCategory();
+        advanceProductPick();
       });
 
       content.appendChild(formEl);
@@ -1122,8 +1322,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function appendMaterialCategoryForm(index) {
-      var category = materialsState.categories[index];
-      var options = window.MaterialsPricing.getOptionsForCategory(category.key, materialsState.zip);
+      var category = pickState.categories[index];
+      var options = window.MaterialsPricing.getOptionsForCategory(category.key, pickState.zip);
 
       var parts = botRow();
       var content = el("div", "ai-chat-text");
@@ -1155,7 +1355,17 @@ document.addEventListener("DOMContentLoaded", function () {
         var btn = document.createElement("button");
         btn.type = "button";
         btn.className = "ai-chat-choice ai-chat-choice--material";
-        if (iconSvg) {
+        if (opt.imageUrl) {
+          // The product's own real photo — from the scraped Home Depot
+          // listing (see tools/scrapers/build_catalog.py). Falls back to
+          // the generic category glyph below when a listing has none.
+          var photo = document.createElement("img");
+          photo.className = "ai-chat-material-thumb";
+          photo.src = opt.imageUrl;
+          photo.alt = "";
+          photo.loading = "lazy";
+          btn.appendChild(photo);
+        } else if (iconSvg) {
           var icon = el("span", "ai-chat-material-icon");
           icon.setAttribute("aria-hidden", "true");
           icon.innerHTML = iconSvg;
@@ -1177,6 +1387,13 @@ document.addEventListener("DOMContentLoaded", function () {
             other.setAttribute("aria-pressed", isThis ? "true" : "false");
           });
           errorEl.hidden = true;
+          // Live-updates the 3D preview toward this product's real finish
+          // (best-effort — see MaterialsPricing.guessFinishColor()), the
+          // same "see it as you pick it" pattern every other live-updating
+          // field in this flow already follows.
+          if (window.BathroomRoom3D) {
+            window.BathroomRoom3D.setFixtureFinish(category.key, window.MaterialsPricing.guessFinishColor(opt.name));
+          }
         });
         buttons.push(btn);
         choicesWrap.appendChild(btn);
@@ -1188,8 +1405,8 @@ document.addEventListener("DOMContentLoaded", function () {
       var actionsWrap = el("div", "ai-chat-group-actions");
       var cancelBtn = el("button", "ai-chat-group-cancel", "Cancel");
       cancelBtn.type = "button";
-      var isLast = index === materialsState.categories.length - 1;
-      var continueBtn = el("button", "ai-chat-group-continue", isLast ? "See My Materials Total →" : "Continue →");
+      var isLast = index === pickState.categories.length - 1;
+      var continueBtn = el("button", "ai-chat-group-continue", isLast ? "See My Estimate →" : "Continue →");
       continueBtn.type = "submit";
       actionsWrap.appendChild(cancelBtn);
       actionsWrap.appendChild(continueBtn);
@@ -1203,7 +1420,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       cancelBtn.addEventListener("click", function () {
         disableForm();
-        cancelMaterialsFlow();
+        cancelFlow();
       });
 
       formEl.addEventListener("submit", function (e) {
@@ -1219,16 +1436,17 @@ document.addEventListener("DOMContentLoaded", function () {
           category.unit,
           chosen.best.price,
         );
-        materialsState.picks[category.key] = {
+        pickState.picks[category.key] = {
           categoryLabel: category.label,
           productName: chosen.name,
+          imageUrl: chosen.imageUrl,
           retailer: chosen.best.name,
           url: chosen.best.url,
           quantityLabel: costInfo.quantityLabel,
           cost: costInfo.cost,
         };
         disableForm();
-        advanceMaterialsCategory();
+        advanceProductPick();
       });
 
       content.appendChild(formEl);
@@ -1237,184 +1455,6 @@ document.addEventListener("DOMContentLoaded", function () {
       scrollToEnd();
       var first = formEl.querySelector(".ai-chat-choice");
       if (first) first.focus({ preventScroll: true });
-    }
-
-    function buildMaterialsSummary(pickList, materialsSubtotal, combinedTotal) {
-      var out = ["My bathroom materials picks from your website:"];
-      pickList.forEach(function (p) {
-        out.push("- " + p.categoryLabel + ": " + p.productName + " (" + p.retailer + ") — " + Pricing.money(p.cost));
-      });
-      out.push("- Materials subtotal: " + Pricing.money(materialsSubtotal));
-      out.push("- Labor + materials (before plumbing/electrical, permits and taxes): " + Pricing.money(combinedTotal));
-      return out.join("\n");
-    }
-
-    function exportMaterialsPdf(button, status, pickList, materialsSubtotal, combinedTotal) {
-      if (button.disabled) return;
-      var label = button.textContent;
-      button.disabled = true;
-      button.textContent = "Preparing PDF…";
-      status.hidden = true;
-      status.textContent = "";
-      window.EstimatePdf.load()
-        .then(function () {
-          var doc = window.EstimatePdf.build({
-            title: "Bathroom Restoration — Materials List",
-            lines: pickList.map(function (p) {
-              return {
-                label: p.categoryLabel + ": " + p.productName,
-                detail: p.quantityLabel + " · " + p.retailer,
-                amount: Pricing.money(p.cost),
-              };
-            }),
-            excluded: [],
-            totals: [
-              { label: "Materials Subtotal", value: Pricing.money(materialsSubtotal), strong: true },
-              {
-                label: "Labor + Materials (before plumbing/electrical, permits, taxes)",
-                value: Pricing.money(combinedTotal),
-              },
-            ],
-            sections: [
-              {
-                title: "Where to buy",
-                items: pickList.map(function (p) {
-                  return (
-                    p.categoryLabel +
-                    ": " +
-                    p.productName +
-                    " — " +
-                    p.retailer +
-                    " (" +
-                    p.url +
-                    ") — " +
-                    Pricing.money(p.cost)
-                  );
-                }),
-              },
-            ],
-            footer: {
-              business: businessLine(),
-              phone: PHONE,
-              email: EMAIL,
-              date: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
-            },
-          });
-          doc.save("premium-restoration-materials-list.pdf");
-          button.disabled = false;
-          button.textContent = label;
-        })
-        .catch(function () {
-          button.disabled = false;
-          button.textContent = "Retry PDF";
-          status.hidden = false;
-          status.textContent = "Sorry, the PDF couldn't be prepared. Check your connection and press Retry PDF.";
-          status.classList.add("is-error");
-        });
-    }
-
-    function appendMaterialsCard(state) {
-      var pickList = state.categories
-        .map(function (c) {
-          return state.picks[c.key];
-        })
-        .filter(Boolean);
-      var materialsSubtotal = Pricing.roundCents(
-        pickList.reduce(function (sum, p) {
-          return sum + p.cost;
-        }, 0),
-      );
-      var combinedTotal = Pricing.roundCents(state.laborResult.subtotal + materialsSubtotal);
-
-      var parts = botRow();
-      var content = el("div", "ai-chat-text");
-      var card = el("div", "ai-chat-estimate ai-chat-materials");
-
-      var head = el("div", "ai-chat-estimate-header");
-      head.appendChild(el("p", "eyebrow", "Materials Pricing"));
-      head.appendChild(el("h3", null, "Bathroom Materials"));
-      head.appendChild(el("p", "ai-chat-estimate-lede", "Based on the items you picked above."));
-      card.appendChild(head);
-
-      var lines = el("div", "ai-chat-estimate-lines");
-      pickList.forEach(function (p) {
-        var line = el("div", "ai-chat-estimate-line");
-        var labelWrap = el("span", null, p.categoryLabel + ": " + p.productName + " ");
-        labelWrap.appendChild(el("small", "ai-chat-estimate-detail", p.quantityLabel + " · " + p.retailer));
-        line.appendChild(labelWrap);
-        line.appendChild(el("span", "ai-chat-estimate-amount", Pricing.money(p.cost)));
-        lines.appendChild(line);
-      });
-      if (!pickList.length) {
-        var empty = el("div", "ai-chat-estimate-line");
-        empty.appendChild(el("span", null, "No materials selected"));
-        empty.appendChild(el("span", "ai-chat-estimate-amount", Pricing.money(0)));
-        lines.appendChild(empty);
-      }
-      card.appendChild(lines);
-
-      var totalWrap = el("div", "ai-chat-estimate-total");
-      totalWrap.appendChild(el("span", "ai-chat-estimate-total-label", "Materials Subtotal"));
-      totalWrap.appendChild(el("span", "ai-chat-estimate-total-value", Pricing.money(materialsSubtotal)));
-      card.appendChild(totalWrap);
-
-      var combinedWrap = el("div", "ai-chat-estimate-line muted");
-      combinedWrap.appendChild(el("span", null, "Labor + materials, before plumbing/electrical, permits & taxes"));
-      combinedWrap.appendChild(el("span", null, Pricing.money(combinedTotal)));
-      card.appendChild(combinedWrap);
-
-      if (pickList.length) {
-        var shoppingWrap = el("div", "ai-chat-estimate-assumptions ai-chat-materials-shopping");
-        shoppingWrap.appendChild(el("p", "ai-chat-estimate-assumptions-title", "Where to buy these"));
-        var list = document.createElement("ul");
-        pickList.forEach(function (p) {
-          var item = document.createElement("li");
-          item.appendChild(document.createTextNode(p.categoryLabel + ": " + p.productName + " — "));
-          var link = document.createElement("a");
-          link.href = p.url;
-          link.target = "_blank";
-          link.rel = "noopener noreferrer";
-          link.textContent = p.retailer;
-          item.appendChild(link);
-          item.appendChild(document.createTextNode(" — " + Pricing.money(p.cost)));
-          list.appendChild(item);
-        });
-        shoppingWrap.appendChild(list);
-        card.appendChild(shoppingWrap);
-      }
-
-      var actions = el("div", "ai-chat-estimate-actions");
-      var exportBtn = el("button", "ai-chat-estimate-export", "Export as PDF");
-      exportBtn.type = "button";
-      var pdfStatus = el("p", "ai-chat-estimate-pdf-status");
-      pdfStatus.setAttribute("role", "status");
-      pdfStatus.hidden = true;
-      exportBtn.addEventListener("click", function () {
-        exportMaterialsPdf(exportBtn, pdfStatus, pickList, materialsSubtotal, combinedTotal);
-      });
-      actions.appendChild(exportBtn);
-
-      var cta = el("a", "ai-chat-estimate-cta", "Contact Us About This →");
-      cta.href = "contact.html?from=materials";
-      cta.addEventListener("click", function () {
-        try {
-          sessionStorage.setItem(
-            "pr_materials_summary",
-            buildMaterialsSummary(pickList, materialsSubtotal, combinedTotal),
-          );
-        } catch (e) {
-          /* storage blocked: the contact form just starts empty */
-        }
-      });
-      actions.appendChild(cta);
-      card.appendChild(actions);
-      card.appendChild(pdfStatus);
-
-      content.appendChild(card);
-      parts.inner.appendChild(content);
-      chatMessages.appendChild(parts.row);
-      scrollToEnd();
-      chatInput.focus({ preventScroll: true });
     }
 
     // ---------- messages ----------
@@ -1484,15 +1524,13 @@ document.addEventListener("DOMContentLoaded", function () {
     var submit = document.getElementById("lead-submit");
     var message = document.getElementById("message");
     var SUMMARY_KEY = "pr_estimate_summary";
-    var MATERIALS_SUMMARY_KEY = "pr_materials_summary";
 
-    // Pre-fill the project details from "Contact Us About This" (labor
-    // estimate or materials picker — whichever the visitor came from).
-    if (/[?&]from=(estimate|materials)\b/.test(window.location.search)) {
-      var fromMaterials = /[?&]from=materials\b/.test(window.location.search);
+    // Pre-fill the project details from "Contact Us About This" on the
+    // estimate card (labor, plus any real materials picked).
+    if (/[?&]from=estimate\b/.test(window.location.search)) {
       var summary = null;
       try {
-        summary = sessionStorage.getItem(fromMaterials ? MATERIALS_SUMMARY_KEY : SUMMARY_KEY);
+        summary = sessionStorage.getItem(SUMMARY_KEY);
       } catch (e) {
         summary = null;
       }
@@ -1650,7 +1688,6 @@ document.addEventListener("DOMContentLoaded", function () {
           form.reset();
           try {
             sessionStorage.removeItem(SUMMARY_KEY);
-            sessionStorage.removeItem(MATERIALS_SUMMARY_KEY);
           } catch (e) {
             /* ignore */
           }

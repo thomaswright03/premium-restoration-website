@@ -113,18 +113,21 @@ OUTLIER_MULTIPLE = 4
 
 
 def normalize(raw_product, unit_kind):
-    """Returns (unit_price, display_name) for one scraped product, or None
-    if it can't be safely reduced to a real per-unit price."""
+    """Returns (unit_price, display_name, image_url) for one scraped
+    product, or None if it can't be safely reduced to a real per-unit
+    price. image_url is whatever homedepot_scraper.py's own image_url
+    field found — not re-validated here, just passed through."""
     title = raw_product.get("title")
     price = raw_product.get("price_value")
     brand = raw_product.get("brand")
+    image_url = raw_product.get("image_url")
     if not title or not isinstance(price, (int, float)) or price <= 0:
         return None
 
     display_name = f"{brand} {title}" if brand and not title.lower().startswith(brand.lower()) else title
 
     if unit_kind == "each":
-        return price, display_name
+        return price, display_name, image_url
 
     if unit_kind == "sqft":
         match = COVERAGE_RE.search(title)
@@ -134,13 +137,13 @@ def normalize(raw_product, unit_kind):
         if coverage <= 0:
             return None
         name = COVERAGE_RE.sub("", display_name).strip().rstrip(",").strip()
-        return round(price / coverage, 2), name
+        return round(price / coverage, 2), name, image_url
 
     if unit_kind == "gallon":
         match = GALLON_PACK_RE.search(title)
         gallons = float(match.group(1)) if match else 1.0
         name = GALLON_STRIP_RE.sub("", display_name).strip() or display_name
-        return round(price / gallons, 2), f"{name} (per gallon)"
+        return round(price / gallons, 2), f"{name} (per gallon)", image_url
 
     return None
 
@@ -169,7 +172,7 @@ def curate(category_key, products, unit_kind, max_options=3):
         result = normalize(product, unit_kind)
         if not result:
             continue
-        unit_price, name = result
+        unit_price, name, image_url = result
         if name in seen_names:
             continue
         seen_names.add(name)
@@ -179,6 +182,7 @@ def curate(category_key, products, unit_kind, max_options=3):
                 "price": unit_price,
                 "item_id": product.get("item_id"),
                 "url": product.get("product_url"),
+                "imageUrl": image_url,
             }
         )
 
@@ -204,6 +208,7 @@ def curate(category_key, products, unit_kind, max_options=3):
         {
             "id": f"hd-{p['item_id']}",
             "name": p["name"],
+            "imageUrl": p["imageUrl"],
             "retailers": [{"name": "Home Depot", "price": p["price"], "url": p["url"]}],
         }
         for p in picks

@@ -1280,6 +1280,26 @@ body.ai-chat-locked {
   display: block;
 }
 
+/* The product's own real photo (scraped Home Depot listing image) — shown
+   in place of the generic glyph above once one is available, both on the
+   choice buttons and on the combined estimate card's material lines. */
+.ai-chat-material-thumb {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-line);
+}
+
+.ai-chat-estimate-line-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
 .ai-chat-material-text {
   display: flex;
   flex-direction: column;

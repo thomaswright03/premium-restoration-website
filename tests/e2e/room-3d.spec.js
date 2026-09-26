@@ -1,7 +1,15 @@
 "use strict";
 
 const { test, expect } = require("@playwright/test");
-const { startEstimate, answerScope, fillGroup, useConfig, sendChat, skipRoomInteractionSteps } = require("./helpers");
+const {
+  startEstimate,
+  answerScope,
+  fillGroup,
+  useConfig,
+  sendChat,
+  skipRoomInteractionSteps,
+  disableMaterials,
+} = require("./helpers");
 
 const NEEDS_WALLS = { demolition: "No", floorFinish: "Tile", walls: "Tile (full height)", paintCeiling: "Yes" };
 
@@ -22,6 +30,9 @@ test.describe("3D bathroom room preview", () => {
   });
 
   test("stays live-updating through scope, dimensions and fixtures", async ({ page }) => {
+    // Not about the materials picker — off so fixtures submits straight to
+    // the card, matching what this test is actually checking.
+    await disableMaterials(page);
     await startEstimate(page);
     await answerScope(page, NEEDS_WALLS);
     await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 10, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 });
@@ -79,6 +90,10 @@ test.describe("3D room preview: wall-click plumbing walls, entry points, walk-in
   // they're offered unconditionally (whenever the 3D preview is up),
   // before fixture counts are even asked.
   async function reachRoomShapeSteps(page) {
+    // These tests are about the wall-click room-shape flow and 3D camera,
+    // not the materials picker — off so fixtures submits straight to the
+    // card as it always has.
+    await disableMaterials(page);
     await startEstimate(page);
     await answerScope(page, NEEDS_WALLS);
     await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 10, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 });

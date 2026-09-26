@@ -45,6 +45,46 @@ function wallSpanFor(wallId, widthFt, lengthFt) {
   return wallId === "N" || wallId === "S" ? widthFt : lengthFt;
 }
 
+// Which shared material (see buildMaterials()) represents a fixture type's
+// primary visible finish — matched by reference identity against the
+// already-built `mat` object, so none of the buildX() functions need any
+// per-mesh tagging. Fixture types not listed here (currently just
+// Shower_Quantity, whose finish signal — glass panels + a porcelain pan —
+// isn't a meaningful single color to retint) simply never get tinted.
+var FIXTURE_FINISH_MATERIAL_KEY = {
+  Toilet_Quantity: "porcelainGloss",
+  Sink_Quantity: "porcelain",
+  Bathtub_Quantity: "porcelain",
+  Shower_Door_Quantity: "brass",
+  Door_Quantity: "doorTone",
+  Vanity_Quantity: "cabinetWood",
+  Cabinet_Quantity: "cabinetWood",
+  Mirror_Quantity: "brass",
+  Mirror_Huge_Quantity: "brass",
+  Shower_Shelf_Quantity: "brass",
+};
+
+// Retints every mesh in `instance` using the fixture type's designated
+// finish material (if any) toward `colorHex` — a single cloned material
+// shared across every matching mesh within this one instance, so a
+// toilet's bowl and tank (both porcelainGloss) get the same tinted clone
+// rather than two separate ones.
+function applyFixtureFinish(instance, fixtureKey, mat, colorHex) {
+  var materialKey = FIXTURE_FINISH_MATERIAL_KEY[fixtureKey];
+  var sharedMaterial = materialKey && mat[materialKey];
+  if (!sharedMaterial) return;
+  var tinted = null;
+  instance.traverse(function (child) {
+    if (child.isMesh && child.material === sharedMaterial) {
+      if (!tinted) {
+        tinted = sharedMaterial.clone();
+        tinted.color.setHex(colorHex);
+      }
+      child.material = tinted;
+    }
+  });
+}
+
 function isDarkTheme() {
   var attr = document.documentElement.getAttribute("data-theme");
   if (attr === "dark") return true;
@@ -471,6 +511,12 @@ var state = {
   entryPoints: [], // [{ wallId, offsetFt, hasDoor }]
   cameraMode: "orbit", // "orbit" | "walkin"
   walkInEntryIndex: 0,
+  // fixtureKey -> hex color, set once a real product is picked for that
+  // category in the chat's materials flow. Applies to every placed
+  // instance of that fixture uniformly, matching how a pick actually
+  // works today (one product choice covers however many units of that
+  // category were ordered, not a different product per unit).
+  fixtureFinishes: {},
 };
 // Transient wall-click picking session, entirely separate from `state`
 // (the room's own data) — null when no picking UI is active.
@@ -918,6 +964,8 @@ function rebuildFixtures(s, widthFt, lengthFt) {
     if (p.depthOffset) {
       instance.translateZ(p.depthOffset);
     }
+    var finish = state.fixtureFinishes[p.fixtureKey];
+    if (finish != null) applyFixtureFinish(instance, p.fixtureKey, s.mat, finish);
     setShadowFlags(instance);
     s.fixtureGroup.add(instance);
   });
@@ -1116,6 +1164,7 @@ window.BathroomRoom3D = {
       entryPoints: [],
       cameraMode: "orbit",
       walkInEntryIndex: 0,
+      fixtureFinishes: {},
     };
     picking = null;
     hoveredWallId = null;
@@ -1148,6 +1197,18 @@ window.BathroomRoom3D = {
 
   setFixtureCount: function (fixtureKey, rawValue) {
     state.fixtures = Layout.applyFixtureInput(state.fixtures, fixtureKey, rawValue);
+    markDirty();
+  },
+
+  // Applies once a real product is picked for this category in the chat's
+  // materials flow — retints every placed instance of that fixture type
+  // toward colorHex (see applyFixtureFinish()/FIXTURE_FINISH_MATERIAL_KEY
+  // above). colorHex is typically MaterialsPricing.guessFinishColor()'s
+  // result; pass null/undefined to clear back to the default color (e.g.
+  // if the pick is changed to a product with no recognizable finish word).
+  setFixtureFinish: function (fixtureKey, colorHex) {
+    if (colorHex == null) delete state.fixtureFinishes[fixtureKey];
+    else state.fixtureFinishes[fixtureKey] = colorHex;
     markDirty();
   },
 

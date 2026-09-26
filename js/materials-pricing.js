@@ -61,6 +61,8 @@
       {
         id: "hd-336961024",
         name: "Glacier Bay 12 in. Rough In 2-Piece 1.28 GPF Single Flush Round Toilet in White, Seat Included",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/c85317bf-09ed-407a-b7a5-3856a70bffd9/svn/white-glacier-bay-two-piece-toilets-n2428r-17-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -70,19 +72,23 @@
         ],
       },
       {
-        id: "hd-303338365",
-        name: "Swiss Madison St. Tropez 1-Piece 1.1/1.6 GPF Dual Flush Elongated Toilet in Glossy White, White Hardware",
+        id: "hd-312442216",
+        name: "American Standard Champion Two-Piece 1.28 GPF Single Flush Elongated Chair Height Toilet with Slow-Close Seat in White",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/a8cd7f4f-440a-41ac-a474-7449c68e3f1b/svn/white-american-standard-two-piece-toilets-747aa107sc-020-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
-            price: 254.6,
-            url: "https://www.homedepot.com/p/Swiss-Madison-St-Tropez-1-Piece-1-1-1-6-GPF-Dual-Flush-Elongated-Toilet-in-Glossy-White-White-Hardware-SM-1T254/303338365",
+            price: 249,
+            url: "https://www.homedepot.com/p/American-Standard-Champion-Two-Piece-1-28-GPF-Single-Flush-Elongated-Chair-Height-Toilet-with-Slow-Close-Seat-in-White-747AA107SC-020/312442216",
           },
         ],
       },
       {
         id: "hd-313789704",
         name: "KOHLER Cimarron 12 in. Rough In 2-Piece 1.28 GFP Single Flush Elongated Toilet in White with Soft Close Seat",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/e2040f45-bd28-4da2-9c1e-76f9571c70d0/svn/white-kohler-two-piece-toilets-k-31648-0-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -96,6 +102,8 @@
       {
         id: "hd-100090789",
         name: "Glacier Bay 19 in. Drop-In Round Vitreous China Bathroom Sink in White",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/f4b02798-819f-4efc-830e-9e8f322d4a33/svn/white-glacier-bay-drop-in-bathroom-sinks-13-0013-4whd-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -107,6 +115,8 @@
       {
         id: "hd-202493974",
         name: "KOHLER Caxton 19.3x16.25in. Undermount Bathroom Sink in White Vitreous China with Overflow Drain",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/665e5b48-5b43-44a1-851d-7122c45c6575/svn/white-kohler-undermount-bathroom-sinks-k-r2210-0-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -118,6 +128,8 @@
       {
         id: "hd-207058591",
         name: "Glacier Bay 37 in. W x 22 in. D Cultured Marble White Rectangular Single Sink Vanity Top in White",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/c7d916f1-3601-45ea-9324-e162bba65dc1/svn/glacier-bay-bathroom-vanity-tops-hu3722r-wh-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -131,6 +143,8 @@
       {
         id: "hd-314614191",
         name: "Bootz Industries Aloha 60 in. x 30 in. Alcove Soaking Bathtub with Left Drain in White",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/86749641-8d99-4e11-86cc-d187513c02a3/svn/white-bootz-industries-alcove-bathtubs-011-3365-00-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -142,6 +156,8 @@
       {
         id: "hd-311699666",
         name: "KOHLER Elmbrook 60 in. x 30.25 in. Alcove Deep Soaking Bathtub with Right-Hand Drain in White",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/c130c408-963c-4c29-887a-4ad1980d44a2/svn/white-kohler-alcove-bathtubs-k-r23217-ra-0-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -153,6 +169,8 @@
       {
         id: "hd-340209365",
         name: "Bootz Industries Aloha 60 in. x 30 in. Bathtub, 60 in. x 30 in. x 60 in. NexTile Surround and 56-60 in. Shower Door Combo",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/e02c9295-5f3e-44a4-ba02-4ae75da4ac3d/svn/bootz-industries-tub-shower-combos-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -166,6 +184,8 @@
       {
         id: "hd-202899038",
         name: "Durastall 32 in. x 32 in. x 75 in. Shower Stall with Standard Base in White",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/20abd2a7-90a8-478a-8613-9c81e527ab73/svn/white-durastall-shower-stall-kits-68-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -177,6 +197,8 @@
       {
         id: "hd-341782460",
         name: "American Standard Passage 32 in. W x 72 in. H Four piece Glue Up Acrylic Alcove Shower Wall Set in White Subway Tile",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/823977a3-3d49-427c-a550-c0f2d92c969e/svn/white-subway-tile-american-standard-alcove-shower-walls-surrounds-p2969swt-375-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -188,6 +210,8 @@
       {
         id: "hd-330250438",
         name: "CASTICO Carrara 32 in. x 60 in. x 84 in. Solid Composite Stone Alcove Shower Kit with Walls and Graphite Pan Base L/R Drain",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/920bae9a-a025-4d22-aeb2-67d67968a996/svn/carrara-graphite-castico-shower-stall-kits-k1b1s3260grcaca-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -201,6 +225,8 @@
       {
         id: "hd-318474663",
         name: "TOOLKISS 56 in. - 60 in. W x 72 in. H Sliding Framed Shower Door in Matte Black with Clear Glass",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/48c611a5-89ba-49a2-a5bc-b7d9dad239fd/svn/toolkiss-alcove-shower-doors-tk19118mb-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -212,6 +238,8 @@
       {
         id: "hd-325978612",
         name: "Home Decorators Collection Waverly 58 1/2 in. - 60 in. W x 76 in. H Sliding Frameless Shower Door in Matte Black Finish with Clear Glass",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/ecd53799-4d20-4016-89bf-566b726f158b/svn/home-decorators-collection-alcove-shower-doors-gbsh169-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -223,6 +251,8 @@
       {
         id: "hd-316808409",
         name: "KOHLER Elmbrook 55-60 in. W x 74 in. H Sliding Frameless Shower Door in Matte Black with 5/16 in. Thick Tempered Glass",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/3d6666a5-142a-48ea-bcd9-e7bc884b6328/svn/kohler-alcove-shower-doors-k-r706851-8l-bl-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -236,6 +266,8 @@
       {
         id: "hd-202091529",
         name: "Johnson Hardware 1500 Series 24 in. to 36 in. x 80 in. Universal Pocket Door Frame for 2x4 Stud Wall",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/3f8474e3-ffba-4e38-871f-737cd1f43580/svn/unfinished-johnson-hardware-door-frames-153068pf-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -247,6 +279,8 @@
       {
         id: "hd-310969636",
         name: "eightdoors 30 in. x 80 in. x 1-3/8 in. Shaker White Primed 2-Panel Solid Core Wood Interior Slab Door",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/afa0a80d-0daa-4272-a751-6b43a6d400fa/svn/triple-coat-white-primer-eightdoors-slab-doors-70288014803035sh-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -258,6 +292,8 @@
       {
         id: "hd-202089889",
         name: "Contractors Wardrobe Raised 6-Panel Colonial Painted Steel Interior Sliding Door",
+        imageUrl:
+          "https://images.thdstatic.com/catalog/productImages/600/56/566e4925-375a-464d-a381-1b99d43d9880_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -271,6 +307,8 @@
       {
         id: "hd-203486514",
         name: "Glacier Bay 19 in. Single Sink White Freestanding Bath Vanity with White Cultured Marble Top (Assembled)",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/b3780075-bcb1-4a4b-8ae3-b959f999f062/svn/glacier-bay-bathroom-vanities-with-tops-gb18p2-wh-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -282,6 +320,8 @@
       {
         id: "hd-306307816",
         name: "Home Decorators Collection Sedgewood 37 in. Single Sink Freestanding White Bathroom Vanity with Arctic Solid Surface Top (Assembled)",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/b8a0bbe2-2b2f-480b-9563-8abcadc21ec7/svn/home-decorators-collection-bathroom-vanities-with-tops-pplnkwht36d-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -293,6 +333,8 @@
       {
         id: "hd-328794815",
         name: "ARIEL Hepburn 48 in. Single Sink Freestanding Bathroom Vanity in White with Carrara White Quartz Top",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/47097b14-5e42-4b36-8bd9-e4c401a8c368/svn/ariel-bathroom-vanities-with-tops-t048scqrvowht-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -306,6 +348,8 @@
       {
         id: "hd-308061907",
         name: "Glacier Bay Slat Style 14 in. W x 11 in. D x 58.5 in. H Towel Tower in Nickel",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/9b695bd7-e976-44f5-843b-ec83156f8777/svn/nickel-glacier-bay-linen-cabinets-3458nnhd-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -317,6 +361,8 @@
       {
         id: "hd-204089752",
         name: "Glacier Bay Lancaster 21 in. W x 8 in. D x 26 in. H Surface-Mount Raised panel Bathroom Storage Wall Cabinet in White",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/4e909f61-e079-469e-ae14-cda3debb97b1/svn/white-glacier-bay-bathroom-wall-cabinets-laoj25-wh-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -328,6 +374,8 @@
       {
         id: "hd-203985030",
         name: "Home Decorators Collection Naples 26.5 in. W x 8 in. D x 32.8 in. H Bathroom Storage Wall Cabinet in White",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/19bd0869-f2f2-4911-9731-3072874f1893/svn/white-home-decorators-collection-bathroom-wall-cabinets-nawo2633-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -341,6 +389,8 @@
       {
         id: "hd-331646373",
         name: "Relyblo 22 in. W x 30 in. H Rounded Rectangle Framed Wall Bathroom Vanity Mirror for Over Sink Wall in Matte Black",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/fbad623d-8881-4656-a23e-7fef4e0dde17/svn/22-w-x-30-h-relyblo-vanity-mirrors-yk-2230-bk-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -352,6 +402,8 @@
       {
         id: "hd-322929700",
         name: "TOOLKISS 40 in. W x 32 in. H Rectangular Aluminum Framed Wall Bathroom Vanity Mirror in Matte Black",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/35ec4433-91a5-44c0-9551-51a73f7c42b2/svn/black-toolkiss-vanity-mirrors-b10080-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -363,6 +415,8 @@
       {
         id: "hd-317583429",
         name: "TOOLKISS 48 in. W x 36 in. H Large Rectangular Frameless LED Light Anti-Fog Wall Bathroom Vanity Mirror Super Bright",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/1ab26656-4b37-42b3-90b3-181bf3984202/svn/bulit-in-double-led-light-strip-toolkiss-vanity-mirrors-tk19068-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -376,6 +430,8 @@
       {
         id: "hd-316331995",
         name: "Glacier Bay 36 in. W x 48 in. H Rectangular Frameless Polished Edge Wall Bathroom Vanity Mirror in Silver",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/a1d1e36a-92c9-488d-8af2-8b5dda1f8b4c/svn/silver-glacier-bay-vanity-mirrors-81180-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -387,6 +443,8 @@
       {
         id: "hd-326065853",
         name: "Apmir 72 in. W x 36 in. H Large Rectangular Tempered Glass & Aluminum Alloy Framed Wall Bathroom Vanity Mirror in matte Black",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/db410f4c-b873-4913-8f62-754bb5907c21/svn/matte-black-apmir-vanity-mirrors-b18191-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -398,6 +456,8 @@
       {
         id: "hd-326878062",
         name: "Derrin 60 in. W x 36 in. H Large Rectangular Frameless Anti-Fog Dimmable LED Wall Bathroom Vanity Mirror in Silver",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/114d885b-1cb1-48b5-ab44-79f56287481f/svn/silver-vanity-mirrors-thdbm6036fbvc2v1-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -411,6 +471,8 @@
       {
         id: "hd-314963829",
         name: "Bath Bliss 4 Tier Tension Corner Shower Organizer Caddy in Grey",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/ccd652a3-3c34-43bc-953d-f5742717d041/svn/grey-bath-bliss-shower-caddies-10000-grey-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -422,6 +484,8 @@
       {
         id: "hd-100677312",
         name: "Tile Redi Redi Niche 16 in. W x 20 in. H x 4 in. D Shampoo - Soap Standard Double Niche",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/d975f2f7-cee6-4dee-8c2a-fb13ae70da23/svn/black-tile-redi-shower-niches-rn1620d-bi-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -433,6 +497,8 @@
       {
         id: "hd-343430516",
         name: "Shower Caddy 2 Pack Brushed Nickel Corner Shower Shelf Recessed Floating Bathroom Shelf for Tiled Wall 10 in",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/1f64afab-d812-410a-80be-b664b2a15096/svn/brushed-nickel-shower-caddies-8fc8tvyy-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -446,6 +512,8 @@
       {
         id: "hd-300126888",
         name: "TrafficMaster Vigo Gris 12 in. x 24 in. Matte Ceramic Stone Look Floor and Wall Tile",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/1a6280c5-e0c5-4f8e-811f-88a8833104b9/svn/vigo-gris-trafficmaster-ceramic-tile-nhdvigri1224-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -457,6 +525,8 @@
       {
         id: "hd-313050938",
         name: "Daltile Baker Wood 6 in. x 24 in. Walnut Glazed Porcelain Floor and Wall Tile",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/e0de4409-2500-4157-a51a-a786b505c19d/svn/walnut-daltile-porcelain-tile-bk10624hd1pr-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -468,6 +538,8 @@
       {
         id: "hd-315506629",
         name: "MSI Kenzzi Zenzibar 8 in. x 8 in. Encaustic Matte Porcelain Floor and Wall Tile",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/dc103de7-19e8-4d10-8859-1a011bdd6036/svn/zenzibar-msi-porcelain-tile-nzan8x8-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -481,6 +553,8 @@
       {
         id: "hd-302603803",
         name: "Daltile Restore Bright White 4-1/4 in. x 4-1/4 in. Ceramic Wall Tile",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/fa0b3b2e-40a0-4b5f-8ed4-f059dc9ad902/svn/bright-white-daltile-ceramic-tile-re1544hd1p4-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -492,6 +566,8 @@
       {
         id: "hd-308736405",
         name: "Corso Italia Alpe Graphite Matte 12 in. x 24 in. Quartzite Stone Look Porcelain Floor and Wall Tile",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/873d7877-c14a-5282-b6cf-abcc6a359124/svn/graphite-matte-corso-italia-porcelain-tile-610010002399-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -503,6 +579,8 @@
       {
         id: "hd-313499026",
         name: "Daltile LuxeCraft Arteko Antique White 3 in. x 12 in. Glazed Ceramic Wall Tile",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/7c927ef8-3f18-4b52-a903-13f057391f19/svn/antique-white-daltile-ceramic-tile-ak01312hd1p2-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -516,6 +594,8 @@
       {
         id: "hd-324087709",
         name: "TrafficMaster Breaksea Island 6 MIL x 6 in. x 36 in. Waterproof Click Lock Vinyl Plank Flooring",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/ee8d380a-1f0a-4b77-a8fb-6b96a15d3659/svn/breaksea-island-trafficmaster-vinyl-plank-flooring-vtrhdbreais6x36-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -527,6 +607,8 @@
       {
         id: "hd-309083456",
         name: "Lifeproof Sterling Oak 22 MIL x 8.7 in. W x 48 in. L Click Lock Waterproof Luxury Vinyl Plank Flooring",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/bcd22c39-3623-4830-b3e1-263f59ff1731/svn/sterling-oak-lifeproof-vinyl-plank-flooring-i966106lp-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -538,6 +620,8 @@
       {
         id: "hd-338071457",
         name: "Flooret Modin Nakan Craftsman 40 MIL x 3.35 in x 72 in Waterproof Click Lock Luxury Vinyl Plank Flooring",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/f5c347df-afdf-407e-8ebc-acacc6030c8b/svn/nakan-flooret-vinyl-plank-flooring-fl-mr-naka-c-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -551,6 +635,8 @@
       {
         id: "hd-100141333",
         name: "Glidden Maintenance 5 gal. White Flat Interior and Exterior Paint (per gallon)",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/bdcb331f-bb58-4c8b-a85b-964ee8b86cd5/svn/white-glidden-maintenance-paint-colors-920-05-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -562,6 +648,8 @@
       {
         id: "hd-205853483",
         name: "BEHR PRO 5 gal. i300 White Eggshell Interior Paint (per gallon)",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/eb428f32-538c-4c3e-9f40-90dc64693064/svn/white-behr-pro-paint-colors-pr33005-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -573,6 +661,8 @@
       {
         id: "hd-204405959",
         name: "BEHR PREMIUM PLUS 12 Swiss Coffee Paint (per gallon)",
+        imageUrl:
+          "https://images.thdstatic.com/catalog/productImages/600/a3/a3d1f5d4-2b67-4aa7-bd28-9258ce2de6fc_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -586,6 +676,8 @@
       {
         id: "hd-202246803",
         name: "Glidden Ceiling 1 gal. High-Hiding White Interior Dead-Flat Ceiling Paint (per gallon)",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/b2aad817-b076-4fb5-84a0-2ad7e7632b90/svn/white-glidden-ceiling-ceiling-paint-gpl-0000-01-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -595,19 +687,23 @@
         ],
       },
       {
-        id: "hd-307298172",
-        name: "Glidden Diamond 1 gal. White Flat Interior One-Coat Ceiling Paint with Primer (per gallon)",
+        id: "hd-202188704",
+        name: "Glidden Premium Ceiling 1 gal. Bright White Interior Flat EZ Track Ceiling Paint (per gallon)",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/46e7a530-1c8f-4397-8be6-4fdd864cec6f/svn/white-glidden-premium-ceiling-ceiling-paint-gcn3070-01-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
             price: 34.98,
-            url: "https://www.homedepot.com/p/Glidden-Diamond-1-gal-White-Flat-Interior-One-Coat-Ceiling-Paint-with-Primer-PPG83-610/307298172",
+            url: "https://www.homedepot.com/p/Glidden-Premium-Ceiling-1-gal-Bright-White-Interior-Flat-EZ-Track-Ceiling-Paint-GCN3070-01/202188704",
           },
         ],
       },
       {
         id: "hd-204805213",
         name: "Zinsser 1 gal. Flat Bright White Ceiling Paint and Primer in One (2-Pack) (per gallon)",
+        imageUrl:
+          "https://images.thdstatic.com/productImages/ab8a94a8-2de1-482a-88d1-9f2306a424f8/svn/flat-zinsser-ceiling-paint-260967-64_600.jpg",
         retailers: [
           {
             name: "Home Depot",
@@ -631,6 +727,38 @@
 
   function formatQty(n) {
     return (Number(n) || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  }
+
+  // Best-effort guess at a product's real finish color, parsed from its
+  // retail title (e.g. "... in White", "... Matte Black ..."). This is NOT
+  // a real spec field — Home Depot's search results don't expose one — just
+  // a heuristic over free-text titles, used to retint the 3D preview's
+  // generic fixture proxy toward roughly the right color once a real
+  // product is picked. Returns null when nothing recognizable matches,
+  // which is expected and fine: the 3D proxy just keeps its default color.
+  // Ordered most-specific phrase first (checked in order, first match
+  // wins) so "matte black" doesn't fall through to a generic "black".
+  var FINISH_COLOR_WORDS = [
+    { match: /matte black/i, hex: 0x1c1c1c },
+    { match: /oil.rubbed bronze/i, hex: 0x3d2b1f },
+    { match: /brushed gold|champagne bronze/i, hex: 0xc9a227 },
+    { match: /brushed nickel|satin nickel/i, hex: 0xb8b3ab },
+    { match: /polished chrome|\bchrome\b/i, hex: 0xd8dadb },
+    { match: /\bespresso\b/i, hex: 0x3b2a1f },
+    { match: /\bwalnut\b/i, hex: 0x5a3a26 },
+    { match: /\b(oak|maple|natural wood)\b/i, hex: 0x8a6239 },
+    { match: /\bgray\b|\bgrey\b/i, hex: 0x8a8d90 },
+    { match: /\bblack\b/i, hex: 0x1c1c1c },
+    { match: /\bbone\b|\balmond\b|\bbiscuit\b/i, hex: 0xf0e4d0 },
+    { match: /\bwhite\b/i, hex: 0xfdfcf9 },
+  ];
+
+  function guessFinishColor(productName) {
+    if (!productName) return null;
+    for (var i = 0; i < FINISH_COLOR_WORDS.length; i++) {
+      if (FINISH_COLOR_WORDS[i].match.test(productName)) return FINISH_COLOR_WORDS[i].hex;
+    }
+    return null;
   }
 
   // Deterministic placeholder "regional adjustment" so different ZIP codes
@@ -695,7 +823,7 @@
       var adjusted = opt.retailers.map(function (r) {
         return { name: r.name, price: round2(r.price * factor), url: r.url };
       });
-      return { id: opt.id, name: opt.name, best: bestRetailer(adjusted) };
+      return { id: opt.id, name: opt.name, imageUrl: opt.imageUrl || null, best: bestRetailer(adjusted) };
     });
   }
 
@@ -725,5 +853,6 @@
     categoriesFromLines: categoriesFromLines,
     getOptionsForCategory: getOptionsForCategory,
     computeMaterialCost: computeMaterialCost,
+    guessFinishColor: guessFinishColor,
   };
 });

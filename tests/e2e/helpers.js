@@ -72,6 +72,16 @@ async function skipRoomInteractionSteps(page) {
   }
 }
 
+// Tests that only care about reaching the estimate card and aren't about
+// the materials picker itself (room-shape/3D-camera flow, pure labor
+// pricing math, validation, PDF plumbing) turn materialsEstimator off so a
+// materials category among their fixtures doesn't route them into the
+// ZIP + per-category product-pick steps — see chat.spec.js's "the merged
+// fixtures + real-product-pick flow" describe block for coverage of that.
+async function disableMaterials(page) {
+  await useConfig(page, { materialsEstimator: { enabled: false } });
+}
+
 async function loginAdmin(page) {
   await page.goto("/admin/");
   await page.fill("#login-password", "templein26)");
@@ -108,6 +118,7 @@ module.exports = {
   answerScope,
   fillGroup,
   skipRoomInteractionSteps,
+  disableMaterials,
   loginAdmin,
   chooseAdmin,
   fillAdminQuote,

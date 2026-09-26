@@ -61,6 +61,27 @@ test("getOptionsForCategory resolves the cheapest retailer per option and applie
   assert.deepEqual(options[0].best.price, again[0].best.price);
 });
 
+test("getOptionsForCategory carries each option's real product photo through, or null if it has none", () => {
+  const options = M.getOptionsForCategory("Toilet_Quantity", "84101");
+  assert.ok(options.length > 0);
+  options.forEach((opt) => {
+    assert.ok(opt.imageUrl === null || typeof opt.imageUrl === "string");
+  });
+  assert.ok(
+    options.some((opt) => typeof opt.imageUrl === "string" && opt.imageUrl.length > 0),
+    "the real scraped catalog should have at least one toilet with a photo",
+  );
+});
+
+test("guessFinishColor matches common retail finish words and falls back to null", () => {
+  assert.equal(M.guessFinishColor("KOHLER Elmbrook Sliding Frameless Shower Door in Matte Black"), 0x1c1c1c);
+  assert.equal(M.guessFinishColor("Glacier Bay Toilet in White"), 0xfdfcf9);
+  assert.equal(M.guessFinishColor("Delta Faucet in Oil-Rubbed Bronze"), 0x3d2b1f);
+  assert.equal(M.guessFinishColor("Some Vanity With No Finish Word"), null);
+  assert.equal(M.guessFinishColor(""), null);
+  assert.equal(M.guessFinishColor(null), null);
+});
+
 test("mockRegionalFactor is deterministic and stays in a plausible +/-10% range", () => {
   assert.equal(M.mockRegionalFactor("84101"), M.mockRegionalFactor("84101"));
   const factor = M.mockRegionalFactor("84101");
