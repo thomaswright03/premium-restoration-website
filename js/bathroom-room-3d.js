@@ -15,6 +15,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 var Layout = window.BathroomRoomLayout;
 
@@ -75,9 +76,12 @@ function applyFixtureFinish(instance, fixtureKey, mat, colorHex) {
   if (!sharedMaterial) return;
   var tinted = null;
   instance.traverse(function (child) {
-    if (child.isMesh && child.material === sharedMaterial) {
+    // Real product models (see FIXTURE_MODELS) mark their own finish
+    // surface with userData.finishBase instead of sharing `mat`'s material.
+    var base = child.isMesh && (child.userData.finishBase || (child.material === sharedMaterial && sharedMaterial));
+    if (base) {
       if (!tinted) {
-        tinted = sharedMaterial.clone();
+        tinted = base.clone();
         tinted.color.setHex(colorHex);
         // Marks this as a clone made just for this instance, as opposed to
         // every mesh still pointing at the shared, reused-forever template
@@ -118,7 +122,7 @@ function updateFixtureFinishInstances(s, fixtureKey, colorHex) {
     instance.traverse(function (child) {
       if (child.isMesh && child.material && child.material.userData && child.material.userData.isFinishClone) {
         child.material.dispose();
-        child.material = sharedMaterial;
+        child.material = child.userData.finishBase || sharedMaterial;
       }
     });
     if (colorHex != null) applyFixtureFinish(instance, fixtureKey, s.mat, colorHex);
@@ -540,6 +544,63 @@ function buildShowerShelf(geo, mat) {
 // Toilets are built separately (see buildToiletTemplates below) since,
 // unlike every other fixture, they have two interchangeable styles the
 // visitor can pick between live.
+// ---------------------------------------------------------------------
+// Real product models
+// ---------------------------------------------------------------------
+// Manufacturer/catalog 3D models, converted from .obj by
+// tools/models/obj-to-glb.mjs into this file's fixture convention (feet,
+// Y up, back on the wall at z = 0, projecting toward +z, resting on the
+// floor or — wall-hung — at its real mount height). Loaded after the scene
+// is up; until one arrives (or if it fails to), the procedural stand-in
+// for that fixture type keeps rendering, so nothing here can break the
+// preview. The source OBJs carry no usable materials, so every mesh gets
+// the shared glazed-porcelain material (and stays retintable by
+// setFixtureFinish() via userData.finishBase).
+var FIXTURE_MODELS = {
+  Toilet_Quantity: "models/fixtures/toilet.glb",
+  Sink_Quantity: "models/fixtures/sink.glb",
+  Bathtub_Quantity: "models/fixtures/bathtub.glb",
+};
+
+// Fetched lazily, the first time a fixture of that type is actually placed
+// (see rebuildFixtures()) — most visitors never add a tub, and pulling
+// every model at estimate start competes with the chat UI for the main
+// thread on slower devices.
+var fixtureModelLoader = null;
+
+function ensureFixtureModel(s, fixtureKey) {
+  if (!FIXTURE_MODELS[fixtureKey] || s.modelRequests[fixtureKey]) return;
+  s.modelRequests[fixtureKey] = true;
+  if (!fixtureModelLoader) fixtureModelLoader = new GLTFLoader();
+  fixtureModelLoader.load(
+    FIXTURE_MODELS[fixtureKey],
+    function (gltf) {
+      var template = gltf.scene;
+      template.traverse(function (child) {
+        if (child.isMesh) {
+          child.material = s.mat.porcelainGloss;
+          child.userData.finishBase = s.mat.porcelainGloss;
+        }
+      });
+      if (fixtureKey === "Toilet_Quantity") {
+        // One real model replaces both procedural styles — the style
+        // switch only chooses between stand-ins, so it's hidden once a
+        // real toilet is showing (see rebuildFixtures()).
+        s.toiletTemplates.A = template;
+        s.toiletTemplates.B = template;
+      } else {
+        s.fixtureTemplates[fixtureKey] = template;
+      }
+      s.realModels[fixtureKey] = true;
+      markDirty();
+    },
+    undefined,
+    function (err) {
+      console.warn("3D preview: couldn't load " + FIXTURE_MODELS[fixtureKey] + ", keeping the stand-in.", err);
+    },
+  );
+}
+
 function buildToiletTemplates(geo, mat) {
   return { A: buildToiletStyleA(geo, mat), B: buildToiletStyleB(geo, mat) };
 }
@@ -866,6 +927,8 @@ function ensureScene() {
       mat: mat,
       fixtureTemplates: fixtureTemplates,
       toiletTemplates: toiletTemplates,
+      realModels: {}, // fixtureKey -> true once its real model replaced the stand-in
+      modelRequests: {}, // fixtureKey -> true once its model fetch has started
       fixtureGroup: fixtureGroup,
       shellMaterials: shellMaterials,
       shellGroup: shellGroup,
@@ -1355,6 +1418,7 @@ function rebuildFixtures(s, widthFt, lengthFt) {
   });
   var toiletCount = 0;
   layout.placements.forEach(function (p) {
+    ensureFixtureModel(s, p.fixtureKey);
     // An entry point without a door renders as a trimmed open archway —
     // no slab or knob — instead of the normal door template.
     var archway = p.fixtureKey === "Door_Quantity" && p.hasDoor === false;
@@ -1386,7 +1450,7 @@ function rebuildFixtures(s, widthFt, lengthFt) {
     setShadowFlags(instance);
     s.fixtureGroup.add(instance);
   });
-  if (s.toiletStyleSwitch) s.toiletStyleSwitch.hidden = toiletCount === 0;
+  if (s.toiletStyleSwitch) s.toiletStyleSwitch.hidden = toiletCount === 0 || !!s.realModels.Toilet_Quantity;
   syncCameraControls(s);
 }
 

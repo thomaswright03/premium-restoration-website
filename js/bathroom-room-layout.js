@@ -41,11 +41,14 @@
     // Real-world elongated-bowl toilet: ~20in wall clearance, ~28in front
     // projection (tank back to bowl front), ~30in to the tank lid.
     Toilet_Quantity: { wallSpan: 1.7, depth: 2.3, height: 2.5, mount: "floor" },
-    Bathtub_Quantity: { wallSpan: 5.2, depth: 2.6, height: 1.6, mount: "floor" },
+    // Bathtub and sink footprints match the real product models the 3D
+    // preview loads (models/fixtures/, see FIXTURE_MODELS in
+    // js/bathroom-room-3d.js): a 60x34 in. tub and a 22.5x18 in. wall-hung sink.
+    Bathtub_Quantity: { wallSpan: 5.2, depth: 2.9, height: 1.6, mount: "floor" },
     Shower_Quantity: { wallSpan: 3.2, depth: 3.2, height: 6.5, mount: "floor" },
     Shower_Door_Quantity: { wallSpan: 2.5, depth: 0.1, height: 6.5, mount: "attach", attachTo: "Shower_Quantity" },
     Vanity_Quantity: { wallSpan: 2.5, depth: 1.6, height: 2.6, mount: "floor" },
-    Sink_Quantity: { wallSpan: 1.0, depth: 0.8, height: 2.6, mount: "floor" },
+    Sink_Quantity: { wallSpan: 1.9, depth: 1.55, height: 2.6, mount: "floor" },
     Cabinet_Quantity: { wallSpan: 1.6, depth: 1.4, height: 2.6, mount: "floor" },
     Door_Quantity: { wallSpan: 2.5, depth: 0.15, height: 6.75, mount: "floor", preferWall: "S" },
     Mirror_Quantity: {
