@@ -108,7 +108,12 @@
       },
     },
     {
-      pattern: "\\b(tile|tiles|tiling|tiled)\\b",
+      // "floor|wall" consumed together with "tile" (not just as a separate
+      // alternative) so the strip below removes both words — otherwise
+      // "floor tile" leaves "floor" behind to also match the flooring
+      // pattern later, producing two contradictory price lines in one
+      // reply (flooring's own text says "tile floors are priced as tile").
+      pattern: "\\b(?:floor|wall)\\s+(?:tile|tiles|tiling|tiled)\\b|\\b(?:tile|tiles|tiling|tiled)\\b",
       text: function () {
         return "Tile is " + $(PRICES.Tile_Price_Per_SqFt) + " per sq ft of floor or wall tiled (labor only).";
       },

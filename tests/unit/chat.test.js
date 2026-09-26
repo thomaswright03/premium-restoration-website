@@ -23,6 +23,13 @@ const CASES = [
   ["How much do you charge for painting?", "offerEstimate", /Painting is \$1\.79 per sq ft/, null],
   ["What does demolition cost?", "offerEstimate", /Demolition is \$37\.50 per sq ft/, null],
   ["price for flooring", "offerEstimate", /\$5 per sq ft of bathroom floor/, null],
+  // Regression: "floor tile" used to also independently match the
+  // flooring pattern (only the word "tile" got stripped, not "floor"),
+  // producing both prices in one reply with the flooring sentence's own
+  // "tile floors are priced as tile" contradicting the flooring price
+  // quoted right next to it.
+  ["how much for floor tile", "offerEstimate", /Tile is \$4 per sq ft/, /Bathroom flooring is \$5/],
+  ["wall tile cost", "offerEstimate", /Tile is \$4 per sq ft/, /Bathroom flooring is \$5/],
   ["cabinet price?", "offerEstimate", /\$60 per cabinet/, null],
   ["Do you install toilets?", "offerEstimate", /\$200 per toilet.*plumbing work/, null],
   ["how much is a bathtub", "offerEstimate", /\$350 per bathtub/, null],
