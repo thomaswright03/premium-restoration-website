@@ -151,13 +151,12 @@ test.describe("accessibility", () => {
         .getByRole("button", { name: "Neither", exact: true })
         .click();
       await form.getByRole("button", { name: /Continue/ }).click();
-      const fixtures = page.locator('form[data-group="fixtures"]');
-      await fixtures.locator('input[name="Toilet_Quantity"]').fill("1");
-      await fixtures.locator(".ai-chat-group-continue").click();
 
-      // A plumbing fixture was listed, so the wall-click plumbing-walls and
-      // entry-points steps come next — check their contrast too before
-      // skipping through to the estimate card.
+      // This scope needs no floor/wall area, so no "dimensions" step — the
+      // wall-click plumbing-walls and entry-points steps (room-shape,
+      // unconditional whenever the 3D preview is on) come right after
+      // scope, before fixtures. Check their contrast too before skipping
+      // through to fixtures and the estimate card.
       await expect(page.locator(".ai-chat-group-intro", { hasText: "carry the plumbing stack" })).toBeVisible();
       results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
       expect(results.violations.flatMap((v) => v.nodes.map((n) => n.target + " " + n.failureSummary))).toEqual([]);
@@ -167,6 +166,10 @@ test.describe("accessibility", () => {
       results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
       expect(results.violations.flatMap((v) => v.nodes.map((n) => n.target + " " + n.failureSummary))).toEqual([]);
       await page.locator(".ai-chat-group-cancel", { hasText: "Skip" }).last().click();
+
+      const fixtures = page.locator('form[data-group="fixtures"]');
+      await fixtures.locator('input[name="Toilet_Quantity"]').fill("1");
+      await fixtures.locator(".ai-chat-group-continue").click();
 
       await expect(page.getByTestId("estimate-card")).toBeVisible();
       results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();

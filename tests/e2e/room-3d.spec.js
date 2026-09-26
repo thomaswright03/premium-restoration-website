@@ -25,15 +25,15 @@ test.describe("3D bathroom room preview", () => {
     await startEstimate(page);
     await answerScope(page, NEEDS_WALLS);
     await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 10, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 });
+    // The plumbing-walls and entry-points wall-click steps come next, right
+    // after dimensions and before fixtures (see the dedicated describe
+    // block below for that flow) — skip through them here since this test
+    // is only about the scene surviving every live update, not that flow.
+    await skipRoomInteractionSteps(page);
     await fillGroup(page, "fixtures", { Toilet_Quantity: 1, Vanity_Quantity: 1, Mirror_Quantity: 1 });
 
     const stillAvailable = await page.evaluate(() => window.BathroomRoom3D.available);
     expect(stillAvailable).toBe(true);
-    // A plumbing fixture was listed, so the plumbing-walls and entry-points
-    // wall-click steps come next (see the dedicated describe block below
-    // for that flow) — skip through them here since this test is only
-    // about the scene surviving every live update, not that flow.
-    await skipRoomInteractionSteps(page);
     // The scene object itself must simply have survived every live update.
     await expect(page.getByTestId("estimate-card")).toBeVisible();
   });
@@ -73,16 +73,22 @@ async function clickCanvasWall(page) {
 }
 
 test.describe("3D room preview: wall-click plumbing walls, entry points, walk-in POV", () => {
-  async function reachFixturesStep(page, fixtures) {
+  // Room-shape steps (plumbing walls, entry points) come right after
+  // dimensions and before fixtures — they're basic facts about the room
+  // itself, not something derived from which fixtures end up chosen, so
+  // they're offered unconditionally (whenever the 3D preview is up),
+  // before fixture counts are even asked.
+  async function reachRoomShapeSteps(page) {
     await startEstimate(page);
     await answerScope(page, NEEDS_WALLS);
     await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 10, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 });
     await page.waitForFunction(() => window.BathroomRoom3D && window.BathroomRoom3D.available === true);
-    await fillGroup(page, "fixtures", fixtures);
   }
 
-  test("a plumbing fixture triggers the plumbing-walls step; clicking a wall enables Continue", async ({ page }) => {
-    await reachFixturesStep(page, { Toilet_Quantity: 1 });
+  test("the plumbing-walls step appears right after dimensions, before fixtures; clicking a wall enables Continue", async ({
+    page,
+  }) => {
+    await reachRoomShapeSteps(page);
 
     const intro = page.locator(".ai-chat-group-intro", { hasText: "Which wall(s) carry the plumbing stack" });
     await expect(intro).toBeVisible();
@@ -97,28 +103,27 @@ test.describe("3D room preview: wall-click plumbing walls, entry points, walk-in
     await expect(continueBtn).toBeEnabled();
 
     await continueBtn.click();
-    // Next step is entry points, not another plumbing-walls prompt.
+    // Next step is entry points, not fixtures yet.
     await expect(page.locator(".ai-chat-group-intro", { hasText: "How many entry points" })).toBeVisible();
   });
 
-  test("no plumbing fixtures skips straight to the entry-points step", async ({ page }) => {
-    await reachFixturesStep(page, { Cabinet_Quantity: 1 });
-    await expect(page.locator(".ai-chat-group-intro", { hasText: "carry the plumbing stack" })).toHaveCount(0);
-    await expect(page.locator(".ai-chat-group-intro", { hasText: "How many entry points" })).toBeVisible();
-  });
-
-  test("skipping the plumbing-walls and entry-points steps still reaches the estimate", async ({ page }) => {
-    await reachFixturesStep(page, { Toilet_Quantity: 1 });
+  test("skipping the plumbing-walls and entry-points steps still reaches the estimate once fixtures are filled", async ({
+    page,
+  }) => {
+    await reachRoomShapeSteps(page);
     await page.locator(".ai-chat-group-cancel", { hasText: "Skip" }).last().click();
     await expect(page.locator(".ai-chat-group-intro", { hasText: "How many entry points" })).toBeVisible();
     await page.locator(".ai-chat-group-cancel", { hasText: "Skip" }).last().click();
+    await fillGroup(page, "fixtures", { Toilet_Quantity: 1 });
     await expect(page.getByTestId("estimate-card")).toBeVisible();
   });
 
-  test("placing an entry point: pick a wall, nudge it, answer the door question, confirm, reach the estimate", async ({
+  test("placing an entry point: pick a wall, nudge it, answer the door question, confirm, then fixtures, then the estimate", async ({
     page,
   }) => {
-    await reachFixturesStep(page, { Cabinet_Quantity: 1 });
+    await reachRoomShapeSteps(page);
+    // Not the focus of this test — skip straight to entry points.
+    await page.locator(".ai-chat-group-cancel", { hasText: "Skip" }).last().click();
     await expect(page.locator(".ai-chat-group-intro", { hasText: "How many entry points" })).toBeVisible();
     await page.locator('input[type="text"][inputmode="numeric"]').last().fill("1");
     await page.locator(".ai-chat-group-continue", { hasText: "Continue" }).last().click();
@@ -135,6 +140,8 @@ test.describe("3D room preview: wall-click plumbing walls, entry points, walk-in
     await page.locator("button", { hasText: "No — open archway" }).click();
     await confirmBtn.click();
 
+    // Fixtures come next, after the room-shape steps.
+    await fillGroup(page, "fixtures", { Cabinet_Quantity: 1 });
     await expect(page.getByTestId("estimate-card")).toBeVisible();
 
     // The walk-in POV toggle appears once a real entry point is placed.
@@ -149,7 +156,9 @@ test.describe("3D room preview: wall-click plumbing walls, entry points, walk-in
   });
 
   test("multiple entry points show a per-entry switcher row once placed", async ({ page }) => {
-    await reachFixturesStep(page, { Cabinet_Quantity: 1 });
+    await reachRoomShapeSteps(page);
+    await page.locator(".ai-chat-group-cancel", { hasText: "Skip" }).last().click();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "How many entry points" })).toBeVisible();
     await page.locator('input[type="text"][inputmode="numeric"]').last().fill("2");
     await page.locator(".ai-chat-group-continue", { hasText: "Continue" }).last().click();
 
@@ -169,6 +178,7 @@ test.describe("3D room preview: wall-click plumbing walls, entry points, walk-in
       await confirmBtn.click();
     }
 
+    await fillGroup(page, "fixtures", { Cabinet_Quantity: 1 });
     await expect(page.getByTestId("estimate-card")).toBeVisible();
     const entrySwitch = page.locator(".ai-chat-room-3d-camera-controls .ai-chat-room-3d-style-switch");
     await expect(entrySwitch).toBeVisible();

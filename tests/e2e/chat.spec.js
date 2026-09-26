@@ -30,8 +30,8 @@ test.describe("chat estimate", () => {
     await startEstimate(page);
     await answerScope(page, NOTHING_BUT_FLOORING);
     await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8 });
-    await fillGroup(page, "fixtures", { Cabinet_Quantity: 3 });
     await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Cabinet_Quantity: 3 });
 
     const card = page.getByTestId("estimate-card");
     await expect(card).toBeVisible();
@@ -72,6 +72,7 @@ test.describe("chat estimate", () => {
       paintCeiling: "Yes",
     });
     await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 9, Bathroom_Length_Ft: 12, Bathroom_Height_Ft: 9 });
+    await skipRoomInteractionSteps(page);
     const counts = {};
     for (const key of [
       "Toilet_Quantity",
@@ -89,7 +90,6 @@ test.describe("chat estimate", () => {
       counts[key] = 2;
     }
     await fillGroup(page, "fixtures", counts);
-    await skipRoomInteractionSteps(page);
     const card = page.getByTestId("estimate-card");
     await expect(card.locator(".ai-chat-estimate-total-label")).toHaveText("Estimated Labor Total, before plumbing");
     const [download] = await Promise.all([
@@ -120,8 +120,8 @@ test.describe("chat estimate", () => {
     });
     await startEstimate(page);
     await answerScope(page, { demolition: "No", floorFinish: "None", walls: "Neither", paintCeiling: "No" });
-    await fillGroup(page, "fixtures", { Vanity_Quantity: 1 });
     await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Vanity_Quantity: 1 });
     const card = page.getByTestId("estimate-card");
     await card.getByRole("button", { name: "Export as PDF" }).click();
     await expect(card.locator(".ai-chat-estimate-pdf-status")).toContainText("couldn't be prepared");
@@ -151,6 +151,7 @@ test.describe("chat estimate", () => {
 
     await dims.locator('input[name="Bathroom_Width_Ft"]').fill("5");
     await dims.locator(".ai-chat-group-continue").click();
+    await skipRoomInteractionSteps(page);
     const fixtures = page.locator('form[data-group="fixtures"]');
     await fixtures.locator('input[name="Toilet_Quantity"]').fill("2.5");
     await fixtures.locator(".ai-chat-group-continue").click();
@@ -159,7 +160,6 @@ test.describe("chat estimate", () => {
 
     await fixtures.locator('input[name="Toilet_Quantity"]').fill("1");
     await fixtures.locator(".ai-chat-group-continue").click();
-    await skipRoomInteractionSteps(page);
     const card = page.getByTestId("estimate-card");
     await expect(card).toContainText("Demolition");
     await expect(card.locator(".ai-chat-estimate-total-value")).toHaveText("$1,700.00");
@@ -176,8 +176,8 @@ test.describe("chat estimate", () => {
     await startEstimate(page);
     await answerScope(page, NOTHING_BUT_FLOORING);
     await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8 });
-    await fillGroup(page, "fixtures", { Cabinet_Quantity: 3 });
     await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Cabinet_Quantity: 3 });
     await page.getByRole("link", { name: "Contact Us About This →" }).click();
     await expect(page).toHaveURL(/contact\.html\?from=estimate/);
     const message = page.locator("#message");

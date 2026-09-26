@@ -264,6 +264,18 @@ document.addEventListener("DOMContentLoaded", function () {
           }),
         });
       }
+      // Room shape — which wall(s) carry the plumbing stack and where the
+      // entry point(s) are — comes before fixture counts, not after: these
+      // are basic facts about the room itself (like its dimensions), not
+      // something derived from what fixtures end up chosen. Both steps are
+      // skippable, so asking before fixtures are picked is harmless even if
+      // the job turns out to need no plumbing fixtures at all. Only offered
+      // when the 3D preview is actually up and running (room3dInteractive())
+      // — otherwise there is nothing to click.
+      if (scope && room3dInteractive()) {
+        groups.push({ id: "plumbing-walls" });
+        groups.push({ id: "entry-points" });
+      }
       groups.push({
         id: "fixtures",
         intro: "Last step — how many of each should we install? Leave blank or enter 0 for any that don't apply.",
@@ -307,27 +319,11 @@ document.addEventListener("DOMContentLoaded", function () {
       return !!(bathroomRoom3dEnabled() && window.BathroomRoom3D && window.BathroomRoom3D.available);
     }
 
-    // Fixture counts aren't known until the "fixtures" group is submitted,
-    // so whether to ask about plumbing walls can only be decided then —
-    // this splices the follow-up groups in right after it, once.
-    function insertRoomInteractionGroups() {
-      if (!room3dInteractive()) return;
-      var hasPlumbingFixture = Pricing.FIXTURES.some(function (f) {
-        return f.needsPlumbing && (parseFloat(quoteState.values[f.key]) || 0) > 0;
-      });
-      var extra = [];
-      if (hasPlumbingFixture) extra.push({ id: "plumbing-walls" });
-      extra.push({ id: "entry-points" });
-      var insertAt = quoteState.index + 1;
-      quoteState.groups.splice.apply(quoteState.groups, [insertAt, 0].concat(extra));
-    }
-
     function advance() {
       if (quoteState.index === 0) {
-        // The scope decides which measurements are asked for.
+        // The scope decides which measurements are asked for, and whether
+        // the room-interaction steps are offered — see buildGroups().
         quoteState.groups = buildGroups(quoteState.scope);
-      } else if (quoteState.groups[quoteState.index].id === "fixtures") {
-        insertRoomInteractionGroups();
       }
       quoteState.index++;
       if (quoteState.index < quoteState.groups.length) {
