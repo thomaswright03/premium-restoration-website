@@ -432,6 +432,25 @@ test("computeLayout: an entry point on a wall too narrow for the door's footprin
   assert.equal(result.droppedCounts.Door_Quantity, 1);
 });
 
+test("computeLayout: an entry point placed away from a plumbing wall's start doesn't falsely claim the free space before it", () => {
+  // Regression: wall.used was being jumped straight to the door's far edge
+  // regardless of how much genuinely free space sat before it on the wall,
+  // so restricting a fixture to that same wall (via plumbingWallIds) wrongly
+  // dropped it even though most of the wall was still open floor.
+  var result = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    plumbingWallIds: ["N"],
+    entryPoints: [{ wallId: "N", offsetFt: 9, hasDoor: true }],
+    fixtureCounts: { Toilet_Quantity: 1 },
+  });
+  var toilet = result.placements.filter((p) => p.fixtureKey === "Toilet_Quantity")[0];
+  var door = result.placements.filter((p) => p.fixtureKey === "Door_Quantity")[0];
+  assert.ok(door, "the entry point itself should still be placed");
+  assert.ok(toilet, "the toilet should still fit in the ~7.5ft of free floor before the door");
+  assert.equal(result.droppedCounts.Toilet_Quantity, undefined);
+});
+
 test("computeLayout: an entry point whose wall id doesn't exist is dropped rather than throwing", () => {
   var result = L.computeLayout({
     widthFt: 10,

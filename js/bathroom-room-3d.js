@@ -79,8 +79,25 @@ function applyFixtureFinish(instance, fixtureKey, mat, colorHex) {
       if (!tinted) {
         tinted = sharedMaterial.clone();
         tinted.color.setHex(colorHex);
+        // Marks this as a clone made just for this instance, as opposed to
+        // every mesh still pointing at the shared, reused-forever template
+        // material — rebuildFixtures() uses this to know which materials
+        // it's safe (and necessary) to dispose() when a fixture is rebuilt.
+        tinted.userData.isFinishClone = true;
       }
       child.material = tinted;
+    }
+  });
+}
+
+// Releases GPU resources (compiled shader program) for the one-off tinted
+// material clones applyFixtureFinish() creates. The template's own shared
+// geometries/materials (still referenced by every future template.clone())
+// are deliberately left untouched.
+function disposeFixtureInstance(instance) {
+  instance.traverse(function (child) {
+    if (child.isMesh && child.material && child.material.userData && child.material.userData.isFinishClone) {
+      child.material.dispose();
     }
   });
 }
@@ -949,7 +966,9 @@ function setShadowFlags(object3d) {
 
 function rebuildFixtures(s, widthFt, lengthFt) {
   while (s.fixtureGroup.children.length) {
-    s.fixtureGroup.remove(s.fixtureGroup.children[0]);
+    var old = s.fixtureGroup.children[0];
+    disposeFixtureInstance(old);
+    s.fixtureGroup.remove(old);
   }
   var layout = Layout.computeLayout({
     widthFt: widthFt,
@@ -1031,7 +1050,11 @@ function applyCameraMode(s) {
       state.cameraMode = "orbit";
     } else {
       var normal = WALL_INWARD_NORMAL[ep.wallId] || { x: 0, z: 1 };
-      var eyeHeight = 5.5;
+      // A typical standing eye height, but never above the ceiling: rooms
+      // can legally be as short as Layout.RENDER_MIN_DIM (2ft), where a
+      // fixed 5.5ft would put the camera outside the shell looking at the
+      // back (non-rendering) side of the BackSide-material ceiling.
+      var eyeHeight = Math.min(5.5, dims.heightFt - 1);
       var epsilon = 0.05;
       s.cameraLerp = null;
       s.camera.position.set(ep.x, eyeHeight, ep.z);

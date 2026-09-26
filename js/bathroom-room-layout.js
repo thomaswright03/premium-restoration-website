@@ -392,7 +392,16 @@
         placement.fixtureKey = "Door_Quantity";
         placement.index = i;
         placement.hasDoor = ep.hasDoor !== false;
-        wall.used = Math.max(wall.used, alongOffset + doorHalfWidth);
+        // Deliberately NOT touching wall.used here. wall.used is a
+        // left-to-right packing cursor for the automatic scan below, which
+        // always tries a fixture at exactly wall.used + halfWidth — it
+        // assumes everything before that point is occupied. A customer's
+        // explicit entry point can land anywhere on the wall (here, well
+        // past its start), and treating everything before it as "used"
+        // wrongly claims real free floor space the automatic scan could
+        // still use. The actual conflict-avoidance is placedRects/
+        // rectsOverlap below, which checks real overlap regardless of
+        // wall.used and already covers this correctly.
         placedRects.push(rect);
         placements.push(placement);
         placedByType.Door_Quantity.push(placement);
