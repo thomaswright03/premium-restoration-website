@@ -199,4 +199,41 @@ test.describe("3D room preview: wall-click plumbing walls, entry points, walk-in
     await expect(entrySwitch).toBeVisible();
     await expect(entrySwitch.locator(".ai-chat-room-3d-style-btn")).toHaveCount(2);
   });
+
+  test("Cancel on the plumbing-walls step abandons the whole estimate, not just that step", async ({ page }) => {
+    await reachRoomShapeSteps(page);
+    await expect(
+      page.locator(".ai-chat-group-intro", { hasText: "Which wall(s) carry the plumbing stack" }),
+    ).toBeVisible();
+    await page.locator(".ai-chat-group-cancel", { hasText: "Cancel" }).last().click();
+    await expect(page.locator("#ai-chat-room-3d")).toBeHidden();
+    await expect(page.locator("#ai-chat-form")).toBeVisible();
+  });
+
+  test("Cancel on the entry-points count step abandons the whole estimate", async ({ page }) => {
+    await reachRoomShapeSteps(page);
+    await page.locator(".ai-chat-group-cancel", { hasText: "Skip" }).last().click();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "How many entry points" })).toBeVisible();
+    await page.locator(".ai-chat-group-cancel", { hasText: "Cancel" }).last().click();
+    await expect(page.locator("#ai-chat-room-3d")).toBeHidden();
+    await expect(page.locator("#ai-chat-form")).toBeVisible();
+  });
+
+  test("Cancel is available on the per-entry-point wall-pick screen, even before a wall is clicked", async ({
+    page,
+  }) => {
+    await reachRoomShapeSteps(page);
+    await page.locator(".ai-chat-group-cancel", { hasText: "Skip" }).last().click();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "How many entry points" })).toBeVisible();
+    await page.locator(".ai-chat-group-continue", { hasText: "Continue" }).last().click();
+
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "click its wall" }).last()).toBeVisible();
+    // No wall picked yet — this is exactly the state that used to have no
+    // actionable button at all.
+    const cancelBtn = page.locator(".ai-chat-group-cancel", { hasText: "Cancel" }).last();
+    await expect(cancelBtn).toBeVisible();
+    await cancelBtn.click();
+    await expect(page.locator("#ai-chat-room-3d")).toBeHidden();
+    await expect(page.locator("#ai-chat-form")).toBeVisible();
+  });
 });

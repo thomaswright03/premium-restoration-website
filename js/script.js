@@ -576,6 +576,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
       var actionsWrap = document.createElement("div");
       actionsWrap.className = "ai-chat-group-actions";
+      var cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.className = "ai-chat-group-cancel";
+      cancelBtn.textContent = "Cancel";
       var skipBtn = document.createElement("button");
       skipBtn.type = "button";
       skipBtn.className = "ai-chat-group-cancel";
@@ -585,6 +589,7 @@ document.addEventListener("DOMContentLoaded", function () {
       continueBtn.className = "ai-chat-group-continue";
       continueBtn.textContent = "Continue →";
       continueBtn.disabled = true;
+      actionsWrap.appendChild(cancelBtn);
       actionsWrap.appendChild(skipBtn);
       actionsWrap.appendChild(continueBtn);
       content.appendChild(actionsWrap);
@@ -592,14 +597,24 @@ document.addEventListener("DOMContentLoaded", function () {
       chatMessages.appendChild(parts.row);
       scrollToEnd();
 
-      var selectedIds = [];
-      function finish(ids) {
+      function disableActions() {
+        cancelBtn.disabled = true;
         skipBtn.disabled = true;
         continueBtn.disabled = true;
+      }
+
+      var selectedIds = [];
+      function finish(ids) {
+        disableActions();
         window.BathroomRoom3D.endWallPicking();
         window.BathroomRoom3D.setPlumbingWalls(ids);
         advance();
       }
+      cancelBtn.addEventListener("click", function () {
+        disableActions();
+        window.BathroomRoom3D.endWallPicking();
+        cancelFlow();
+      });
       skipBtn.addEventListener("click", function () {
         finish([]);
       });
@@ -647,6 +662,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
       var actionsWrap = document.createElement("div");
       actionsWrap.className = "ai-chat-group-actions";
+      var cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.className = "ai-chat-group-cancel";
+      cancelBtn.textContent = "Cancel";
       var skipBtn = document.createElement("button");
       skipBtn.type = "button";
       skipBtn.className = "ai-chat-group-cancel";
@@ -655,6 +674,7 @@ document.addEventListener("DOMContentLoaded", function () {
       continueBtn.type = "submit";
       continueBtn.className = "ai-chat-group-continue";
       continueBtn.textContent = "Continue →";
+      actionsWrap.appendChild(cancelBtn);
       actionsWrap.appendChild(skipBtn);
       actionsWrap.appendChild(continueBtn);
       formEl.appendChild(actionsWrap);
@@ -662,6 +682,11 @@ document.addEventListener("DOMContentLoaded", function () {
       parts.inner.appendChild(content);
       chatMessages.appendChild(parts.row);
       scrollToEnd();
+
+      cancelBtn.addEventListener("click", function () {
+        disableAll(content);
+        cancelFlow();
+      });
 
       function disableAll(root) {
         Array.prototype.forEach.call(root.querySelectorAll("input, button"), function (el) {
@@ -721,6 +746,24 @@ document.addEventListener("DOMContentLoaded", function () {
         wallStatus.className = "ai-chat-group-intro";
         wallStatus.textContent = "No wall selected yet.";
         epContent.appendChild(wallStatus);
+
+        // Visible from the start (not nested inside detailsWrap, which
+        // stays hidden until a wall is picked below) — otherwise a visitor
+        // who wants out right at "click its wall" has no button at all to
+        // do that with.
+        var topActionsWrap = document.createElement("div");
+        topActionsWrap.className = "ai-chat-group-actions";
+        var cancelBtn = document.createElement("button");
+        cancelBtn.type = "button";
+        cancelBtn.className = "ai-chat-group-cancel";
+        cancelBtn.textContent = "Cancel";
+        cancelBtn.addEventListener("click", function () {
+          disableAll(epContent);
+          window.BathroomRoom3D.endWallPicking();
+          cancelFlow();
+        });
+        topActionsWrap.appendChild(cancelBtn);
+        epContent.appendChild(topActionsWrap);
 
         var detailsWrap = document.createElement("div");
         detailsWrap.hidden = true;
