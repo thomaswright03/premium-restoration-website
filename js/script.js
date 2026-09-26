@@ -1544,6 +1544,15 @@ document.addEventListener("DOMContentLoaded", function () {
             var r = window.ChatReplies.reply(message, { estimatorEnabled: estimatorEnabled() });
             chatSend.disabled = false;
             if (r && r.action === "startEstimate") {
+              // In practice chatSend being disabled during this ~500-900ms
+              // delay already blocks a second Enter-triggered submission
+              // (a disabled default submit button stops implicit form
+              // submission) — but that's an incidental side effect of
+              // button state, not something this code path asserts on
+              // purpose. Guard explicitly instead of relying on it, the
+              // same way appendEstimateOffer() already does: never start a
+              // second estimate over one that's already running.
+              if (quoteState) return;
               if (starterRow && starterRow.parentNode) starterRow.remove();
               startEstimate();
               return;
