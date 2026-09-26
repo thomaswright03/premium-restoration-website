@@ -288,6 +288,7 @@ function buildGeometries() {
     showerDoorFrameEdge: new THREE.BoxGeometry(0.06, 6.5, 0.06),
     doorSlab: new THREE.BoxGeometry(2.5, 6.75, 0.15),
     doorKnob: new THREE.SphereGeometry(0.05, 8, 8),
+    doorFrameEdge: new THREE.BoxGeometry(0.06, 6.75, 0.06),
     vanityBody: new THREE.BoxGeometry(2.5, 2.6, 1.6),
     vanityBasin: new THREE.CylinderGeometry(0.55, 0.5, 0.12, 16),
     cabinetBody: new THREE.BoxGeometry(1.6, 2.6, 1.4),
@@ -446,6 +447,17 @@ function buildEntryDoor(geo, mat) {
   return g;
 }
 
+// An entry point without a door: no slab, no knob — just a trimmed
+// rectangular opening in the wall (same footprint a real door would use),
+// so it reads as a doorway rather than a plain, unbroken wall.
+function buildEntryArchway(geo, mat) {
+  var g = new THREE.Group();
+  var frame = frameStrips(geo.doorFrameEdge, mat.doorTone, 2.5, 6.75);
+  frame.position.set(0, 3.375, 0);
+  g.add(frame);
+  return g;
+}
+
 function buildVanity(geo, mat) {
   var g = new THREE.Group();
   var body = new THREE.Mesh(geo.vanityBody, mat.cabinetWood);
@@ -499,6 +511,7 @@ function buildFixtureTemplates(geo, mat) {
     Shower_Quantity: buildShower(geo, mat),
     Shower_Door_Quantity: buildShowerDoor(geo, mat),
     Door_Quantity: buildEntryDoor(geo, mat),
+    Door_Quantity_Archway: buildEntryArchway(geo, mat),
     Vanity_Quantity: buildVanity(geo, mat),
     Cabinet_Quantity: buildCabinet(geo, mat),
     Mirror_Quantity: buildMirror(geo, mat, false),
@@ -950,11 +963,12 @@ function rebuildFixtures(s, widthFt, lengthFt) {
   });
   var toiletCount = 0;
   layout.placements.forEach(function (p) {
-    // An entry point without a door renders as an open archway — no slab or
-    // knob, just the wall opening the placement already reserved.
-    if (p.fixtureKey === "Door_Quantity" && p.hasDoor === false) return;
-    var template =
-      p.fixtureKey === "Toilet_Quantity"
+    // An entry point without a door renders as a trimmed open archway —
+    // no slab or knob — instead of the normal door template.
+    var archway = p.fixtureKey === "Door_Quantity" && p.hasDoor === false;
+    var template = archway
+      ? s.fixtureTemplates.Door_Quantity_Archway
+      : p.fixtureKey === "Toilet_Quantity"
         ? s.toiletTemplates[state.selectedToiletStyle]
         : s.fixtureTemplates[p.fixtureKey];
     if (!template) return;
@@ -1208,6 +1222,27 @@ window.BathroomRoom3D = {
     markDirty();
   },
 
+  // Whether candidate fixture counts would all actually fit in the current
+  // room (dimensions, plumbing-wall restriction, entry points already
+  // placed) — the same clearance/overlap/anchor checks computeLayout always
+  // runs, just run ahead of time against counts that haven't been
+  // committed to state.fixtures yet, so a submit can be blocked instead of
+  // silently dropping whatever didn't fit. Returns droppedCounts (a plain
+  // {fixtureKey: droppedCount} map, empty when everything fits). Callers
+  // are expected to only pass already-range-validated counts (e.g. after
+  // Pricing.validateJob) — this does no input sanitizing of its own.
+  checkFit: function (fixtureCounts) {
+    var dims = Layout.computeRoomDimensions(state.dims);
+    var result = Layout.computeLayout({
+      widthFt: dims.widthFt,
+      lengthFt: dims.lengthFt,
+      fixtureCounts: fixtureCounts,
+      plumbingWallIds: state.plumbingWallIds,
+      entryPoints: state.entryPoints,
+    });
+    return result.droppedCounts;
+  },
+
   // Applies once a real product is picked for this category in the chat's
   // materials flow — retints every placed instance of that fixture type
   // toward colorHex (see applyFixtureFinish()/FIXTURE_FINISH_MATERIAL_KEY
@@ -1279,6 +1314,14 @@ window.BathroomRoom3D = {
     var span = wallSpanFor(ep.wallId, dims.widthFt, dims.lengthFt);
     ep.offsetFt = Layout.clampEntryOffset(span, ep.offsetFt + (deltaFt || 0));
     markDirty();
+  },
+
+  // A shallow copy of the confirmed entry points so far, each
+  // {wallId, offsetFt, hasDoor} — used to derive the "Entry doors" fixture
+  // count straight from what was actually placed (see appendEntryPointsStep
+  // in js/script.js) instead of asking for it a second time.
+  getEntryPoints: function () {
+    return state.entryPoints.slice();
   },
 
   // --- Walk-in POV camera -------------------------------------------

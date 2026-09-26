@@ -81,24 +81,37 @@ test.describe("chat estimate", () => {
       walls: "Tile (full height)",
       paintCeiling: "Yes",
     });
-    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 9, Bathroom_Length_Ft: 12, Bathroom_Height_Ft: 9 });
+    // Big enough that this whole mix actually fits the room's own clearance
+    // rules (verified against js/bathroom-room-layout.js directly) —
+    // otherwise the fit-check below (see "the merged fixtures + real-
+    // product-pick flow" tests) would rightly block it. Realism isn't the
+    // point here; exercising every field (and the PDF's multi-page output)
+    // is, so quantities are 2 of everything except the shower-attached trio
+    // (a shower's own floor footprint is the biggest single item — 2 of
+    // them alongside 2 of everything else doesn't fit even in a very large
+    // room, a separate, pre-existing layout-algorithm limitation).
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 15, Bathroom_Length_Ft: 15, Bathroom_Height_Ft: 9 });
     await skipRoomInteractionSteps(page);
     const counts = {};
     for (const key of [
       "Toilet_Quantity",
       "Sink_Quantity",
       "Bathtub_Quantity",
-      "Shower_Quantity",
-      "Shower_Door_Quantity",
-      "Door_Quantity",
+      // Door_Quantity is left out here: with the 3D preview on (as it is in
+      // this suite by default), it's derived from entry points confirmed in
+      // skipRoomInteractionSteps() above (skipped -> 0), not a fixture
+      // field of its own — see "entry points derive the Entry doors count"
+      // below for dedicated coverage of that.
       "Vanity_Quantity",
       "Cabinet_Quantity",
       "Mirror_Quantity",
       "Mirror_Huge_Quantity",
-      "Shower_Shelf_Quantity",
     ]) {
       counts[key] = 2;
     }
+    counts.Shower_Quantity = 1;
+    counts.Shower_Door_Quantity = 1;
+    counts.Shower_Shelf_Quantity = 1;
     await fillGroup(page, "fixtures", counts);
     const card = page.getByTestId("estimate-card");
     await expect(card.locator(".ai-chat-estimate-total-label")).toHaveText("Estimated Labor Total, before plumbing");
@@ -296,6 +309,147 @@ test.describe("the merged fixtures + real-product-pick flow", () => {
     await expect(card).toBeVisible();
     await expect(card.locator(".ai-chat-estimate-total-label")).toHaveText("Estimated Labor Total");
     await expect(card).not.toContainText("Materials Subtotal");
+  });
+});
+
+// Entry doors are no longer their own fixture-count field when the 3D
+// preview (and so the entry-points wall-click step) is on — that step is
+// the one source of truth for how many entry doors there are. See
+// buildGroups()/appendEntryPointsStep() in js/script.js.
+test.describe("entry points derive the Entry doors count", () => {
+  const NOTHING = { demolition: "No", floorFinish: "None", walls: "Neither", paintCeiling: "No" };
+
+  test("no manual 'Entry doors' field; placing 2 doored entry points prices 2 entry doors", async ({ page }) => {
+    await disableMaterials(page);
+    await startEstimate(page);
+    await answerScope(page, { demolition: "No", floorFinish: "Tile", walls: "Neither", paintCeiling: "No" });
+    // A real room size, not the small DEFAULT_ROOM fallback — enough space
+    // to actually nudge the second entry point clear of the first's
+    // clearance envelope (same room size the equivalent room-3d.spec.js
+    // multi-entry-point test already uses).
+    const dims = page.locator('form[data-group="dimensions"]').last();
+    await dims.locator('input[name="Bathroom_Width_Ft"]').fill("10");
+    await dims.locator('input[name="Bathroom_Length_Ft"]').fill("8");
+    await dims.locator(".ai-chat-group-continue").click();
+    await expect(page.locator(".ai-chat-group-cancel", { hasText: "Skip" }).last()).toBeVisible();
+    await page.locator(".ai-chat-group-cancel", { hasText: "Skip" }).last().click(); // skip plumbing walls
+
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "How many entry points" })).toBeVisible();
+    await page.locator('input[type="text"][inputmode="numeric"]').last().fill("2");
+    await page.locator(".ai-chat-group-continue").last().click();
+
+    const canvas = page.locator("#ai-chat-room-3d-canvas-wrap canvas");
+    for (let i = 0; i < 2; i++) {
+      await expect(page.locator(".ai-chat-group-intro", { hasText: "click its wall" }).last()).toBeVisible();
+      const box = await canvas.boundingBox();
+      await page.mouse.click(box.x + box.width * 0.3, box.y + box.height * 0.3);
+      if (i === 1) {
+        const rightBtn = page.locator("button", { hasText: "Move right →" }).last();
+        for (let n = 0; n < 6; n++) await rightBtn.click(); // clear of the first point
+      }
+      // Leave the default "Yes" (has a door) for both.
+      await page
+        .locator(".ai-chat-group-continue", { hasText: /Confirm/ })
+        .last()
+        .click();
+    }
+
+    const fixtures = page.locator('form[data-group="fixtures"]').last();
+    await expect(fixtures).toBeVisible();
+    await expect(fixtures.locator('input[name="Door_Quantity"]')).toHaveCount(0);
+    await fixtures.locator(".ai-chat-group-continue").click();
+
+    const card = page.getByTestId("estimate-card");
+    await expect(card).toBeVisible();
+    await expect(card).toContainText("Entry doors");
+    await expect(card).toContainText("2 units × $200.00");
+  });
+
+  test("the 3D preview off keeps the manual 'Entry doors' fixture field", async ({ page }) => {
+    // A single useConfig() call: each call rebuilds site-config.json fresh
+    // from the base and re-registers its own route handler, so a second,
+    // separate call (e.g. disableMaterials()) would silently win and drop
+    // this override instead of merging with it.
+    await useConfig(page, { bathroomVisualizer: { enabled: false }, materialsEstimator: { enabled: false } });
+    await startEstimate(page);
+    await answerScope(page, NOTHING);
+    const fixtures = page.locator('form[data-group="fixtures"]').last();
+    await expect(fixtures).toBeVisible();
+    await expect(fixtures.locator('input[name="Door_Quantity"]')).toHaveCount(1);
+  });
+});
+
+// The room's own clearance/overlap/anchor rules (js/bathroom-room-layout.js
+// — the same ones the 3D preview's own layout always runs) now block a
+// submission that wouldn't actually fit, instead of silently dropping
+// whatever didn't fit later. See checkFit() in js/bathroom-room-3d.js.
+test.describe("the room's own clearance rules block what won't fit", () => {
+  test("a fixture count that can't possibly fit the room is blocked with an inline error", async ({ page }) => {
+    await disableMaterials(page);
+    await startEstimate(page);
+    await answerScope(page, { demolition: "No", floorFinish: "Tile", walls: "Neither", paintCeiling: "No" });
+    const dims = page.locator('form[data-group="dimensions"]').last();
+    await dims.locator('input[name="Bathroom_Width_Ft"]').fill("5");
+    await dims.locator('input[name="Bathroom_Length_Ft"]').fill("5");
+    await dims.locator(".ai-chat-group-continue").click();
+    await skipRoomInteractionSteps(page);
+
+    const fixtures = page.locator('form[data-group="fixtures"]').last();
+    await fixtures.locator('input[name="Toilet_Quantity"]').fill("10");
+    await fixtures.locator(".ai-chat-group-continue").click();
+
+    await expect(fixtures).toBeVisible(); // blocked, not advanced
+    await expect(fixtures.locator(".ai-chat-field-error:visible").first()).toContainText("Not enough room");
+    await expect(page.getByTestId("estimate-card")).toHaveCount(0);
+
+    // Reducing the count to something that fits gets past it.
+    await fixtures.locator('input[name="Toilet_Quantity"]').fill("1");
+    await fixtures.locator(".ai-chat-group-continue").click();
+    await expect(page.getByTestId("estimate-card")).toBeVisible();
+  });
+
+  test("an entry point placed where another already is gets blocked with an inline error", async ({ page }) => {
+    await disableMaterials(page);
+    await startEstimate(page);
+    await answerScope(page, { demolition: "No", floorFinish: "Tile", walls: "Neither", paintCeiling: "No" });
+    const dims = page.locator('form[data-group="dimensions"]').last();
+    await dims.locator('input[name="Bathroom_Width_Ft"]').fill("10");
+    await dims.locator('input[name="Bathroom_Length_Ft"]').fill("8");
+    await dims.locator(".ai-chat-group-continue").click();
+    await page.locator(".ai-chat-group-cancel", { hasText: "Skip" }).last().click();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "How many entry points" })).toBeVisible();
+    await page.locator('input[type="text"][inputmode="numeric"]').last().fill("2");
+    await page.locator(".ai-chat-group-continue").last().click();
+
+    const canvas = page.locator("#ai-chat-room-3d-canvas-wrap canvas");
+    const box = await canvas.boundingBox();
+
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "click its wall" }).last()).toBeVisible();
+    await page.mouse.click(box.x + box.width * 0.3, box.y + box.height * 0.3);
+    await page
+      .locator(".ai-chat-group-continue", { hasText: /Confirm/ })
+      .last()
+      .click();
+
+    // Same spot again, no nudge -> overlaps the first one.
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "click its wall" }).last()).toBeVisible();
+    await page.mouse.click(box.x + box.width * 0.3, box.y + box.height * 0.3);
+    await page
+      .locator(".ai-chat-group-continue", { hasText: /Confirm/ })
+      .last()
+      .click();
+
+    await expect(page.locator(".ai-chat-field-error:visible").last()).toContainText("doesn't fit");
+    await expect(page.locator('form[data-group="fixtures"]')).toHaveCount(0); // blocked, not advanced
+
+    // Nudge clear and it goes through.
+    const rightBtn = page.locator("button", { hasText: "Move right →" }).last();
+    for (let n = 0; n < 6; n++) await rightBtn.click();
+    await page
+      .locator(".ai-chat-group-continue", { hasText: /Confirm/ })
+      .last()
+      .click();
+    await expect(page.locator('form[data-group="fixtures"]')).toBeVisible();
   });
 });
 

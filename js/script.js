@@ -277,14 +277,23 @@ document.addEventListener("DOMContentLoaded", function () {
       // the job turns out to need no plumbing fixtures at all. Only offered
       // when the 3D preview is actually up and running (room3dInteractive())
       // — otherwise there is nothing to click.
-      if (scope && room3dInteractive()) {
+      // Whether the entry-points step runs (just above): when it does, it's
+      // the source of truth for how many entry doors there are (see
+      // appendEntryPointsStep()) — the "Entry doors" fixture-count field
+      // would just be asking the same thing a second time, so it's left out
+      // of the fixtures group below. When the 3D preview is off there's no
+      // other way to say how many entry doors there are, so it stays.
+      var entryPointsStepRuns = !!(scope && room3dInteractive());
+      if (entryPointsStepRuns) {
         groups.push({ id: "plumbing-walls" });
         groups.push({ id: "entry-points" });
       }
       groups.push({
         id: "fixtures",
         intro: "How many of each should we install? Leave blank or enter 0 for any that don't apply.",
-        fields: Pricing.FIXTURES.map(function (f) {
+        fields: Pricing.FIXTURES.filter(function (f) {
+          return f.key !== "Door_Quantity" || !entryPointsStepRuns;
+        }).map(function (f) {
           return { key: f.key, label: f.plural, type: "number", inputmode: "numeric", target: "values" };
         }),
       });
@@ -507,6 +516,24 @@ document.addEventListener("DOMContentLoaded", function () {
           showFieldError(field.key, message);
           if (message && !firstBad) firstBad = field.key;
         });
+        // Beyond just being valid numbers, fixture counts also have to
+        // actually fit the room — the same clearance/overlap/anchor checks
+        // the 3D preview's own layout always runs, just run here first so a
+        // count that would just get silently dropped is blocked instead,
+        // with the customer told which one and why.
+        if (!firstBad && group.id === "fixtures" && room3dInteractive()) {
+          var dropped = window.BathroomRoom3D.checkFit(quoteState.values);
+          group.fields.forEach(function (field) {
+            if (!firstBad && dropped[field.key]) {
+              firstBad = field.key;
+              showFieldError(
+                field.key,
+                "Not enough room for all of these — reduce the count, make the room bigger, or check what " +
+                  "else needs to be picked first (e.g. a vanity or sink for a mirror to mount above).",
+              );
+            }
+          });
+        }
         summaryError.hidden = !firstBad;
         summaryError.textContent = firstBad ? "Please fix the highlighted answers above." : "";
         if (firstBad) {
@@ -644,6 +671,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       skipBtn.addEventListener("click", function () {
         disableAll(content);
+        quoteState.values.Door_Quantity = "0";
         advance();
       });
 
@@ -656,8 +684,21 @@ document.addEventListener("DOMContentLoaded", function () {
         collectEntryPoint(n, 0);
       });
 
+      // Entry doors are no longer asked for separately (see buildGroups()) —
+      // this is now their one source of truth, read straight off what was
+      // actually confirmed above (an entry point counts unless its own
+      // "No — open archway" answer said otherwise).
+      function recordDoorCount() {
+        var points = window.BathroomRoom3D.getEntryPoints();
+        var doorCount = points.filter(function (ep) {
+          return ep.hasDoor !== false;
+        }).length;
+        quoteState.values.Door_Quantity = String(doorCount);
+      }
+
       function collectEntryPoint(total, i) {
         if (i >= total) {
+          recordDoorCount();
           window.BathroomRoom3D.endWallPicking();
           advance();
           return;
@@ -738,6 +779,10 @@ document.addEventListener("DOMContentLoaded", function () {
         confirmBtn.textContent = i === total - 1 ? "Confirm entry point" : "Confirm & next →";
         confirmBtn.disabled = true;
         detailsWrap.appendChild(confirmBtn);
+        var fitError = document.createElement("p");
+        fitError.className = "ai-chat-field-error";
+        fitError.hidden = true;
+        detailsWrap.appendChild(fitError);
         epContent.appendChild(detailsWrap);
         epParts.inner.appendChild(epContent);
         chatMessages.appendChild(epParts.row);
@@ -745,11 +790,26 @@ document.addEventListener("DOMContentLoaded", function () {
 
         leftBtn.addEventListener("click", function () {
           window.BathroomRoom3D.nudgeEntryPoint(i, -0.5);
+          fitError.hidden = true;
         });
         rightBtn.addEventListener("click", function () {
           window.BathroomRoom3D.nudgeEntryPoint(i, 0.5);
+          fitError.hidden = true;
         });
         confirmBtn.addEventListener("click", function () {
+          // Same clearance/overlap check computeLayout always runs, against
+          // just the entry points confirmed so far (this one included) —
+          // catches a wall too narrow for the door, or a position that
+          // overlaps something already placed, before it gets silently
+          // dropped later.
+          var dropped = window.BathroomRoom3D.checkFit({});
+          if (dropped.Door_Quantity) {
+            fitError.textContent =
+              "That spot doesn't fit — try a different wall, or nudge it clear of what's already there.";
+            fitError.hidden = false;
+            return;
+          }
+          fitError.hidden = true;
           disableAll(epContent);
           collectEntryPoint(total, i + 1);
         });
