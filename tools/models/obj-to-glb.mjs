@@ -13,18 +13,20 @@
 //
 //   node tools/models/obj-to-glb.mjs in.obj out.glb [--up z|y|-y|x]
 //        [--front -y|+y|-z|+z|-x|+x] [--units in|cm|mm|ft] [--mount floor|wall]
-//        [--wall-height <in>]
+//        [--wall-height <in>] [--cluster <in>] [--crease <deg>]
 //
 // --up     which source axis points up (3ds Max exports are usually z)
 // --front  which source direction the fixture's front faces
 // --mount  wall: keep the source height instead of dropping it to the
 //          floor, and lift it so its top sits at --wall-height inches
 //          (a wall-hung sink's rim is typically ~34 in.)
+// --cluster  simplification grid size in inches (default 0.35; 0 = off)
+// --crease   edges sharper than this many degrees stay hard (default 40)
 
 import { readFileSync, writeFileSync } from "node:fs";
 
 function parseArgs(argv) {
-  const opts = { up: "z", front: "-y", units: "in", mount: "floor", wallHeight: 34 };
+  const opts = { up: "z", front: "-y", units: "in", mount: "floor", wallHeight: 34, cluster: 0.35, crease: 40 };
   const pos = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -33,6 +35,8 @@ function parseArgs(argv) {
     else if (a === "--units") opts.units = argv[++i];
     else if (a === "--mount") opts.mount = argv[++i];
     else if (a === "--wall-height") opts.wallHeight = Number(argv[++i]);
+    else if (a === "--cluster") opts.cluster = Number(argv[++i]);
+    else if (a === "--crease") opts.crease = Number(argv[++i]);
     else pos.push(a);
   }
   if (pos.length !== 2) {
@@ -94,52 +98,103 @@ function parseObj(text) {
 }
 
 function convert(text, opts) {
-  const { positions, normals, faces } = parseObj(text);
+  const { positions, faces } = parseObj(text);
   const B = basis(opts.up, opts.front);
   const scale = UNIT_TO_FT[opts.units];
   if (!scale) throw new Error("bad --units " + opts.units);
   const rot = (p) => [0, 1, 2].map((r) => B[r][0] * p[0] + B[r][1] * p[1] + B[r][2] * p[2]);
 
   const P = positions.map((p) => rot(p).map((c) => c * scale));
-  const N = normals.map(rot);
 
-  // Vertices deduplicated per (position, normal) pair; OBJs without
-  // normals get smooth area-weighted normals per position instead.
-  const useFileNormals = normals.length > 0;
+  // Triangulate (fan) into position-index triangles.
+  let tris = [];
+  for (const poly of faces) {
+    for (let i = 1; i + 1 < poly.length; i++) tris.push([poly[0][0], poly[i][0], poly[i + 1][0]]);
+  }
+
+  // Vertex-clustering simplification: snap vertices to a grid of
+  // --cluster inches, merge each cell to its members' average, drop the
+  // triangles that collapse. Catalog models are often far denser than a
+  // room preview needs (tens of thousands of triangles per fixture), and
+  // every triangle is drawn twice per frame (color + shadow pass).
+  let V = P;
+  if (opts.cluster > 0) {
+    const cell = opts.cluster * scale;
+    const cellOf = new Map();
+    const sums = [];
+    const remap = P.map((p) => {
+      const k = p.map((c) => Math.round(c / cell)).join(",");
+      let id = cellOf.get(k);
+      if (id === undefined) {
+        id = sums.length;
+        cellOf.set(k, id);
+        sums.push([0, 0, 0, 0]);
+      }
+      const acc = sums[id];
+      acc[0] += p[0];
+      acc[1] += p[1];
+      acc[2] += p[2];
+      acc[3]++;
+      return id;
+    });
+    V = sums.map((a) => [a[0] / a[3], a[1] / a[3], a[2] / a[3]]);
+    const seen = new Set();
+    tris = tris
+      .map((t) => t.map((v) => remap[v]))
+      .filter((t) => {
+        if (t[0] === t[1] || t[1] === t[2] || t[0] === t[2]) return false;
+        const k = [...t].sort((a, b) => a - b).join(",");
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+  }
+
+  // Normals: smooth across edges gentler than --crease degrees, hard
+  // across sharper ones (a tub's rim edge stays crisp, its curves smooth).
+  // Source normals are ignored — they don't survive simplification.
+  const faceN = tris.map(([a, b, c]) =>
+    cross(
+      [V[b][0] - V[a][0], V[b][1] - V[a][1], V[b][2] - V[a][2]],
+      [V[c][0] - V[a][0], V[c][1] - V[a][1], V[c][2] - V[a][2]],
+    ),
+  );
+  const faceU = faceN.map((n) => {
+    const l = Math.hypot(n[0], n[1], n[2]) || 1;
+    return [n[0] / l, n[1] / l, n[2] / l];
+  });
+  const incident = V.map(() => []);
+  tris.forEach((t, f) => t.forEach((v) => incident[v].push(f)));
+  const cosCrease = Math.cos((opts.crease * Math.PI) / 180);
+
   const outPos = [];
   const outNrm = [];
   const indices = [];
   const key = new Map();
-  const smooth = useFileNormals ? null : P.map(() => [0, 0, 0]);
-  function vert(v, n) {
-    const k = useFileNormals ? v + "/" + n : String(v);
-    let idx = key.get(k);
-    if (idx === undefined) {
-      idx = outPos.length / 3;
-      key.set(k, idx);
-      outPos.push(...P[v]);
-      outNrm.push(...(useFileNormals && n >= 0 ? N[n] : [0, 0, 0]));
-    }
-    return idx;
-  }
-  for (const poly of faces) {
-    for (let i = 1; i + 1 < poly.length; i++) {
-      const tri = [poly[0], poly[i], poly[i + 1]];
-      if (smooth) {
-        const [a, b, c] = tri.map((t) => P[t[0]]);
-        const n = cross([b[0] - a[0], b[1] - a[1], b[2] - a[2]], [c[0] - a[0], c[1] - a[1], c[2] - a[2]]);
-        for (const t of tri) for (let k = 0; k < 3; k++) smooth[t[0]][k] += n[k];
+  tris.forEach((t, f) => {
+    for (const v of t) {
+      const n = [0, 0, 0];
+      for (const g of incident[v]) {
+        const u = faceU[g];
+        if (u[0] * faceU[f][0] + u[1] * faceU[f][1] + u[2] * faceU[f][2] >= cosCrease) {
+          n[0] += faceN[g][0];
+          n[1] += faceN[g][1];
+          n[2] += faceN[g][2];
+        }
       }
-      for (const t of tri) indices.push(vert(t[0], t[1]));
+      const l = Math.hypot(n[0], n[1], n[2]) || 1;
+      const nn = [n[0] / l, n[1] / l, n[2] / l];
+      const k = v + "/" + nn.map((c) => Math.round(c * 100)).join(",");
+      let idx = key.get(k);
+      if (idx === undefined) {
+        idx = outPos.length / 3;
+        key.set(k, idx);
+        outPos.push(...V[v]);
+        outNrm.push(...nn);
+      }
+      indices.push(idx);
     }
-  }
-  if (smooth) {
-    for (const [k, idx] of key) {
-      const n = smooth[Number(k)];
-      const len = Math.hypot(n[0], n[1], n[2]) || 1;
-      outNrm.splice(idx * 3, 3, n[0] / len, n[1] / len, n[2] / len);
-    }
-  }
+  });
 
   // Normalize placement: centered on x, back face on z = 0, floor at y = 0
   // (or, wall-mounted, top at --wall-height).
