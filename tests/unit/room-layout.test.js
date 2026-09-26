@@ -466,6 +466,54 @@ test("computeLayout: an entry point whose wall id doesn't exist is dropped rathe
   assert.equal(result.droppedCounts.Door_Quantity, 1);
 });
 
+test("computeLayout: a null/undefined entry in the entryPoints array is dropped rather than throwing", () => {
+  var result = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    entryPoints: [null, { wallId: "N", offsetFt: 2 }, undefined, { wallId: "S", offsetFt: 3 }],
+  });
+  var doors = result.placements.filter((p) => p.fixtureKey === "Door_Quantity");
+  assert.equal(doors.length, 2, "the two real entry points still get placed");
+  assert.equal(result.droppedCounts.Door_Quantity, 2, "the null and undefined slots are dropped, not silently ignored");
+});
+
+test("computeLayout: a non-numeric/NaN offsetFt falls back to a safe default instead of producing NaN coordinates", () => {
+  var withNaN = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    entryPoints: [{ wallId: "N", offsetFt: NaN }],
+  });
+  var doorNaN = withNaN.placements.filter((p) => p.fixtureKey === "Door_Quantity")[0];
+  assert.ok(doorNaN, "still placed (NaN falls back to a default offset, not dropped)");
+  assert.ok(isFinite(doorNaN.x) && isFinite(doorNaN.z), "coordinates are real numbers, not NaN");
+
+  var withString = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    entryPoints: [{ wallId: "N", offsetFt: "far" }],
+  });
+  var doorString = withString.placements.filter((p) => p.fixtureKey === "Door_Quantity")[0];
+  assert.ok(doorString);
+  assert.ok(isFinite(doorString.x) && isFinite(doorString.z));
+});
+
+test("computeLayout: a garbage (truthy but non-numeric) widthFt/lengthFt/fixture-count falls back safely instead of corrupting placements", () => {
+  // `||` only catches falsy values -- an object, array, or non-numeric
+  // string is truthy and used to slip straight through into arithmetic,
+  // producing string-concatenated "coordinates" like "garbage0" or NaN.
+  // computeLayout is an exported, documented-pure function real callers
+  // could reasonably invoke directly (not just through the already-
+  // validated chat-input path), so it has to hold this invariant itself.
+  var badDims = L.computeLayout({ widthFt: {}, lengthFt: 10, fixtureCounts: { Vanity_Quantity: 4 } });
+  var vanities = badDims.placements.filter((p) => p.fixtureKey === "Vanity_Quantity");
+  assert.equal(vanities.length, 4, "a real, valid fixture count should still place fully even with garbage dims");
+  vanities.forEach(function (v) {
+    assert.ok(isFinite(v.x), "x should be a real number, got " + JSON.stringify(v.x));
+    assert.ok(isFinite(v.y), "y should be a real number, got " + JSON.stringify(v.y));
+    assert.ok(isFinite(v.z), "z should be a real number, got " + JSON.stringify(v.z));
+  });
+});
+
 // --- clampEntryOffset -------------------------------------------------
 
 test("clampEntryOffset keeps an offset within the door's clearance envelope on the given wall span", () => {

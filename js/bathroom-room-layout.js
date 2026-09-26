@@ -313,8 +313,20 @@
   // object-iteration-order dependence.
   function computeLayout(input) {
     input = input || {};
-    var widthFt = input.widthFt || DEFAULT_ROOM.widthFt;
-    var lengthFt = input.lengthFt || DEFAULT_ROOM.lengthFt;
+    // parseNumber (not `||`) so a truthy-but-non-numeric value (an object,
+    // array, or garbage string someone passes this pure function directly
+    // — `||` only catches falsy values, not those) can't reach the
+    // arithmetic below and silently produce NaN/string-concatenated
+    // coordinates; still clamped to the same render bounds
+    // applyDimensionInput already holds the live-preview path to, so
+    // calling this directly with an out-of-range value behaves the same
+    // way as going through the normal input path.
+    var parsedWidth = parseNumber(input.widthFt);
+    var parsedLength = parseNumber(input.lengthFt);
+    var widthFt =
+      parsedWidth === null ? DEFAULT_ROOM.widthFt : clamp(parsedWidth, RENDER_MIN_DIM, DIMENSION_BOUNDS.widthFt);
+    var lengthFt =
+      parsedLength === null ? DEFAULT_ROOM.lengthFt : clamp(parsedLength, RENDER_MIN_DIM, DIMENSION_BOUNDS.lengthFt);
     var fixtureCounts = input.fixtureCounts || {};
     // Wall ids restricting the plumbing-needing fixtures (empty/omitted =
     // unrestricted, today's behavior). Multiple walls can carry the stack.
@@ -364,6 +376,10 @@
       var doorHalfWidth = expandedHalfWidth(doorFootprint, "Door_Quantity");
       placedByType.Door_Quantity = [];
       explicitEntryPoints.forEach(function (ep, i) {
+        if (!ep) {
+          droppedCounts.Door_Quantity = (droppedCounts.Door_Quantity || 0) + 1;
+          return;
+        }
         var wall = wallByIdOrder([ep.wallId])[0];
         if (!wall) {
           droppedCounts.Door_Quantity = (droppedCounts.Door_Quantity || 0) + 1;
@@ -378,7 +394,11 @@
           droppedCounts.Door_Quantity = (droppedCounts.Door_Quantity || 0) + 1;
           return;
         }
-        var rawOffset = ep.offsetFt != null ? ep.offsetFt : wall.span / 2;
+        // isFinite (not just != null) — a non-numeric or NaN offsetFt must
+        // fall back to the same safe default as a missing one, not
+        // propagate NaN through clampEntryOffset into every downstream
+        // coordinate.
+        var rawOffset = typeof ep.offsetFt === "number" && isFinite(ep.offsetFt) ? ep.offsetFt : wall.span / 2;
         var alongOffset = clampEntryOffset(wall.span, rawOffset);
         var rect = clearanceRect(wall, alongOffset, doorHalfWidth, depthExtent);
         var conflict = placedRects.some(function (r) {
@@ -416,7 +436,8 @@
       var halfWidth = expandedHalfWidth(footprint, fixtureKey);
       var requiredSpan = 2 * halfWidth;
       var depthExtent = footprint.depth + clearance.front;
-      var count = clamp(Math.floor(fixtureCounts[fixtureKey] || 0), 0, MAX_FIXTURE_COUNT);
+      var parsedCount = parseNumber(fixtureCounts[fixtureKey]);
+      var count = clamp(Math.floor(parsedCount === null ? 0 : parsedCount), 0, MAX_FIXTURE_COUNT);
       placedByType[fixtureKey] = [];
       var isPlumbing = plumbingWallIds && plumbingWallIds.length && PLUMBING_FIXTURE_KEYS.indexOf(fixtureKey) !== -1;
       for (var i = 0; i < count; i++) {
@@ -501,7 +522,8 @@
     // z-fighting and checkFit() would still wrongly report it as fitting.
     WALL_MOUNT_PRIORITY.forEach(function (fixtureKey) {
       var footprint = FIXTURE_LAYOUT[fixtureKey];
-      var count = clamp(Math.floor(fixtureCounts[fixtureKey] || 0), 0, MAX_FIXTURE_COUNT);
+      var parsedCount = parseNumber(fixtureCounts[fixtureKey]);
+      var count = clamp(Math.floor(parsedCount === null ? 0 : parsedCount), 0, MAX_FIXTURE_COUNT);
       var anchorPool = [];
       for (var a = 0; a < footprint.anchors.length; a++) {
         var pool = placedByType[footprint.anchors[a]] || [];
