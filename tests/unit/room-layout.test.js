@@ -285,15 +285,6 @@ test("colorForFloorFinish / colorForWalls / colorForCeiling return the brand hex
   assert.equal(L.colorForCeiling(false, false), 0xfaf8f4);
 });
 
-test("textureKindForFloorFinish / textureKindForWalls map to a pattern only for tile/flooring", () => {
-  assert.equal(L.textureKindForFloorFinish("tile"), "tile");
-  assert.equal(L.textureKindForFloorFinish("flooring"), "flooring");
-  assert.equal(L.textureKindForFloorFinish("none"), null);
-  assert.equal(L.textureKindForWalls("tile"), "tile");
-  assert.equal(L.textureKindForWalls("paint"), null);
-  assert.equal(L.textureKindForWalls("none"), null);
-});
-
 test("demolition has no fixture-layout or finish-color entry point, same convention as the materials picker", () => {
   assert.equal(Object.prototype.hasOwnProperty.call(L.FIXTURE_LAYOUT, "demolition"), false);
 });

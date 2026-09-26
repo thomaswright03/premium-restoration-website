@@ -547,16 +547,6 @@
     ceilingUnpainted: { light: 0xfaf8f4, dark: 0x14120f },
   };
 
-  function textureKindForFloorFinish(value) {
-    if (value === "tile") return "tile";
-    if (value === "flooring") return "flooring";
-    return null;
-  }
-
-  function textureKindForWalls(value) {
-    return value === "tile" ? "tile" : null;
-  }
-
   function colorForFloorFinish(value, isDark) {
     var shade = isDark ? "dark" : "light";
     if (value === "tile") return FINISH_COLORS.tile[shade];
@@ -589,8 +579,6 @@
     applyFixtureInput: applyFixtureInput,
     computeRoomDimensions: computeRoomDimensions,
     computeLayout: computeLayout,
-    textureKindForFloorFinish: textureKindForFloorFinish,
-    textureKindForWalls: textureKindForWalls,
     colorForFloorFinish: colorForFloorFinish,
     colorForWalls: colorForWalls,
     colorForCeiling: colorForCeiling,
