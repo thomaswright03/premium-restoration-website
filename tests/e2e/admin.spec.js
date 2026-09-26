@@ -105,6 +105,57 @@ test.describe("admin bathroom quote", () => {
     expect(await quotesInStorage(page)).toHaveLength(1);
   });
 
+  test("saving over a quote that changed elsewhere (another tab) asks before overwriting", async ({ page }) => {
+    await loginAdmin(page);
+    await fillAdminQuote(page, {
+      address: "9 Conflict Ln",
+      dims: ROOM,
+      scope: FLOORING_ONLY,
+      counts: { Cabinet_Quantity: 3 },
+    });
+    await page.click("#save-quote-btn");
+    await expect(page).toHaveURL(/#\/dashboard$/);
+
+    // Open it for edit (captures the quote's current updatedAt into the draft).
+    await page
+      .locator(".quote-card", { hasText: "9 Conflict Ln" })
+      .getByRole("button", { name: "View / Edit" })
+      .click();
+    await page.fill('input[name="Cabinet_Quantity"]', "4");
+
+    // Simulate another tab saving this same quote in the meantime — same
+    // id, a newer updatedAt, a different address.
+    await page.evaluate(() => {
+      const quotes = JSON.parse(localStorage.getItem("pr_quotes") || "[]");
+      quotes[0].address = "9 Conflict Ln (edited elsewhere)";
+      quotes[0].updatedAt = new Date(Date.now() + 60000).toISOString();
+      localStorage.setItem("pr_quotes", JSON.stringify(quotes));
+    });
+
+    const messages = [];
+    page.once("dialog", (d) => {
+      messages.push(d.message());
+      d.dismiss();
+    });
+    await page.click("#save-quote-btn");
+    expect(messages).toEqual([
+      "This quote was changed elsewhere since you opened it (maybe in another tab or window). " +
+        "Saving now will overwrite that change with what's on this screen. Save anyway?",
+    ]);
+    // Declining the dialog must not have saved — the other tab's edit survives.
+    await expect(page.locator("#screen-step2")).toBeVisible();
+    const stillOther = await quotesInStorage(page);
+    expect(stillOther[0].address).toBe("9 Conflict Ln (edited elsewhere)");
+
+    // Accepting proceeds with the overwrite, same as today's plain save.
+    page.once("dialog", (d) => d.accept());
+    await page.click("#save-quote-btn");
+    await expect(page).toHaveURL(/#\/dashboard$/);
+    const after = await quotesInStorage(page);
+    expect(after[0].address).toBe("9 Conflict Ln");
+    expect(after[0].data.bathroom.jobValues.Cabinet_Quantity).toBe(4);
+  });
+
   test("Back and Get Started keep every value; reload restores the draft; browser Back works", async ({ page }) => {
     await loginAdmin(page);
     await fillAdminQuote(page, {
@@ -260,6 +311,66 @@ test.describe("admin bathroom quote", () => {
     page.once("dialog", (d) => d.accept());
     await page.setInputFiles("#import-quotes-input", file);
     await expect(page.locator(".quote-card", { hasText: "9 Export St" })).toBeVisible();
+  });
+
+  test("import recomputes the total instead of trusting a tampered file, and skips a record with no valid date", async ({
+    page,
+  }) => {
+    await loginAdmin(page);
+    // A real saved quote first, so the "invalid updatedAt" case below has
+    // an existing id to collide with.
+    await fillAdminQuote(page, { address: "11 Untouched Rd", dims: ROOM, scope: FLOORING_ONLY });
+    await page.click("#save-quote-btn");
+    const before = await quotesInStorage(page);
+    expect(before).toHaveLength(1);
+    const existingId = before[0].id;
+
+    const tampered = {
+      id: "tampered-import-1",
+      address: "12 Tampered Ave",
+      categories: ["bathroom"],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      data: {
+        bathroom: {
+          calcVersion: 2,
+          jobValues: { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8, Cabinet_Quantity: 3 },
+          scope: { demolition: false, floorFinish: "flooring", walls: "none", paintCeiling: false },
+          prices: {},
+          lines: [],
+          subtotal: 0,
+          taxRatePercent: 0,
+          taxAmount: 0,
+          // The lie: real jobValues/scope above price out to $380.00 (see
+          // the "prices only the chosen work" test), but the file claims a
+          // wildly different total.
+          totalPrice: 999999,
+        },
+      },
+    };
+    const noValidDate = {
+      id: existingId,
+      address: "should not appear",
+      categories: ["bathroom"],
+      createdAt: new Date().toISOString(),
+      updatedAt: "not-a-real-date",
+      data: { bathroom: { calcVersion: 2, jobValues: {}, scope: {} } },
+    };
+    const importFile = "/tmp/admin-import-test.json";
+    fs.writeFileSync(importFile, JSON.stringify({ quotes: [tampered, noValidDate] }));
+
+    page.once("dialog", (d) => d.accept());
+    await page.setInputFiles("#import-quotes-input", importFile);
+    await expect(page.locator("#admin-toast")).toContainText("1 skipped");
+
+    const after = await quotesInStorage(page);
+    expect(after).toHaveLength(2); // the original + the tampered one; the no-valid-date one was skipped
+    const untouched = after.find((q) => q.id === existingId);
+    expect(untouched.address).toBe("11 Untouched Rd"); // not overwritten by "should not appear"
+
+    const imported = after.find((q) => q.id === "tampered-import-1");
+    expect(imported.data.bathroom.totalPrice).toBe(380);
+    await expect(page.locator(".quote-card", { hasText: "12 Tampered Ave" })).toContainText("Total $380.00");
   });
 
   test("Quote Details fits a 375px phone with no sideways scroll", async ({ page }) => {

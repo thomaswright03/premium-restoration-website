@@ -276,6 +276,12 @@
       values: values,
       scope: legacy ? {} : Object.assign({}, bathroom.scope || {}),
       createdAt: quote.createdAt,
+      // Not part of snapshot()/isDirty() (this tracks conflicts with
+      // OTHER edits, not this draft's own unsaved changes) — compared
+      // against the stored record's updatedAt right before saving, so a
+      // second tab/window that saved this same quote first can't get
+      // silently overwritten by a stale draft's save (see handleStep2Submit).
+      openedUpdatedAt: quote.updatedAt || null,
       legacy: legacy
         ? {
             total: Number(bathroom.totalPrice) || 0,
@@ -623,6 +629,36 @@
         return alertError("That file isn't a quotes export from this tool, so nothing was imported.");
       }
       if (!incoming.length) return alertError("That file has no quotes in it, so nothing was imported.");
+      // The dashboard shows bathroom.totalPrice straight from storage
+      // without recomputing it (unlike save/PDF, which always run
+      // Pricing.computeEstimate fresh) — so an imported file's totalPrice
+      // has to actually be trustworthy going in, not just carried through
+      // whatever the file happened to say. A legacy-calcVersion record is
+      // left exactly as imported (same as any other legacy quote, still
+      // caught by the existing "needs review" flag once it's on screen);
+      // anything else gets its totals recomputed fresh from its own
+      // jobValues/scope against current prices, same as a normal save.
+      function trustworthy(q) {
+        var bathroom = q.data && q.data.bathroom;
+        if (!bathroom || Pricing.isLegacyQuoteData(bathroom)) return q;
+        var prices = Pricing.getPrices();
+        var result = Pricing.computeEstimate(bathroom.jobValues, bathroom.scope, {
+          prices: prices,
+          includeTrade: true,
+        });
+        return Object.assign({}, q, {
+          data: {
+            bathroom: Object.assign({}, bathroom, {
+              prices: prices,
+              lines: result.lines,
+              subtotal: result.subtotal,
+              taxRatePercent: result.taxRatePercent,
+              taxAmount: result.taxAmount,
+              totalPrice: result.total,
+            }),
+          },
+        });
+      }
       var quotes = getQuotes();
       var byId = {};
       quotes.forEach(function (q, i) {
@@ -630,18 +666,33 @@
       });
       var added = 0;
       var updated = 0;
+      var skipped = 0;
       incoming.forEach(function (q) {
         if (byId[q.id] === undefined) {
-          quotes.push(q);
+          quotes.push(trustworthy(q));
           added++;
-        } else if (new Date(q.updatedAt) > new Date(quotes[byId[q.id]].updatedAt)) {
-          quotes[byId[q.id]] = q;
+          return;
+        }
+        var incomingDate = new Date(q.updatedAt);
+        // An incoming record matching an existing id needs a real,
+        // parseable updatedAt to compare — without one there's no honest
+        // way to tell it's actually newer, so skip it rather than let
+        // `Invalid Date > Invalid Date` (always false) quietly drop it
+        // from the counts as if nothing was wrong with the file.
+        if (isNaN(incomingDate.getTime())) {
+          skipped++;
+        } else if (incomingDate > new Date(quotes[byId[q.id]].updatedAt)) {
+          quotes[byId[q.id]] = trustworthy(q);
           updated++;
         }
       });
-      if (!window.confirm("Import " + added + " new quote(s) and update " + updated + " with newer copies?")) return;
+      var skippedNote = skipped ? " (" + skipped + " skipped: missing or invalid date)" : "";
+      if (
+        !window.confirm("Import " + added + " new quote(s) and update " + updated + " with newer copies?" + skippedNote)
+      )
+        return;
       if (!saveQuotes(quotes)) return alertError(STORAGE_ERROR);
-      toast("Imported " + added + " new and " + updated + " updated quote(s).");
+      toast("Imported " + added + " new and " + updated + " updated quote(s)." + skippedNote);
       renderDashboard();
     };
     reader.onerror = function () {
@@ -1122,6 +1173,30 @@
       return;
     }
     errorBox.hidden = true;
+
+    // Someone else (another tab, another window) may have saved this same
+    // quote after this draft was opened — draft.values/scope here would
+    // still be the OLD version, so saving over it without asking would
+    // silently discard whatever they just did. importQuotes() already
+    // compares updatedAt before overwriting; this applies the same check
+    // to the normal save path.
+    if (!draft.isNew) {
+      var currentStored = getQuotes().filter(function (q) {
+        return q.id === draft.id;
+      })[0];
+      if (
+        currentStored &&
+        draft.openedUpdatedAt &&
+        currentStored.updatedAt &&
+        currentStored.updatedAt !== draft.openedUpdatedAt
+      ) {
+        var proceed = window.confirm(
+          "This quote was changed elsewhere since you opened it (maybe in another tab or window). " +
+            "Saving now will overwrite that change with what's on this screen. Save anyway?",
+        );
+        if (!proceed) return;
+      }
+    }
 
     saving = true;
     var saveBtn = document.getElementById("save-quote-btn");
