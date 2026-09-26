@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   checks:
-    name: Lint, format, page sync, placeholders, unit and browser tests
+    name: Lint, format, page/catalog sync, placeholders, unit and browser tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -34,6 +34,9 @@ jobs:
 
       - name: No visible placeholders
         run: npm run check:placeholders
+
+      - name: Materials catalog is in sync with the scraped/curated JSON
+        run: npm run check:catalog
 
       - name: Unit tests
         run: npm run test:unit

@@ -11,9 +11,10 @@
     "pages": "node scripts/sync-pages.mjs",
     "check:pages": "node scripts/sync-pages.mjs --check",
     "check:placeholders": "node scripts/check-placeholders.mjs",
+    "check:catalog": "node scripts/generate-materials-catalog.mjs --check",
     "test:unit": "node --test \"tests/unit/*.test.js\"",
     "test:e2e": "playwright test",
-    "check": "npm run lint && npm run format:check && npm run check:pages && npm run check:placeholders && npm run test:unit",
+    "check": "npm run lint && npm run format:check && npm run check:pages && npm run check:placeholders && npm run check:catalog && npm run test:unit",
     "test": "npm run check && npm run test:e2e"
   },
   "engines": {
