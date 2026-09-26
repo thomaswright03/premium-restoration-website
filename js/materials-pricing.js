@@ -149,7 +149,7 @@
           {
             name: "Home Depot",
             price: 249,
-            url: null,
+            url: "https://www.homedepot.com/p/314614191",
           },
         ],
       },
@@ -162,7 +162,7 @@
           {
             name: "Home Depot",
             price: 439,
-            url: null,
+            url: "https://www.homedepot.com/p/311699666",
           },
         ],
       },
@@ -175,7 +175,7 @@
           {
             name: "Home Depot",
             price: 1187.99,
-            url: null,
+            url: "https://www.homedepot.com/p/340209365",
           },
         ],
       },
@@ -272,7 +272,7 @@
           {
             name: "Home Depot",
             price: 125,
-            url: null,
+            url: "https://www.homedepot.com/p/202091529",
           },
         ],
       },
@@ -285,7 +285,7 @@
           {
             name: "Home Depot",
             price: 229.61,
-            url: null,
+            url: "https://www.homedepot.com/p/310969636",
           },
         ],
       },
@@ -298,7 +298,7 @@
           {
             name: "Home Depot",
             price: 474.8,
-            url: null,
+            url: "https://www.homedepot.com/p/202089889",
           },
         ],
       },
@@ -742,11 +742,12 @@
     { match: /matte black/i, hex: 0x1c1c1c },
     { match: /oil.rubbed bronze/i, hex: 0x3d2b1f },
     { match: /brushed gold|champagne bronze/i, hex: 0xc9a227 },
-    { match: /brushed nickel|satin nickel/i, hex: 0xb8b3ab },
-    { match: /polished chrome|\bchrome\b/i, hex: 0xd8dadb },
+    { match: /brushed nickel|satin nickel|\bnickel\b/i, hex: 0xb8b3ab },
+    { match: /polished chrome|\bchrome\b|\bsilver\b/i, hex: 0xd8dadb },
     { match: /\bespresso\b/i, hex: 0x3b2a1f },
     { match: /\bwalnut\b/i, hex: 0x5a3a26 },
     { match: /\b(oak|maple|natural wood)\b/i, hex: 0x8a6239 },
+    { match: /\bgraphite\b/i, hex: 0x4a4a4a },
     { match: /\bgray\b|\bgrey\b/i, hex: 0x8a8d90 },
     { match: /\bblack\b/i, hex: 0x1c1c1c },
     { match: /\bbone\b|\balmond\b|\bbiscuit\b/i, hex: 0xf0e4d0 },
@@ -815,16 +816,23 @@
   }
 
   // Options for one category, regionally adjusted, with the cheapest
-  // retailer already resolved per option.
+  // retailer already resolved per option. A malformed catalog entry (no
+  // retailers, so nothing to price) is dropped here rather than handed on
+  // with best: null — every caller can then trust opt.best is always a real
+  // object, instead of each one needing its own null guard.
   function getOptionsForCategory(categoryKey, zip) {
     var options = CATALOG[categoryKey] || [];
     var factor = mockRegionalFactor(zip);
-    return options.map(function (opt) {
-      var adjusted = opt.retailers.map(function (r) {
-        return { name: r.name, price: round2(r.price * factor), url: r.url };
+    return options
+      .map(function (opt) {
+        var adjusted = (opt.retailers || []).map(function (r) {
+          return { name: r.name, price: round2(r.price * factor), url: r.url };
+        });
+        return { id: opt.id, name: opt.name, imageUrl: opt.imageUrl || null, best: bestRetailer(adjusted) };
+      })
+      .filter(function (opt) {
+        return opt.best !== null;
       });
-      return { id: opt.id, name: opt.name, imageUrl: opt.imageUrl || null, best: bestRetailer(adjusted) };
-    });
   }
 
   // Cost for one pick: qty x unit price, except paint categories, which are

@@ -1042,12 +1042,16 @@ document.addEventListener("DOMContentLoaded", function () {
         pickList.forEach(function (p) {
           var item = document.createElement("li");
           item.appendChild(document.createTextNode(p.categoryLabel + ": " + p.productName + " — "));
-          var link = document.createElement("a");
-          link.href = p.url;
-          link.target = "_blank";
-          link.rel = "noopener noreferrer";
-          link.textContent = p.retailer;
-          item.appendChild(link);
+          if (p.url) {
+            var link = document.createElement("a");
+            link.href = p.url;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = p.retailer;
+            item.appendChild(link);
+          } else {
+            item.appendChild(document.createTextNode(p.retailer));
+          }
           item.appendChild(document.createTextNode(" — " + Pricing.money(p.cost)));
           shopList.appendChild(item);
         });
@@ -1161,9 +1165,8 @@ document.addEventListener("DOMContentLoaded", function () {
                   p.productName +
                   " — " +
                   p.retailer +
-                  " (" +
-                  p.url +
-                  ") — " +
+                  (p.url ? " (" + p.url + ")" : "") +
+                  " — " +
                   Pricing.money(p.cost)
                 );
               }),

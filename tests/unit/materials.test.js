@@ -73,10 +73,43 @@ test("getOptionsForCategory carries each option's real product photo through, or
   );
 });
 
+test("getOptionsForCategory drops a malformed catalog entry (no retailers) instead of crashing or returning best: null", () => {
+  // A future re-scrape could in principle commit an entry with an empty or
+  // missing retailers array (nothing priced for it at all) — every caller
+  // downstream (js/script.js's appendMaterialCategoryForm) assumes
+  // opt.best is always a real object, so getOptionsForCategory must never
+  // hand one back with best: null.
+  const malformed = { id: "test-malformed", name: "Malformed Test Option", imageUrl: null, retailers: [] };
+  M.CATALOG.Toilet_Quantity.push(malformed);
+  try {
+    const options = M.getOptionsForCategory("Toilet_Quantity", "84101");
+    assert.ok(
+      !options.some((o) => o.id === "test-malformed"),
+      "the malformed entry should be filtered out, not passed through",
+    );
+    options.forEach((o) => assert.ok(o.best !== null));
+  } finally {
+    M.CATALOG.Toilet_Quantity.pop();
+  }
+});
+
+test("bestRetailer carries a missing URL through as null rather than the string 'null'", () => {
+  // The scraper doesn't always get a canonicalUrl back from Home Depot's
+  // own search data (some listings genuinely don't have one) — bestRetailer
+  // must pass that through as a real null so callers (js/script.js) can
+  // render a plain label instead of a broken href="null" link or a PDF
+  // line reading "(null)".
+  const best = M.bestRetailer([{ name: "Home Depot", price: 249, url: null }]);
+  assert.equal(best.url, null);
+});
+
 test("guessFinishColor matches common retail finish words and falls back to null", () => {
   assert.equal(M.guessFinishColor("KOHLER Elmbrook Sliding Frameless Shower Door in Matte Black"), 0x1c1c1c);
   assert.equal(M.guessFinishColor("Glacier Bay Toilet in White"), 0xfdfcf9);
   assert.equal(M.guessFinishColor("Delta Faucet in Oil-Rubbed Bronze"), 0x3d2b1f);
+  assert.equal(M.guessFinishColor("Glacier Bay Towel Tower in Nickel"), 0xb8b3ab);
+  assert.equal(M.guessFinishColor("Derrin Mirror in Silver"), 0xd8dadb);
+  assert.equal(M.guessFinishColor("Corso Italia Alpe Graphite Matte Tile"), 0x4a4a4a);
   assert.equal(M.guessFinishColor("Some Vanity With No Finish Word"), null);
   assert.equal(M.guessFinishColor(""), null);
   assert.equal(M.guessFinishColor(null), null);
