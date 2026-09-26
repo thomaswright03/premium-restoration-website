@@ -102,6 +102,29 @@ function disposeFixtureInstance(instance) {
   });
 }
 
+// Retints every already-placed instance of fixtureKey in place — used by
+// setFixtureFinish() so picking a product's finish doesn't have to pay for
+// a full rebuildFixtures() (which recomputes the whole layout and
+// re-instantiates every fixture in the room) just to change a color.
+// colorHex null resets back to the shared, untinted material. Placement
+// itself never depends on fixtureFinishes, so this never needs to touch
+// Layout.computeLayout() at all.
+function updateFixtureFinishInstances(s, fixtureKey, colorHex) {
+  var materialKey = FIXTURE_FINISH_MATERIAL_KEY[fixtureKey];
+  var sharedMaterial = materialKey && s.mat[materialKey];
+  if (!sharedMaterial) return;
+  s.fixtureGroup.children.forEach(function (instance) {
+    if (instance.userData.fixtureKey !== fixtureKey) return;
+    instance.traverse(function (child) {
+      if (child.isMesh && child.material && child.material.userData && child.material.userData.isFinishClone) {
+        child.material.dispose();
+        child.material = sharedMaterial;
+      }
+    });
+    if (colorHex != null) applyFixtureFinish(instance, fixtureKey, s.mat, colorHex);
+  });
+}
+
 function isDarkTheme() {
   var attr = document.documentElement.getAttribute("data-theme");
   if (attr === "dark") return true;
@@ -1005,6 +1028,9 @@ function rebuildFixtures(s, widthFt, lengthFt) {
     if (p.depthOffset) {
       instance.translateZ(p.depthOffset);
     }
+    // setFixtureFinish() looks instances up by this to retint in place
+    // without a full rebuild — see updateFixtureFinishInstances().
+    instance.userData.fixtureKey = p.fixtureKey;
     var finish = state.fixtureFinishes[p.fixtureKey];
     if (finish != null) applyFixtureFinish(instance, p.fixtureKey, s.mat, finish);
     setShadowFlags(instance);
@@ -1275,7 +1301,17 @@ window.BathroomRoom3D = {
   setFixtureFinish: function (fixtureKey, colorHex) {
     if (colorHex == null) delete state.fixtureFinishes[fixtureKey];
     else state.fixtureFinishes[fixtureKey] = colorHex;
-    markDirty();
+    // Placement is untouched by a finish change, so this retints whatever
+    // is already placed in place instead of going through markDirty()'s
+    // full rebuild — cheap and safe even if nothing of this type is placed
+    // yet (a no-op then; the eventual real rebuild picks up
+    // state.fixtureFinishes correctly once it exists).
+    if (threeState) {
+      updateFixtureFinishInstances(threeState, fixtureKey, colorHex);
+      needsRender = true;
+    } else {
+      markDirty();
+    }
   },
 
   // --- Wall-click picking (plumbing walls + entry points) ---------------
