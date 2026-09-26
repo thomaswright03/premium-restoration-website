@@ -964,21 +964,18 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // =====================================================================
-    // Materials picker — MOCK DATA (js/materials-pricing.js) until a real
-    // pricing source is connected. Starts only after the labor estimate is
-    // finished, from the "Pick Your Materials" button on its card. Reuses
-    // the same fullscreen/progress-bar/group-form UI as the labor estimate.
+    // Materials picker — real Home Depot prices (js/materials-pricing.js,
+    // see its own header comment for how they're kept up to date). Starts
+    // only after the labor estimate is finished, from the "Pick Your
+    // Materials" button on its card. Reuses the same fullscreen/progress-
+    // bar/group-form UI as the labor estimate.
     // =====================================================================
-    var MATERIALS_DISCLOSURE =
-      "Sample prices shown for illustration only — these are not current retail prices. Materials pricing is " +
-      "placeholder data until a live pricing source is connected. Always confirm real prices before buying, and " +
-      "before agreeing to any job cost.";
 
-    // Generic category glyphs, not real product photos — this is mock data
-    // (see js/materials-pricing.js), so there's no real per-product photo to
-    // show yet. A real pricing integration would normally include an image
-    // URL per product; swap these for <img> tags fed by that at the same
-    // time IS_MOCK_DATA is turned off. Single-stroke, currentColor so they
+    // Generic category glyphs, not real product photos. The scraped Home
+    // Depot data (see tools/scrapers/build_catalog.py) does carry a real
+    // image URL per product, but CATALOG in js/materials-pricing.js
+    // doesn't currently keep it — wiring up real per-product <img> tags is
+    // a follow-up, not done here. Single-stroke, currentColor so they
     // follow the button's text colour (and the site's dark theme) for free.
     var MATERIAL_ICON_SVG = {
       Toilet_Quantity:
@@ -1061,9 +1058,7 @@ document.addEventListener("DOMContentLoaded", function () {
         el(
           "p",
           "ai-chat-group-intro",
-          "Now let's pick your materials — " +
-            MATERIALS_DISCLOSURE +
-            " What ZIP code is the job in? (Prices can vary a little by area.)",
+          "Now let's pick your materials. What ZIP code is the job in? (Prices can vary a little by area.)",
         ),
       );
 
@@ -1249,7 +1244,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function buildMaterialsSummary(pickList, materialsSubtotal, combinedTotal) {
-      var out = ["My bathroom materials picks from your website (sample pricing, not final):"];
+      var out = ["My bathroom materials picks from your website:"];
       pickList.forEach(function (p) {
         out.push("- " + p.categoryLabel + ": " + p.productName + " (" + p.retailer + ") — " + Pricing.money(p.cost));
       });
@@ -1269,7 +1264,6 @@ document.addEventListener("DOMContentLoaded", function () {
         .then(function () {
           var doc = window.EstimatePdf.build({
             title: "Bathroom Restoration — Materials List",
-            intro: "Sample prices for illustration only — not current retail prices.",
             lines: pickList.map(function (p) {
               return {
                 label: p.categoryLabel + ": " + p.productName,
@@ -1285,7 +1279,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 value: Pricing.money(combinedTotal),
               },
             ],
-            afterTotal: [MATERIALS_DISCLOSURE],
             sections: [
               {
                 title: "Where to buy",
@@ -1342,12 +1335,10 @@ document.addEventListener("DOMContentLoaded", function () {
       var card = el("div", "ai-chat-estimate ai-chat-materials");
 
       var head = el("div", "ai-chat-estimate-header");
-      head.appendChild(el("p", "eyebrow", "Sample Materials Pricing"));
+      head.appendChild(el("p", "eyebrow", "Materials Pricing"));
       head.appendChild(el("h3", null, "Bathroom Materials"));
       head.appendChild(el("p", "ai-chat-estimate-lede", "Based on the items you picked above."));
       card.appendChild(head);
-
-      card.appendChild(el("p", "ai-chat-materials-disclosure", MATERIALS_DISCLOSURE));
 
       var lines = el("div", "ai-chat-estimate-lines");
       pickList.forEach(function (p) {

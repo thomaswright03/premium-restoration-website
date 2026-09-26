@@ -5,8 +5,8 @@ const assert = require("node:assert/strict");
 const P = require("../../js/bathroom-pricing.js");
 const M = require("../../js/materials-pricing.js");
 
-test("materials picker is explicitly marked as using mock data", () => {
-  assert.equal(M.IS_MOCK_DATA, true);
+test("materials picker holds real generated data, not mock data", () => {
+  assert.equal(M.IS_MOCK_DATA, false);
 });
 
 test("categoriesFromLines only offers materials for work actually priced, never demolition", () => {

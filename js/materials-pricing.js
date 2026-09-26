@@ -1,27 +1,26 @@
 // Premium Restoration — materials picker data layer.
 //
-// MOCK DATA. Every product name, retailer, price and URL below is
-// illustrative, not fetched from anywhere real. This file exists so the
-// whole materials flow (categories derived from the labor estimate, the
-// cheaper-of-two-retailers logic, the ZIP-based regional adjustment, the
-// shopping-list summary) can be built and exercised end to end before real
-// accounts exist for a live pricing source. IS_MOCK_DATA below drives a
-// visible "sample prices" notice in the UI — never remove that notice
-// without also replacing the data it warns about.
+// CATALOG (between the catalog:generated markers below) holds real Home
+// Depot prices, generated — not hand-written — by a two-step offline
+// pipeline, since this site has no live retailer API access:
+//   1. tools/scrapers/build_catalog.py scrapes Home Depot search results
+//      and curates/normalizes them into tools/scrapers/materials-catalog.json
+//      (committed). See that script's own docstring for why this is a
+//      manual/offline tool, not something run live from the site, and for
+//      the real unit-normalization issues it corrects for (tile/flooring
+//      priced per box vs. per sq ft, paint priced per pail vs. per gallon).
+//   2. `node scripts/generate-materials-catalog.mjs` reads that JSON and
+//      rewrites the CATALOG block below, in place — the same
+//      generate-and-commit pattern npm run pages already uses for the
+//      HTML partials and published prices.
+// Nothing else in this file is generated. Re-run step 1 then step 2
+// whenever prices should be refreshed; nothing does this automatically.
 //
-// To go live later:
-//   1. Sign up for the Home Depot and/or Lowe's affiliate/data-feed
-//      programs (self-serve, free) for real current product + price data.
-//   2. Replace getOptionsForCategory() below with a real server-side lookup
-//      (a Vercel serverless function, so any retailer API key is never
-//      exposed in this public file) returning the same shape: an array of
-//      { id, name, retailers: [{ name, price, url }] }.
-//   3. Replace mockRegionalFactor() with a real location adjustment (e.g.
-//      BEA Regional Price Parities keyed off the ZIP's metro area) or with
-//      real per-store pricing if the retailer API supports it.
-//   4. Set IS_MOCK_DATA to false.
-// Nothing else needs to change — js/script.js only calls the functions
-// exposed at the bottom of this file.
+// IS_MOCK_DATA still exists for the ZIP-based regional adjustment below
+// (mockRegionalFactor is NOT real market data — see its own comment) and
+// as a fallback this file can be flipped back to by hand if the live
+// catalog is ever pulled. It no longer drives a "sample prices" UI notice:
+// once CATALOG holds real prices, showing that notice would be wrong.
 //
 // Loads as a plain browser script (window.MaterialsPricing) and as a Node
 // module (for the unit tests).
@@ -37,8 +36,6 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  var IS_MOCK_DATA = true;
-
   // Categories priced by the gallon (coverage in sq ft per gallon) instead
   // of directly by quantity x price. Everything else in CATALOG is priced
   // qty x unit price, whether qty means "each" or "sq ft".
@@ -47,226 +44,581 @@
     ceilingPaint: { coverageSqFtPerGallon: 400 },
   };
 
-  // The mock catalog, keyed by the same line `key` the labor estimate
-  // already produces (js/bathroom-pricing.js FIXTURES keys, or "floorTile" /
-  // "flooring" / "wallTile" / "wallPaint" / "ceilingPaint"). Options with
-  // more than one entry in `retailers` represent the SAME manufacturer
-  // model sold at both stores (e.g. one specific Kohler or American
-  // Standard SKU) — the only case where "cheaper of two" is a valid
-  // comparison. A single-retailer option represents a store-exclusive
-  // private-label product with no equivalent to compare against.
-  var TILE_OPTIONS = [
-    {
-      id: "tile-ceramic-white",
-      name: "12x24 white ceramic tile",
-      retailers: [{ name: "Home Depot", price: 1.98, url: "https://www.homedepot.com/" }],
-    },
-    {
-      id: "tile-porcelain-wood",
-      name: "Wood-look porcelain tile",
-      retailers: [{ name: "Lowe's", price: 3.49, url: "https://www.lowes.com/" }],
-    },
-    {
-      id: "tile-marble-look",
-      name: "Marble-look porcelain tile",
-      retailers: [{ name: "Home Depot", price: 5.98, url: "https://www.homedepot.com/" }],
-    },
-  ];
+  // Real data below (IS_MOCK_DATA and CATALOG), rewritten by
+  // `node scripts/generate-materials-catalog.mjs` from
+  // tools/scrapers/materials-catalog.json. Do not hand-edit anything
+  // between the catalog:generated-start/-end markers — edit the generator
+  // or re-run the upstream scrape/curation instead
+  // (tools/scrapers/build_catalog.py), then re-run the generator. Keyed by
+  // the same line `key` the labor estimate already produces
+  // (js/bathroom-pricing.js FIXTURES keys, or "floorTile" / "flooring" /
+  // "wallTile" / "wallPaint" / "ceilingPaint").
+  // catalog:generated-start
+  var IS_MOCK_DATA = false;
 
   var CATALOG = {
     Toilet_Quantity: [
       {
-        id: "toilet-cadet3",
-        name: "American Standard Cadet 3 two-piece 1.28 GPF toilet",
+        id: "hd-336961024",
+        name: "Glacier Bay 12 in. Rough In 2-Piece 1.28 GPF Single Flush Round Toilet in White, Seat Included",
         retailers: [
-          { name: "Home Depot", price: 228.0, url: "https://www.homedepot.com/" },
-          { name: "Lowe's", price: 219.0, url: "https://www.lowes.com/" },
+          {
+            name: "Home Depot",
+            price: 94,
+            url: "https://www.homedepot.com/p/Glacier-Bay-12-in-Rough-In-2-Piece-1-28-GPF-Single-Flush-Round-Toilet-in-White-Seat-Included-N2428R-17/336961024",
+          },
         ],
       },
       {
-        id: "toilet-glacier",
-        name: "Glacier Bay dual-flush two-piece toilet",
-        retailers: [{ name: "Home Depot", price: 148.0, url: "https://www.homedepot.com/" }],
+        id: "hd-303338365",
+        name: "Swiss Madison St. Tropez 1-Piece 1.1/1.6 GPF Dual Flush Elongated Toilet in Glossy White, White Hardware",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 254.6,
+            url: "https://www.homedepot.com/p/Swiss-Madison-St-Tropez-1-Piece-1-1-1-6-GPF-Dual-Flush-Elongated-Toilet-in-Glossy-White-White-Hardware-SM-1T254/303338365",
+          },
+        ],
       },
       {
-        id: "toilet-project-source",
-        name: "Project Source round two-piece toilet",
-        retailers: [{ name: "Lowe's", price: 138.0, url: "https://www.lowes.com/" }],
+        id: "hd-313789704",
+        name: "KOHLER Cimarron 12 in. Rough In 2-Piece 1.28 GFP Single Flush Elongated Toilet in White with Soft Close Seat",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 369.22,
+            url: "https://www.homedepot.com/p/KOHLER-Cimarron-12-in-Rough-In-2-Piece-1-28-GFP-Single-Flush-Elongated-Toilet-in-White-with-Soft-Close-Seat-K-31648-0/313789704",
+          },
+        ],
       },
     ],
     Sink_Quantity: [
       {
-        id: "sink-kohler-caxton",
-        name: "Kohler Caxton drop-in bathroom sink",
+        id: "hd-100090789",
+        name: "Glacier Bay 19 in. Drop-In Round Vitreous China Bathroom Sink in White",
         retailers: [
-          { name: "Home Depot", price: 159.0, url: "https://www.homedepot.com/" },
-          { name: "Lowe's", price: 164.0, url: "https://www.lowes.com/" },
+          {
+            name: "Home Depot",
+            price: 49.96,
+            url: "https://www.homedepot.com/p/Glacier-Bay-19-in-Drop-In-Round-Vitreous-China-Bathroom-Sink-in-White-13-0013-4WHD/100090789",
+          },
         ],
       },
       {
-        id: "sink-glacier-oval",
-        name: "Glacier Bay oval drop-in sink",
-        retailers: [{ name: "Home Depot", price: 69.0, url: "https://www.homedepot.com/" }],
+        id: "hd-202493974",
+        name: "KOHLER Caxton 19.3x16.25in. Undermount Bathroom Sink in White Vitreous China with Overflow Drain",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 94.37,
+            url: "https://www.homedepot.com/p/KOHLER-Caxton-19-3x16-25in-Undermount-Bathroom-Sink-in-White-Vitreous-China-with-Overflow-Drain-K-R2210-0/202493974",
+          },
+        ],
       },
       {
-        id: "sink-allen-roth",
-        name: "allen + roth undermount sink",
-        retailers: [{ name: "Lowe's", price: 89.0, url: "https://www.lowes.com/" }],
+        id: "hd-207058591",
+        name: "Glacier Bay 37 in. W x 22 in. D Cultured Marble White Rectangular Single Sink Vanity Top in White",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 286,
+            url: "https://www.homedepot.com/p/Glacier-Bay-37-in-W-x-22-in-D-Cultured-Marble-White-Rectangular-Single-Sink-Vanity-Top-in-White-HU3722R-WH/207058591",
+          },
+        ],
       },
     ],
     Bathtub_Quantity: [
       {
-        id: "tub-american-standard",
-        name: "American Standard Cambridge 60 in. alcove tub",
-        retailers: [{ name: "Home Depot", price: 449.0, url: "https://www.homedepot.com/" }],
+        id: "hd-314614191",
+        name: "Bootz Industries Aloha 60 in. x 30 in. Alcove Soaking Bathtub with Left Drain in White",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 249,
+            url: null,
+          },
+        ],
       },
       {
-        id: "tub-sterling",
-        name: "Sterling Ensemble 60 in. alcove tub",
-        retailers: [{ name: "Lowe's", price: 399.0, url: "https://www.lowes.com/" }],
+        id: "hd-311699666",
+        name: "KOHLER Elmbrook 60 in. x 30.25 in. Alcove Deep Soaking Bathtub with Right-Hand Drain in White",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 439,
+            url: null,
+          },
+        ],
+      },
+      {
+        id: "hd-340209365",
+        name: "Bootz Industries Aloha 60 in. x 30 in. Bathtub, 60 in. x 30 in. x 60 in. NexTile Surround and 56-60 in. Shower Door Combo",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 1187.99,
+            url: null,
+          },
+        ],
       },
     ],
     Shower_Quantity: [
       {
-        id: "shower-delta-base",
-        name: "Delta 60 in. x 32 in. shower base",
-        retailers: [{ name: "Home Depot", price: 329.0, url: "https://www.homedepot.com/" }],
+        id: "hd-202899038",
+        name: "Durastall 32 in. x 32 in. x 75 in. Shower Stall with Standard Base in White",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 229.99,
+            url: "https://www.homedepot.com/p/Durastall-32-in-x-32-in-x-75-in-Shower-Stall-with-Standard-Base-in-White-68/202899038",
+          },
+        ],
       },
       {
-        id: "shower-sterling-kit",
-        name: "Sterling Advantage shower kit",
-        retailers: [{ name: "Lowe's", price: 599.0, url: "https://www.lowes.com/" }],
+        id: "hd-341782460",
+        name: "American Standard Passage 32 in. W x 72 in. H Four piece Glue Up Acrylic Alcove Shower Wall Set in White Subway Tile",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 829,
+            url: "https://www.homedepot.com/p/American-Standard-Passage-32-in-W-x-72-in-H-Four-piece-Glue-Up-Acrylic-Alcove-Shower-Wall-Set-in-White-Subway-Tile-P2969SWT-375/341782460",
+          },
+        ],
+      },
+      {
+        id: "hd-330250438",
+        name: "CASTICO Carrara 32 in. x 60 in. x 84 in. Solid Composite Stone Alcove Shower Kit with Walls and Graphite Pan Base L/R Drain",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 1799,
+            url: "https://www.homedepot.com/p/CASTICO-Carrara-32-in-x-60-in-x-84-in-Solid-Composite-Stone-Alcove-Shower-Kit-with-Walls-and-Graphite-Pan-Base-L-R-Drain-K1B1S3260GRCACA/330250438",
+          },
+        ],
       },
     ],
     Shower_Door_Quantity: [
       {
-        id: "shower-door-delta",
-        name: "Delta Classic 400 sliding shower door",
+        id: "hd-318474663",
+        name: "TOOLKISS 56 in. - 60 in. W x 72 in. H Sliding Framed Shower Door in Matte Black with Clear Glass",
         retailers: [
-          { name: "Home Depot", price: 279.0, url: "https://www.homedepot.com/" },
-          { name: "Lowe's", price: 289.0, url: "https://www.lowes.com/" },
+          {
+            name: "Home Depot",
+            price: 339,
+            url: "https://www.homedepot.com/p/TOOLKISS-56-in-60-in-W-x-72-in-H-Sliding-Framed-Shower-Door-in-Matte-Black-with-Clear-Glass-TK19118MB/318474663",
+          },
         ],
       },
       {
-        id: "shower-door-basic",
-        name: "Basic framed sliding shower door",
-        retailers: [{ name: "Home Depot", price: 189.0, url: "https://www.homedepot.com/" }],
+        id: "hd-325978612",
+        name: "Home Decorators Collection Waverly 58 1/2 in. - 60 in. W x 76 in. H Sliding Frameless Shower Door in Matte Black Finish with Clear Glass",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 699,
+            url: "https://www.homedepot.com/p/Home-Decorators-Collection-Waverly-58-1-2-in-60-in-W-x-76-in-H-Sliding-Frameless-Shower-Door-in-Matte-Black-Finish-with-Clear-Glass-GBSH169/325978612",
+          },
+        ],
+      },
+      {
+        id: "hd-316808409",
+        name: "KOHLER Elmbrook 55-60 in. W x 74 in. H Sliding Frameless Shower Door in Matte Black with 5/16 in. Thick Tempered Glass",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 819,
+            url: "https://www.homedepot.com/p/KOHLER-Elmbrook-55-60-in-W-x-74-in-H-Sliding-Frameless-Shower-Door-in-Matte-Black-with-5-16-in-Thick-Tempered-Glass-K-R706851-8L-BL/316808409",
+          },
+        ],
       },
     ],
     Door_Quantity: [
       {
-        id: "door-6panel",
-        name: "6-panel solid core interior door, 32 in.",
-        retailers: [{ name: "Home Depot", price: 129.0, url: "https://www.homedepot.com/" }],
+        id: "hd-202091529",
+        name: "Johnson Hardware 1500 Series 24 in. to 36 in. x 80 in. Universal Pocket Door Frame for 2x4 Stud Wall",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 125,
+            url: null,
+          },
+        ],
       },
       {
-        id: "door-shaker",
-        name: "Shaker flush interior door, 32 in.",
-        retailers: [{ name: "Lowe's", price: 145.0, url: "https://www.lowes.com/" }],
+        id: "hd-310969636",
+        name: "eightdoors 30 in. x 80 in. x 1-3/8 in. Shaker White Primed 2-Panel Solid Core Wood Interior Slab Door",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 229.61,
+            url: null,
+          },
+        ],
+      },
+      {
+        id: "hd-202089889",
+        name: "Contractors Wardrobe Raised 6-Panel Colonial Painted Steel Interior Sliding Door",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 474.8,
+            url: null,
+          },
+        ],
       },
     ],
     Vanity_Quantity: [
       {
-        id: "vanity-glacier-24",
-        name: "24 in. single-sink vanity with cultured marble top",
+        id: "hd-203486514",
+        name: "Glacier Bay 19 in. Single Sink White Freestanding Bath Vanity with White Cultured Marble Top (Assembled)",
         retailers: [
-          { name: "Home Depot", price: 349.0, url: "https://www.homedepot.com/" },
-          { name: "Lowe's", price: 359.0, url: "https://www.lowes.com/" },
+          {
+            name: "Home Depot",
+            price: 139,
+            url: "https://www.homedepot.com/p/Glacier-Bay-19-in-Single-Sink-White-Freestanding-Bath-Vanity-with-White-Cultured-Marble-Top-Assembled-GB18P2-WH/203486514",
+          },
         ],
       },
       {
-        id: "vanity-allen-roth-30",
-        name: "30 in. vanity with quartz top",
-        retailers: [{ name: "Lowe's", price: 549.0, url: "https://www.lowes.com/" }],
+        id: "hd-306307816",
+        name: "Home Decorators Collection Sedgewood 37 in. Single Sink Freestanding White Bathroom Vanity with Arctic Solid Surface Top (Assembled)",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 499,
+            url: "https://www.homedepot.com/p/Home-Decorators-Collection-Sedgewood-37-in-Single-Sink-Freestanding-White-Bathroom-Vanity-with-Arctic-Solid-Surface-Top-Assembled-PPLNKWHT36D/306307816",
+          },
+        ],
+      },
+      {
+        id: "hd-328794815",
+        name: "ARIEL Hepburn 48 in. Single Sink Freestanding Bathroom Vanity in White with Carrara White Quartz Top",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 1927,
+            url: "https://www.homedepot.com/p/ARIEL-Hepburn-48-in-Single-Sink-Freestanding-Bathroom-Vanity-in-White-with-Carrara-White-Quartz-Top-T048SCQRVOWHT/328794815",
+          },
+        ],
       },
     ],
     Cabinet_Quantity: [
       {
-        id: "cabinet-shaker-white",
-        name: "Shaker white bathroom wall cabinet",
-        retailers: [{ name: "Home Depot", price: 179.0, url: "https://www.homedepot.com/" }],
+        id: "hd-308061907",
+        name: "Glacier Bay Slat Style 14 in. W x 11 in. D x 58.5 in. H Towel Tower in Nickel",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 50,
+            url: "https://www.homedepot.com/p/Glacier-Bay-Slat-Style-14-in-W-x-11-in-D-x-58-5-in-H-Towel-Tower-in-Nickel-3458NNHD/308061907",
+          },
+        ],
       },
       {
-        id: "cabinet-linen-tower",
-        name: "Linen tower storage cabinet",
-        retailers: [{ name: "Lowe's", price: 219.0, url: "https://www.lowes.com/" }],
+        id: "hd-204089752",
+        name: "Glacier Bay Lancaster 21 in. W x 8 in. D x 26 in. H Surface-Mount Raised panel Bathroom Storage Wall Cabinet in White",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 132,
+            url: "https://www.homedepot.com/p/Glacier-Bay-Lancaster-21-in-W-x-8-in-D-x-26-in-H-Surface-Mount-Raised-panel-Bathroom-Storage-Wall-Cabinet-in-White-LAOJ25-WH/204089752",
+          },
+        ],
+      },
+      {
+        id: "hd-203985030",
+        name: "Home Decorators Collection Naples 26.5 in. W x 8 in. D x 32.8 in. H Bathroom Storage Wall Cabinet in White",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 320,
+            url: "https://www.homedepot.com/p/Home-Decorators-Collection-Naples-26-5-in-W-x-8-in-D-x-32-8-in-H-Bathroom-Storage-Wall-Cabinet-in-White-NAWO2633/203985030",
+          },
+        ],
       },
     ],
     Mirror_Quantity: [
       {
-        id: "mirror-frameless-24",
-        name: "24 in. frameless rectangular mirror",
-        retailers: [{ name: "Home Depot", price: 59.0, url: "https://www.homedepot.com/" }],
+        id: "hd-331646373",
+        name: "Relyblo 22 in. W x 30 in. H Rounded Rectangle Framed Wall Bathroom Vanity Mirror for Over Sink Wall in Matte Black",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 33.07,
+            url: "https://www.homedepot.com/p/Relyblo-22-in-W-x-30-in-H-Rounded-Rectangle-Framed-Wall-Bathroom-Vanity-Mirror-for-Over-Sink-Wall-in-Matte-Black-YK-2230-BK/331646373",
+          },
+        ],
       },
       {
-        id: "mirror-framed-oval",
-        name: "Framed oval vanity mirror",
-        retailers: [{ name: "Lowe's", price: 79.0, url: "https://www.lowes.com/" }],
+        id: "hd-322929700",
+        name: "TOOLKISS 40 in. W x 32 in. H Rectangular Aluminum Framed Wall Bathroom Vanity Mirror in Matte Black",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 107,
+            url: "https://www.homedepot.com/p/TOOLKISS-40-in-W-x-32-in-H-Rectangular-Aluminum-Framed-Wall-Bathroom-Vanity-Mirror-in-Matte-Black-B10080/322929700",
+          },
+        ],
+      },
+      {
+        id: "hd-317583429",
+        name: "TOOLKISS 48 in. W x 36 in. H Large Rectangular Frameless LED Light Anti-Fog Wall Bathroom Vanity Mirror Super Bright",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 318,
+            url: "https://www.homedepot.com/p/TOOLKISS-48-in-W-x-36-in-H-Large-Rectangular-Frameless-LED-Light-Anti-Fog-Wall-Bathroom-Vanity-Mirror-Super-Bright-TK19068/317583429",
+          },
+        ],
       },
     ],
     Mirror_Huge_Quantity: [
       {
-        id: "mirror-huge-led",
-        name: "48 in. LED backlit rectangular mirror",
-        retailers: [{ name: "Home Depot", price: 219.0, url: "https://www.homedepot.com/" }],
+        id: "hd-316331995",
+        name: "Glacier Bay 36 in. W x 48 in. H Rectangular Frameless Polished Edge Wall Bathroom Vanity Mirror in Silver",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 84.97,
+            url: "https://www.homedepot.com/p/Glacier-Bay-36-in-W-x-48-in-H-Rectangular-Frameless-Polished-Edge-Wall-Bathroom-Vanity-Mirror-in-Silver-81180/316331995",
+          },
+        ],
       },
       {
-        id: "mirror-huge-framed",
-        name: "48 in. framed rectangular mirror",
-        retailers: [{ name: "Lowe's", price: 189.0, url: "https://www.lowes.com/" }],
+        id: "hd-326065853",
+        name: "Apmir 72 in. W x 36 in. H Large Rectangular Tempered Glass & Aluminum Alloy Framed Wall Bathroom Vanity Mirror in matte Black",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 239,
+            url: "https://www.homedepot.com/p/Apmir-72-in-W-x-36-in-H-Large-Rectangular-Tempered-Glass-Aluminum-Alloy-Framed-Wall-Bathroom-Vanity-Mirror-in-matte-Black-B18191/326065853",
+          },
+        ],
+      },
+      {
+        id: "hd-326878062",
+        name: "Derrin 60 in. W x 36 in. H Large Rectangular Frameless Anti-Fog Dimmable LED Wall Bathroom Vanity Mirror in Silver",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 330,
+            url: "https://www.homedepot.com/p/Derrin-60-in-W-x-36-in-H-Large-Rectangular-Frameless-Anti-Fog-Dimmable-LED-Wall-Bathroom-Vanity-Mirror-in-Silver-THDBM6036FBVC2V1/326878062",
+          },
+        ],
       },
     ],
     Shower_Shelf_Quantity: [
       {
-        id: "shelf-niche",
-        name: "Recessed tile-in shower niche shelf",
-        retailers: [{ name: "Home Depot", price: 45.0, url: "https://www.homedepot.com/" }],
+        id: "hd-314963829",
+        name: "Bath Bliss 4 Tier Tension Corner Shower Organizer Caddy in Grey",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 16.18,
+            url: "https://www.homedepot.com/p/Bath-Bliss-4-Tier-Tension-Corner-Shower-Organizer-Caddy-in-Grey-10000-GREY/314963829",
+          },
+        ],
       },
       {
-        id: "shelf-corner",
-        name: "Corner shower caddy shelf",
-        retailers: [{ name: "Lowe's", price: 32.0, url: "https://www.lowes.com/" }],
+        id: "hd-100677312",
+        name: "Tile Redi Redi Niche 16 in. W x 20 in. H x 4 in. D Shampoo - Soap Standard Double Niche",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 69,
+            url: "https://www.homedepot.com/p/Tile-Redi-Redi-Niche-16-in-W-x-20-in-H-x-4-in-D-Shampoo-Soap-Standard-Double-Niche-RN1620D-BI/100677312",
+          },
+        ],
+      },
+      {
+        id: "hd-343430516",
+        name: "Shower Caddy 2 Pack Brushed Nickel Corner Shower Shelf Recessed Floating Bathroom Shelf for Tiled Wall 10 in",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 233.58,
+            url: "https://www.homedepot.com/p/Shower-Caddy-2-Pack-Brushed-Nickel-Corner-Shower-Shelf-Recessed-Floating-Bathroom-Shelf-for-Tiled-Wall-10-in-8FC8TVYY/343430516",
+          },
+        ],
       },
     ],
-    floorTile: TILE_OPTIONS,
-    wallTile: TILE_OPTIONS,
-    flooring: [
+    floorTile: [
       {
-        id: "flooring-vinyl-plank",
-        name: "Luxury vinyl plank flooring",
-        retailers: [{ name: "Home Depot", price: 3.29, url: "https://www.homedepot.com/" }],
+        id: "hd-300126888",
+        name: "TrafficMaster Vigo Gris 12 in. x 24 in. Matte Ceramic Stone Look Floor and Wall Tile",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 0.97,
+            url: "https://www.homedepot.com/p/TrafficMaster-Vigo-Gris-12-in-x-24-in-Matte-Ceramic-Stone-Look-Floor-and-Wall-Tile-16-sq-ft-Case-NHDVIGRI1224/300126888",
+          },
+        ],
       },
       {
-        id: "flooring-laminate",
-        name: "Water-resistant laminate flooring",
-        retailers: [{ name: "Lowe's", price: 2.79, url: "https://www.lowes.com/" }],
+        id: "hd-313050938",
+        name: "Daltile Baker Wood 6 in. x 24 in. Walnut Glazed Porcelain Floor and Wall Tile",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 1.97,
+            url: "https://www.homedepot.com/p/Daltile-Baker-Wood-6-in-x-24-in-Walnut-Glazed-Porcelain-Floor-and-Wall-Tile-14-55-sq-ft-Case-BK10624HD1PR/313050938",
+          },
+        ],
+      },
+      {
+        id: "hd-315506629",
+        name: "MSI Kenzzi Zenzibar 8 in. x 8 in. Encaustic Matte Porcelain Floor and Wall Tile",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 5.18,
+            url: "https://www.homedepot.com/p/MSI-Kenzzi-Zenzibar-8-in-x-8-in-Encaustic-Matte-Porcelain-Floor-and-Wall-Tile-5-16-sq-ft-Case-NZAN8X8/315506629",
+          },
+        ],
+      },
+    ],
+    wallTile: [
+      {
+        id: "hd-302603803",
+        name: "Daltile Restore Bright White 4-1/4 in. x 4-1/4 in. Ceramic Wall Tile",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 0.88,
+            url: "https://www.homedepot.com/p/Daltile-Restore-Bright-White-4-1-4-in-x-4-1-4-in-Ceramic-Wall-Tile-12-5-sq-ft-Case-RE1544HD1P4/302603803",
+          },
+        ],
+      },
+      {
+        id: "hd-308736405",
+        name: "Corso Italia Alpe Graphite Matte 12 in. x 24 in. Quartzite Stone Look Porcelain Floor and Wall Tile",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 1.99,
+            url: "https://www.homedepot.com/p/Corso-Italia-Alpe-Graphite-Matte-12-in-x-24-in-Quartzite-Stone-Look-Porcelain-Floor-and-Wall-Tile-15-50-sq-ft-Case-610010002399/308736405",
+          },
+        ],
+      },
+      {
+        id: "hd-313499026",
+        name: "Daltile LuxeCraft Arteko Antique White 3 in. x 12 in. Glazed Ceramic Wall Tile",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 5.99,
+            url: "https://www.homedepot.com/p/Daltile-LuxeCraft-Arteko-Antique-White-3-in-x-12-in-Glazed-Ceramic-Wall-Tile-12-sq-ft-Case-AK01312HD1P2/313499026",
+          },
+        ],
+      },
+    ],
+    flooring: [
+      {
+        id: "hd-324087709",
+        name: "TrafficMaster Breaksea Island 6 MIL x 6 in. x 36 in. Waterproof Click Lock Vinyl Plank Flooring",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 1.49,
+            url: "https://www.homedepot.com/p/TrafficMaster-Breaksea-Island-6-MIL-x-6-in-x-36-in-Waterproof-Click-Lock-Vinyl-Plank-Flooring-23-95-sq-ft-case-VTRHDBREAIS6X36/324087709",
+          },
+        ],
+      },
+      {
+        id: "hd-309083456",
+        name: "Lifeproof Sterling Oak 22 MIL x 8.7 in. W x 48 in. L Click Lock Waterproof Luxury Vinyl Plank Flooring",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 2.98,
+            url: "https://www.homedepot.com/p/Lifeproof-Sterling-Oak-22-MIL-x-8-7-in-W-x-48-in-L-Click-Lock-Waterproof-Luxury-Vinyl-Plank-Flooring-20-1-sqft-case-I966106LP/309083456",
+          },
+        ],
+      },
+      {
+        id: "hd-338071457",
+        name: "Flooret Modin Nakan Craftsman 40 MIL x 3.35 in x 72 in Waterproof Click Lock Luxury Vinyl Plank Flooring",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 5.75,
+            url: "https://www.homedepot.com/p/Flooret-Modin-Nakan-Craftsman-40-MIL-x-3-35-in-x-72-in-Waterproof-Click-Lock-Luxury-Vinyl-Plank-Flooring-20-09-sq-ft-case-FL-MR-NAKA-C/338071457",
+          },
+        ],
       },
     ],
     wallPaint: [
       {
-        id: "paint-behr-eggshell",
-        name: "Behr Premium Plus eggshell interior paint (1 gal)",
-        retailers: [{ name: "Home Depot", price: 34.98, url: "https://www.homedepot.com/" }],
+        id: "hd-100141333",
+        name: "Glidden Maintenance 5 gal. White Flat Interior and Exterior Paint (per gallon)",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 8,
+            url: "https://www.homedepot.com/p/Glidden-Maintenance-5-gal-White-Flat-Interior-and-Exterior-Paint-920-05/100141333",
+          },
+        ],
       },
       {
-        id: "paint-valspar-semigloss",
-        name: "Valspar Signature semi-gloss interior paint (1 gal)",
-        retailers: [{ name: "Lowe's", price: 39.98, url: "https://www.lowes.com/" }],
+        id: "hd-205853483",
+        name: "BEHR PRO 5 gal. i300 White Eggshell Interior Paint (per gallon)",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 23.8,
+            url: "https://www.homedepot.com/p/BEHR-PRO-5-gal-i300-White-Eggshell-Interior-Paint-PR33005/205853483",
+          },
+        ],
+      },
+      {
+        id: "hd-204405959",
+        name: "BEHR PREMIUM PLUS 12 Swiss Coffee Paint (per gallon)",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 43.98,
+            url: "https://www.homedepot.com/p/BEHR-PREMIUM-PLUS-1-gal-12-Swiss-Coffee-Semi-Gloss-Enamel-Low-Odor-Interior-Paint-Primer-305001/204405959",
+          },
+        ],
       },
     ],
     ceilingPaint: [
       {
-        id: "paint-ceiling-flat-white",
-        name: "Flat white ceiling paint (1 gal)",
-        retailers: [{ name: "Home Depot", price: 27.98, url: "https://www.homedepot.com/" }],
+        id: "hd-202246803",
+        name: "Glidden Ceiling 1 gal. High-Hiding White Interior Dead-Flat Ceiling Paint (per gallon)",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 23.98,
+            url: "https://www.homedepot.com/p/Glidden-Ceiling-1-gal-High-Hiding-White-Interior-Dead-Flat-Ceiling-Paint-GPL-0000-01/202246803",
+          },
+        ],
       },
       {
-        id: "paint-ceiling-stainblock",
-        name: "Stain-blocking flat ceiling paint (1 gal)",
-        retailers: [{ name: "Lowe's", price: 31.98, url: "https://www.lowes.com/" }],
+        id: "hd-307298172",
+        name: "Glidden Diamond 1 gal. White Flat Interior One-Coat Ceiling Paint with Primer (per gallon)",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 34.98,
+            url: "https://www.homedepot.com/p/Glidden-Diamond-1-gal-White-Flat-Interior-One-Coat-Ceiling-Paint-with-Primer-PPG83-610/307298172",
+          },
+        ],
+      },
+      {
+        id: "hd-204805213",
+        name: "Zinsser 1 gal. Flat Bright White Ceiling Paint and Primer in One (2-Pack) (per gallon)",
+        retailers: [
+          {
+            name: "Home Depot",
+            price: 79.94,
+            url: "https://www.homedepot.com/p/Zinsser-1-gal-Flat-Bright-White-Ceiling-Paint-and-Primer-in-One-2-Pack-260967/204805213",
+          },
+        ],
       },
     ],
   };
+  // catalog:generated-end
 
   function round2(n) {
     return Math.round((Number(n) || 0) * 100) / 100;

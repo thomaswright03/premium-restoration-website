@@ -5,4 +5,4 @@ playwright-report/
 blob-report/
 .env
 .env.local
-tools/scrapers/*.json
+tools/scrapers/homedepot-products-*.json
