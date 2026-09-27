@@ -65,6 +65,10 @@ test.describe("3D bathroom room preview", () => {
   });
 
   test("Kohler product switcher shows a row per placed fixture and swaps the pick", async ({ page }) => {
+    // Loads the tub, vanity sink, faucet and valve models on top of the
+    // usual scene — slow under CI's software WebGL, same as chat.spec.js's
+    // full-estimate test.
+    test.setTimeout(90000);
     await disableMaterials(page);
     await startEstimate(page);
     await answerScope(page, NEEDS_WALLS);
