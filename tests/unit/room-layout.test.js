@@ -527,3 +527,22 @@ test("clampEntryOffset keeps an offset within the door's clearance envelope on t
 test("clampEntryOffset never goes below the half-width even on a wall shorter than the door's own span", () => {
   assert.equal(L.clampEntryOffset(1, 0.5), 1.25);
 });
+
+test("computeLayout footprints override a fixture's size: a tub too long for the wall is dropped", () => {
+  var base = { widthFt: 6, lengthFt: 5, fixtureCounts: { Bathtub_Quantity: 1 } };
+  assert.equal(L.computeLayout(base).droppedCounts.Bathtub_Quantity, undefined);
+  var bigTub = L.computeLayout(
+    Object.assign({}, base, { footprints: { Bathtub_Quantity: { wallSpan: 6.1, depth: 3.6 } } }),
+  );
+  assert.equal(bigTub.droppedCounts.Bathtub_Quantity, 1);
+});
+
+test("computeLayout ignores malformed footprint overrides, keeping the default size", () => {
+  var base = { widthFt: 10, lengthFt: 8, fixtureCounts: { Bathtub_Quantity: 1, Toilet_Quantity: 1 } };
+  var expected = JSON.stringify(L.computeLayout(base));
+  [null, "x", 5, [], { Bathtub_Quantity: null }, { Bathtub_Quantity: { wallSpan: -3, depth: "abc" } }].forEach(
+    (footprints) => {
+      assert.equal(JSON.stringify(L.computeLayout(Object.assign({}, base, { footprints }))), expected);
+    },
+  );
+});

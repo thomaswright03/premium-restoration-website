@@ -64,6 +64,31 @@ test.describe("3D bathroom room preview", () => {
     await page.waitForFunction(() => window.BathroomRoom3D && window.BathroomRoom3D.available === true);
   });
 
+  test("Kohler product switcher shows a row per placed fixture and swaps the pick", async ({ page }) => {
+    await disableMaterials(page);
+    await startEstimate(page);
+    await answerScope(page, NEEDS_WALLS);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 12, Bathroom_Length_Ft: 10, Bathroom_Height_Ft: 8 });
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Bathtub_Quantity: 1, Vanity_Quantity: 1, Shower_Quantity: 1 });
+
+    const switcher = page.locator(".ai-chat-room-3d-products");
+    await expect(switcher).toBeVisible();
+    for (const label of ["Tub", "Tub faucet", "Vanity sink", "Sink faucet", "Shower valve"]) {
+      await expect(switcher.getByRole("group", { name: label, exact: true })).toBeVisible();
+    }
+    const tubs = switcher.getByRole("group", { name: "Tub", exact: true });
+    await expect(tubs.getByRole("button", { name: "Freestanding 60 in." })).toHaveAttribute("aria-pressed", "true");
+    await tubs.getByRole("button", { name: "Devonshire 60 in. alcove" }).click();
+    await expect(tubs.getByRole("button", { name: "Devonshire 60 in. alcove" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(tubs.getByRole("button", { name: "Freestanding 60 in." })).toHaveAttribute("aria-pressed", "false");
+    const picks = await page.evaluate(() => window.BathroomRoom3D.getProductPicks());
+    expect(picks.tub).toBe("K-1184-0");
+  });
+
   test("off when bathroomVisualizer.enabled is false", async ({ page }) => {
     await useConfig(page, { bathroomVisualizer: { enabled: false } });
     await startEstimate(page);

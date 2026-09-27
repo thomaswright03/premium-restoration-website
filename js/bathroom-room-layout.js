@@ -28,6 +28,7 @@
   var DIMENSION_BOUNDS = { widthFt: 50, lengthFt: 50, heightFt: 20 };
   var RENDER_MIN_DIM = 2; // floor for a sane, non-degenerate rendered room
   var MAX_FIXTURE_COUNT = 20; // mirrors Pricing.MAX_FIXTURE_COUNT
+  var MAX_FOOTPRINT_FT = 20; // cap on computeLayout({ footprints }) overrides
 
   // Per-fixture footprint, in feet, used by the layout algorithm below.
   // wallSpan: how much of a wall's length this fixture consumes.
@@ -341,6 +342,24 @@
     // conflict is dropped just like any other fixture that doesn't fit.
     var explicitEntryPoints =
       Array.isArray(input.entryPoints) && input.entryPoints.length > 0 ? input.entryPoints : null;
+    // Per-fixture size overrides ({ fixtureKey: { wallSpan, depth, height } })
+    // for when the 3D preview shows a specific product whose real size
+    // differs from the default footprint — e.g. a 72 in. tub. Anything
+    // not a positive number is ignored, keeping the default.
+    var footprintOverrides = input.footprints && typeof input.footprints === "object" ? input.footprints : {};
+    function footprintFor(fixtureKey) {
+      var base = FIXTURE_LAYOUT[fixtureKey];
+      var override = Object.prototype.hasOwnProperty.call(footprintOverrides, fixtureKey)
+        ? footprintOverrides[fixtureKey]
+        : null;
+      if (!override || typeof override !== "object") return base;
+      var merged = Object.assign({}, base);
+      ["wallSpan", "depth", "height"].forEach(function (dim) {
+        var n = parseNumber(override[dim]);
+        if (n !== null && n > 0) merged[dim] = clamp(n, 0.1, MAX_FOOTPRINT_FT);
+      });
+      return merged;
+    }
     var walls = wallsFor(widthFt, lengthFt);
     var placements = [];
     var droppedCounts = {};
@@ -434,7 +453,7 @@
     FLOOR_PRIORITY.forEach(function (fixtureKey, priorityIdx) {
       // Handled above instead, when the customer picked explicit points.
       if (fixtureKey === "Door_Quantity" && explicitEntryPoints) return;
-      var footprint = FIXTURE_LAYOUT[fixtureKey];
+      var footprint = footprintFor(fixtureKey);
       var clearance = clearanceFt(fixtureKey);
       var halfWidth = expandedHalfWidth(footprint, fixtureKey);
       var requiredSpan = 2 * halfWidth;

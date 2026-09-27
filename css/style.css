@@ -719,6 +719,42 @@ body.ai-chat-locked {
   color: var(--color-selected-ink);
 }
 
+.ai-chat-room-3d-style-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Kohler product switcher: one labelled button row per fixture part, built
+   and shown/hidden by js/bathroom-room-3d.js (PRODUCT_SLOTS) while that
+   fixture is placed. */
+.ai-chat-room-3d-products {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ai-chat-room-3d-product-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.ai-chat-room-3d-product-label {
+  flex: 0 0 7.5em;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+
+.ai-chat-room-3d-product-row .ai-chat-room-3d-style-switch {
+  flex: 1 1 auto;
+  gap: var(--space-1);
+}
+
+.ai-chat-room-3d-products .ai-chat-room-3d-style-btn {
+  padding: var(--space-1) var(--space-3);
+}
+
 /* Walk-in POV toggle + (when more than one entry point exists) the entry
    switcher row beneath it — built and shown/hidden entirely by
    js/bathroom-room-3d.js once at least one entry point is placed. */
