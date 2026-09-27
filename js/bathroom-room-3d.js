@@ -257,7 +257,11 @@ function buildMaterials(isDark) {
     metalness: 1,
     clearcoat: 0.3,
   });
+  // Stone/quartz vanity top — only used once a real undermount bowl
+  // swaps the vanity to buildUndermountVanity().
+  var countertop = new THREE.MeshStandardMaterial({ color: isDark ? 0xd9d5cc : 0xeeebe5, roughness: 0.35 });
   return {
+    countertop: countertop,
     porcelain: porcelain,
     cabinetWood: cabinetWood,
     doorTone: doorTone,
@@ -335,6 +339,10 @@ function buildGeometries() {
     doorFrameEdge: new THREE.BoxGeometry(0.06, 6.75, 0.06),
     vanityBody: new THREE.BoxGeometry(2.5, 2.6, 1.6),
     vanityBasin: new THREE.CylinderGeometry(0.55, 0.5, 0.12, 16),
+    vanityLowerBody: new THREE.BoxGeometry(2.5, 2.0, 1.6),
+    vanityApronX: new THREE.BoxGeometry(2.5, 0.5, 0.05),
+    vanityApronZ: new THREE.BoxGeometry(0.05, 0.5, 1.5),
+    vanityCountertop: vanityCountertopGeometry(),
     cabinetBody: new THREE.BoxGeometry(1.6, 2.6, 1.4),
     mirrorGlass: new THREE.PlaneGeometry(1.85, 2.35),
     mirrorFrameEdge: new THREE.BoxGeometry(0.06, 2.35, 0.06),
@@ -599,6 +607,113 @@ function ensureFixtureModel(s, fixtureKey) {
       console.warn("3D preview: couldn't load " + FIXTURE_MODELS[fixtureKey] + ", keeping the stand-in.", err);
     },
   );
+}
+
+// Kohler product parts (models/products/kohler/, converted from the Studio
+// Kohler .obj downloads — see that folder's manifest.json for each part's
+// name, source and conversion flags). Unlike FIXTURE_MODELS these don't
+// replace a fixture; each is added onto every placed instance of its
+// fixture type, at a position in that fixture's own frame (feet; back on
+// the wall at z = 0). Fetched lazily like FIXTURE_MODELS. A part on a
+// fixture that has a real model (sink, tub) only shows once that model has
+// replaced the stand-in, since the offsets are measured against the model.
+//   cutout: the vanity switches to an open-top cabinet with a countertop
+//           cut out for this undermount bowl once it arrives.
+var PRODUCT_PARTS = {
+  Vanity_Quantity: [
+    // Canvas undermount sink, rim tucked under the counter's cutout.
+    {
+      url: "models/products/kohler/K-2874-0.glb",
+      material: "porcelainGloss",
+      position: [0, 2.023, 0.28],
+      cutout: true,
+    },
+    // Purist widespread faucet on the counter behind the bowl.
+    { url: "models/products/kohler/K-14410-4-CP.glb", material: "chrome", position: [0, 2.6, 0.06] },
+  ],
+  Bathtub_Quantity: [
+    // Purist wall-mount bath spout above the tub's back rim.
+    { url: "models/products/kohler/K-14426-CP.glb", material: "chrome", position: [0, 2.3, 0] },
+  ],
+  Shower_Quantity: [
+    // Composed pressure-balancing valve trim at a standard 48 in. valve
+    // height, just in front of the back panel.
+    { url: "models/products/kohler/K-T73117-4-CP.glb", material: "chrome", position: [0, 3.73, 0.06] },
+  ],
+};
+
+function ensureProductParts(s, fixtureKey) {
+  var specs = PRODUCT_PARTS[fixtureKey];
+  if (!specs || s.partRequests[fixtureKey]) return;
+  s.partRequests[fixtureKey] = true;
+  if (!fixtureModelLoader) fixtureModelLoader = new GLTFLoader();
+  specs.forEach(function (spec) {
+    fixtureModelLoader.load(
+      spec.url,
+      function (gltf) {
+        var part = gltf.scene;
+        part.position.set(spec.position[0], spec.position[1], spec.position[2]);
+        part.traverse(function (child) {
+          if (child.isMesh) child.material = s.mat[spec.material];
+        });
+        if (spec.cutout) s.fixtureTemplates[fixtureKey] = buildUndermountVanity(s.geo, s.mat);
+        (s.productParts[fixtureKey] = s.productParts[fixtureKey] || []).push(part);
+        markDirty();
+      },
+      undefined,
+      function (err) {
+        console.warn("3D preview: couldn't load " + spec.url + ", leaving it out.", err);
+      },
+    );
+  });
+}
+
+function addProductParts(s, instance, fixtureKey) {
+  var parts = s.productParts[fixtureKey];
+  if (!parts || (FIXTURE_MODELS[fixtureKey] && !s.realModels[fixtureKey])) return;
+  parts.forEach(function (part) {
+    instance.add(part.clone(true));
+  });
+}
+
+// The vanity once a real undermount bowl is going in: the same 2.5 x 2.6 x
+// 1.6 ft cabinet, but solid only up to just under the bowl, with thin
+// aprons around an open top and a stone countertop with an oval cutout —
+// so looking down you see into the bowl rather than a solid box top.
+function buildUndermountVanity(geo, mat) {
+  var g = new THREE.Group();
+  var body = new THREE.Mesh(geo.vanityLowerBody, mat.cabinetWood);
+  body.position.set(0, 1.0, 0.8);
+  var front = new THREE.Mesh(geo.vanityApronX, mat.cabinetWood);
+  front.position.set(0, 2.25, 1.575);
+  var back = front.clone();
+  back.position.z = 0.025;
+  var left = new THREE.Mesh(geo.vanityApronZ, mat.cabinetWood);
+  left.position.set(-1.225, 2.25, 0.8);
+  var right = left.clone();
+  right.position.x = 1.225;
+  var top = new THREE.Mesh(geo.vanityCountertop, mat.countertop);
+  top.rotation.x = -Math.PI / 2;
+  top.position.set(0, 2.5, 0);
+  g.add(body, front, back, left, right, top);
+  return g;
+}
+
+function vanityCountertopGeometry() {
+  // Drawn in x/y then laid flat (rotation.x = -PI/2 maps y -> -z), so the
+  // shape's y runs from 0 at the wall to -1.6 at the front edge.
+  var shape = new THREE.Shape();
+  shape.moveTo(-1.25, 0);
+  shape.lineTo(1.25, 0);
+  shape.lineTo(1.25, -1.6);
+  shape.lineTo(-1.25, -1.6);
+  shape.closePath();
+  // Just inside the bowl's 8.2 x 6.7 in. top opening, centered where the
+  // bowl sits (PRODUCT_PARTS: z 0.28 + half its 1.28 ft depth).
+  var hole = new THREE.Path();
+  hole.absellipse(0, -0.92, 0.67, 0.54, 0, Math.PI * 2, true);
+  shape.holes.push(hole);
+  return new THREE.ExtrudeGeometry(shape, { depth: 0.1, bevelEnabled: false, curveSegments: 32 });
 }
 
 function buildToiletTemplates(geo, mat) {
@@ -929,6 +1044,8 @@ function ensureScene() {
       toiletTemplates: toiletTemplates,
       realModels: {}, // fixtureKey -> true once its real model replaced the stand-in
       modelRequests: {}, // fixtureKey -> true once its model fetch has started
+      productParts: {}, // fixtureKey -> loaded PRODUCT_PARTS templates
+      partRequests: {}, // fixtureKey -> true once its PRODUCT_PARTS fetches have started
       fixtureGroup: fixtureGroup,
       shellMaterials: shellMaterials,
       shellGroup: shellGroup,
@@ -1419,6 +1536,7 @@ function rebuildFixtures(s, widthFt, lengthFt) {
   var toiletCount = 0;
   layout.placements.forEach(function (p) {
     ensureFixtureModel(s, p.fixtureKey);
+    ensureProductParts(s, p.fixtureKey);
     // An entry point without a door renders as a trimmed open archway —
     // no slab or knob — instead of the normal door template.
     var archway = p.fixtureKey === "Door_Quantity" && p.hasDoor === false;
@@ -1437,6 +1555,7 @@ function rebuildFixtures(s, widthFt, lengthFt) {
     // the vertical offset already baked into the template's meshes.
     var y = footprint && footprint.mount === "wall" ? p.y : 0;
     var instance = template.clone(true);
+    addProductParts(s, instance, p.fixtureKey);
     instance.position.set(p.x, y, p.z);
     instance.rotation.y = p.rotationY;
     if (p.depthOffset) {
