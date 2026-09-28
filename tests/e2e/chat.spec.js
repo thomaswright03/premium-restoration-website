@@ -68,11 +68,12 @@ test.describe("chat estimate", () => {
   });
 
   test("a long estimate with everything chosen spills onto more pages, each with a footer", async ({ page }) => {
-    // Every field gets filled here, each firing a live 3D-room rebuild — the
-    // realistic toilet's heavier PBR materials/shadows make this the single
-    // slowest path in the suite, especially under this environment's
-    // software-rendered (no real GPU) WebGL.
-    test.setTimeout(60000);
+    // Every field gets filled here, each firing a live 3D-room rebuild — two
+    // each of the real toilet, sink and bathtub models (models/fixtures/),
+    // with PBR materials and shadows, make this the single slowest path in
+    // the suite, especially under this environment's software-rendered (no
+    // real GPU) WebGL.
+    test.setTimeout(90000);
     await disableMaterials(page);
     await startEstimate(page);
     await answerScope(page, {

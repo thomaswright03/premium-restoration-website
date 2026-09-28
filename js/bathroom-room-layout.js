@@ -28,6 +28,7 @@
   var DIMENSION_BOUNDS = { widthFt: 50, lengthFt: 50, heightFt: 20 };
   var RENDER_MIN_DIM = 2; // floor for a sane, non-degenerate rendered room
   var MAX_FIXTURE_COUNT = 20; // mirrors Pricing.MAX_FIXTURE_COUNT
+  var MAX_FOOTPRINT_FT = 20; // cap on computeLayout({ footprints }) overrides
 
   // Per-fixture footprint, in feet, used by the layout algorithm below.
   // wallSpan: how much of a wall's length this fixture consumes.
@@ -41,11 +42,14 @@
     // Real-world elongated-bowl toilet: ~20in wall clearance, ~28in front
     // projection (tank back to bowl front), ~30in to the tank lid.
     Toilet_Quantity: { wallSpan: 1.7, depth: 2.3, height: 2.5, mount: "floor" },
-    Bathtub_Quantity: { wallSpan: 5.2, depth: 2.6, height: 1.6, mount: "floor" },
+    // Bathtub and sink footprints match the real product models the 3D
+    // preview loads (models/fixtures/, see FIXTURE_MODELS in
+    // js/bathroom-room-3d.js): a 60x34 in. tub and a 22.5x18 in. wall-hung sink.
+    Bathtub_Quantity: { wallSpan: 5.2, depth: 2.9, height: 1.6, mount: "floor" },
     Shower_Quantity: { wallSpan: 3.2, depth: 3.2, height: 6.5, mount: "floor" },
     Shower_Door_Quantity: { wallSpan: 2.5, depth: 0.1, height: 6.5, mount: "attach", attachTo: "Shower_Quantity" },
     Vanity_Quantity: { wallSpan: 2.5, depth: 1.6, height: 2.6, mount: "floor" },
-    Sink_Quantity: { wallSpan: 1.0, depth: 0.8, height: 2.6, mount: "floor" },
+    Sink_Quantity: { wallSpan: 1.9, depth: 1.55, height: 2.6, mount: "floor" },
     Cabinet_Quantity: { wallSpan: 1.6, depth: 1.4, height: 2.6, mount: "floor" },
     Door_Quantity: { wallSpan: 2.5, depth: 0.15, height: 6.75, mount: "floor", preferWall: "S" },
     Mirror_Quantity: {
@@ -338,6 +342,24 @@
     // conflict is dropped just like any other fixture that doesn't fit.
     var explicitEntryPoints =
       Array.isArray(input.entryPoints) && input.entryPoints.length > 0 ? input.entryPoints : null;
+    // Per-fixture size overrides ({ fixtureKey: { wallSpan, depth, height } })
+    // for when the 3D preview shows a specific product whose real size
+    // differs from the default footprint — e.g. a 72 in. tub. Anything
+    // not a positive number is ignored, keeping the default.
+    var footprintOverrides = input.footprints && typeof input.footprints === "object" ? input.footprints : {};
+    function footprintFor(fixtureKey) {
+      var base = FIXTURE_LAYOUT[fixtureKey];
+      var override = Object.prototype.hasOwnProperty.call(footprintOverrides, fixtureKey)
+        ? footprintOverrides[fixtureKey]
+        : null;
+      if (!override || typeof override !== "object") return base;
+      var merged = Object.assign({}, base);
+      ["wallSpan", "depth", "height"].forEach(function (dim) {
+        var n = parseNumber(override[dim]);
+        if (n !== null && n > 0) merged[dim] = clamp(n, 0.1, MAX_FOOTPRINT_FT);
+      });
+      return merged;
+    }
     var walls = wallsFor(widthFt, lengthFt);
     var placements = [];
     var droppedCounts = {};
@@ -431,7 +453,7 @@
     FLOOR_PRIORITY.forEach(function (fixtureKey, priorityIdx) {
       // Handled above instead, when the customer picked explicit points.
       if (fixtureKey === "Door_Quantity" && explicitEntryPoints) return;
-      var footprint = FIXTURE_LAYOUT[fixtureKey];
+      var footprint = footprintFor(fixtureKey);
       var clearance = clearanceFt(fixtureKey);
       var halfWidth = expandedHalfWidth(footprint, fixtureKey);
       var requiredSpan = 2 * halfWidth;

@@ -1,0 +1,113 @@
+{
+  "source": "Studio Kohler .obj downloads (Restor step 3), filtered to products sold at Home Depot (step 2). Converted with: node tools/models/obj-to-glb.mjs <MMN>.obj <file> <convertArgs>. slot: the 3D room's product switcher row it appears in (PRODUCT_SLOTS in js/bathroom-room-3d.js).",
+  "products": [
+    {
+      "mmn": "K-14426-CP",
+      "name": "KOHLER Purist Wall Mount Non Diverter Bath Spout 35 Degree in Polished Chrome",
+      "category": "bath_faucets",
+      "file": "models/products/kohler/K-14426-CP.glb",
+      "homeDepotUrl": "https://www.homedepot.com/p/KOHLER-Purist-Wall-Mount-Non-Diverter-Bath-Spout-35-Degree-in-Polished-Chrome-K-14426-CP/100079247",
+      "convertArgs": ["--cluster", "0.12"],
+      "slot": "tubFaucet"
+    },
+    {
+      "mmn": "K-73081-4-CP",
+      "name": "KOHLER Composed 2 Handle Deck Mount Roman Tub Faucet with Lever Handles in Polished Chrome",
+      "category": "bath_faucets",
+      "file": "models/products/kohler/K-73081-4-CP.glb",
+      "homeDepotUrl": "https://www.homedepot.com/p/KOHLER-Composed-2-Handle-Deck-Mount-Roman-Tub-Faucet-with-Lever-Handles-in-Polished-Chrome-K-73081-4-CP/300440898",
+      "convertArgs": ["--up", "y", "--front", "+z", "--cluster", "0.12"],
+      "slot": "tubFaucet"
+    },
+    {
+      "mmn": "K-1163-0",
+      "name": "KOHLER Sunward 60 in x 42 in Oval Soaking Bathtub with Reversible Drain in White",
+      "category": "bathing",
+      "file": "models/products/kohler/K-1163-0.glb",
+      "homeDepotUrl": "https://www.homedepot.com/p/KOHLER-Sunward-60-in-x-42-in-Oval-Soaking-Bathtub-with-Reversible-Drain-in-White-K-1163-0/100409618",
+      "convertArgs": ["--up", "y", "--front", "+z"],
+      "slot": "tub"
+    },
+    {
+      "mmn": "K-1165-0",
+      "name": "KOHLER Sunward 72 in x 42 in Oval Soaking Bathtub with Reversible Drain in White",
+      "category": "bathing",
+      "file": "models/products/kohler/K-1165-0.glb",
+      "homeDepotUrl": "https://www.homedepot.com/p/KOHLER-Sunward-72-in-x-42-in-Oval-Soaking-Bathtub-with-Reversible-Drain-in-White-K-1165-0/100413002",
+      "convertArgs": ["--up", "y", "--front", "+z"],
+      "slot": "tub"
+    },
+    {
+      "mmn": "K-1184-0",
+      "name": "KOHLER Devonshire 60 in x 32 in Acrylic Alcove Rectangular Soaking Bathtub with Reversible Drain in White",
+      "category": "bathing",
+      "file": "models/products/kohler/K-1184-0.glb",
+      "homeDepotUrl": "https://www.homedepot.com/p/KOHLER-Devonshire-60-in-x-32-in-Acrylic-Alcove-Rectangular-Soaking-Bathtub-with-Reversible-Drain-in-White-K-1184-0/100089359",
+      "convertArgs": ["--up", "y", "--front", "+z"],
+      "slot": "tub"
+    },
+    {
+      "mmn": "K-14410-4-CP",
+      "name": "KOHLER Purist 8 in Widespread 2 Handle Low Arc Bathroom Faucet in Polished Chrome with Low Lever Handles",
+      "category": "bathroom_sink_faucets",
+      "file": "models/products/kohler/K-14410-4-CP.glb",
+      "homeDepotUrl": "https://www.homedepot.com/p/KOHLER-Purist-8-in-Widespread-2-Handle-Low-Arc-Bathroom-Faucet-in-Polished-Chrome-with-Low-Lever-Handles-K-14410-4-CP/100066218",
+      "convertArgs": ["--cluster", "0.12"],
+      "slot": "vanityFaucet"
+    },
+    {
+      "mmn": "K-77974-9-CP",
+      "name": "KOHLER Components Bathroom Sink Handles with Industrial Design in Polished Chrome",
+      "category": "bathroom_sink_faucets",
+      "file": "models/products/kohler/K-77974-9-CP.glb",
+      "homeDepotUrl": "https://www.homedepot.com/p/KOHLER-Components-Bathroom-Sink-Handles-with-Industrial-Design-in-Polished-Chrome-K-77974-9-CP/307627783",
+      "convertArgs": ["--cluster", "0.12"],
+      "slot": "vanityFaucet"
+    },
+    {
+      "mmn": "K-2608-SU-NA",
+      "name": "KOHLER Bachata 20x16 69in Undermount Bathroom Sink in Gray Stainless Steel Sink Only",
+      "category": "bathroom_sinks",
+      "file": "models/products/kohler/K-2608-SU-NA.glb",
+      "homeDepotUrl": "https://www.homedepot.com/p/KOHLER-Bachata-20x16-69in-Undermount-Bathroom-Sink-in-Gray-Stainless-Steel-Sink-Only-K-2608-SU-NA/206263425",
+      "convertArgs": [],
+      "slot": "vanitySink"
+    },
+    {
+      "mmn": "K-2874-0",
+      "name": "KOHLER Canvas 19 4x16 0625in Undermount Bathroom Sink in White Cast Iron with Overflow Drain",
+      "category": "bathroom_sinks",
+      "file": "models/products/kohler/K-2874-0.glb",
+      "homeDepotUrl": "https://www.homedepot.com/p/KOHLER-Canvas-19-4x16-0625in-Undermount-Bathroom-Sink-in-White-Cast-Iron-with-Overflow-Drain-K-2874-0/202388471",
+      "convertArgs": ["--up", "y", "--front", "+z"],
+      "slot": "vanitySink"
+    },
+    {
+      "mmn": "K-T72770-4-CP",
+      "name": "KOHLER Artifacts Lever 1 Handle Transfer Valve Trim Kit in Polished Chrome Valve Not Included",
+      "category": "valves_trims",
+      "file": "models/products/kohler/K-T72770-4-CP.glb",
+      "homeDepotUrl": "https://www.homedepot.com/p/KOHLER-Artifacts-Lever-1-Handle-Transfer-Valve-Trim-Kit-in-Polished-Chrome-Valve-Not-Included-K-T72770-4-CP/316759712",
+      "convertArgs": ["--cluster", "0.12"],
+      "slot": "showerValve"
+    },
+    {
+      "mmn": "K-T73117-4-CP",
+      "name": "KOHLER Composed 1 Handle rite temp Pressure Balancing Valve Trim Kit in Polished Chrome Valve Not Included",
+      "category": "valves_trims",
+      "file": "models/products/kohler/K-T73117-4-CP.glb",
+      "homeDepotUrl": "https://www.homedepot.com/p/KOHLER-Composed-1-Handle-rite-temp-Pressure-Balancing-Valve-Trim-Kit-in-Polished-Chrome-Valve-Not-Included-K-T73117-4-CP/300127083",
+      "convertArgs": ["--cluster", "0.12"],
+      "slot": "showerValve"
+    },
+    {
+      "mmn": "K-T78027-9-CP",
+      "name": "KOHLER Components 1 Handle Thermostatic Valve Trim with Industrial Handle in Polished Chrome Valve Not Included",
+      "category": "valves_trims",
+      "file": "models/products/kohler/K-T78027-9-CP.glb",
+      "homeDepotUrl": "https://www.homedepot.com/p/KOHLER-Components-1-Handle-Thermostatic-Valve-Trim-with-Industrial-Handle-in-Polished-Chrome-Valve-Not-Included-K-T78027-9-CP/307649169",
+      "convertArgs": ["--cluster", "0.12"],
+      "slot": "showerValve"
+    }
+  ]
+}

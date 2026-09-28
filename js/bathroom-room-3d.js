@@ -15,6 +15,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 var Layout = window.BathroomRoomLayout;
 
@@ -75,9 +76,12 @@ function applyFixtureFinish(instance, fixtureKey, mat, colorHex) {
   if (!sharedMaterial) return;
   var tinted = null;
   instance.traverse(function (child) {
-    if (child.isMesh && child.material === sharedMaterial) {
+    // Real product models (see FIXTURE_MODELS) mark their own finish
+    // surface with userData.finishBase instead of sharing `mat`'s material.
+    var base = child.isMesh && (child.userData.finishBase || (child.material === sharedMaterial && sharedMaterial));
+    if (base) {
       if (!tinted) {
-        tinted = sharedMaterial.clone();
+        tinted = base.clone();
         tinted.color.setHex(colorHex);
         // Marks this as a clone made just for this instance, as opposed to
         // every mesh still pointing at the shared, reused-forever template
@@ -118,7 +122,7 @@ function updateFixtureFinishInstances(s, fixtureKey, colorHex) {
     instance.traverse(function (child) {
       if (child.isMesh && child.material && child.material.userData && child.material.userData.isFinishClone) {
         child.material.dispose();
-        child.material = sharedMaterial;
+        child.material = child.userData.finishBase || sharedMaterial;
       }
     });
     if (colorHex != null) applyFixtureFinish(instance, fixtureKey, s.mat, colorHex);
@@ -247,13 +251,20 @@ function buildMaterials(isDark) {
     clearcoat: 0.5,
     clearcoatRoughness: 0.15,
   });
+  // Brushed stainless (the Bachata sink bowl).
+  var stainless = new THREE.MeshStandardMaterial({ color: 0xc4c7c9, roughness: 0.38, metalness: 0.9 });
   var chrome = new THREE.MeshPhysicalMaterial({
     color: 0xd8dadb,
     roughness: 0.12,
     metalness: 1,
     clearcoat: 0.3,
   });
+  // Stone/quartz vanity top — only used once a real undermount bowl
+  // swaps the vanity to buildUndermountVanity().
+  var countertop = new THREE.MeshStandardMaterial({ color: isDark ? 0xd9d5cc : 0xeeebe5, roughness: 0.35 });
   return {
+    countertop: countertop,
+    stainless: stainless,
     porcelain: porcelain,
     cabinetWood: cabinetWood,
     doorTone: doorTone,
@@ -331,6 +342,9 @@ function buildGeometries() {
     doorFrameEdge: new THREE.BoxGeometry(0.06, 6.75, 0.06),
     vanityBody: new THREE.BoxGeometry(2.5, 2.6, 1.6),
     vanityBasin: new THREE.CylinderGeometry(0.55, 0.5, 0.12, 16),
+    vanityLowerBody: new THREE.BoxGeometry(2.5, 2.0, 1.6),
+    vanityApronX: new THREE.BoxGeometry(2.5, 0.5, 0.05),
+    vanityApronZ: new THREE.BoxGeometry(0.05, 0.5, 1.5),
     cabinetBody: new THREE.BoxGeometry(1.6, 2.6, 1.4),
     mirrorGlass: new THREE.PlaneGeometry(1.85, 2.35),
     mirrorFrameEdge: new THREE.BoxGeometry(0.06, 2.35, 0.06),
@@ -540,6 +554,557 @@ function buildShowerShelf(geo, mat) {
 // Toilets are built separately (see buildToiletTemplates below) since,
 // unlike every other fixture, they have two interchangeable styles the
 // visitor can pick between live.
+// ---------------------------------------------------------------------
+// Real product models
+// ---------------------------------------------------------------------
+// Manufacturer/catalog 3D models, converted from .obj by
+// tools/models/obj-to-glb.mjs into this file's fixture convention (feet,
+// Y up, back on the wall at z = 0, projecting toward +z, resting on the
+// floor or — wall-hung — at its real mount height). Loaded after the scene
+// is up; until one arrives (or if it fails to), the procedural stand-in
+// for that fixture type keeps rendering, so nothing here can break the
+// preview. The source OBJs carry no usable materials, so every mesh gets
+// the shared glazed-porcelain material (and stays retintable by
+// setFixtureFinish() via userData.finishBase).
+var FIXTURE_MODELS = {
+  Toilet_Quantity: "models/fixtures/toilet.glb",
+  Sink_Quantity: "models/fixtures/sink.glb",
+};
+
+// Fetched lazily, the first time a fixture of that type is actually placed
+// (see rebuildFixtures()) — most visitors never add a tub, and pulling
+// every model at estimate start competes with the chat UI for the main
+// thread on slower devices.
+var fixtureModelLoader = null;
+
+function ensureFixtureModel(s, fixtureKey) {
+  if (!FIXTURE_MODELS[fixtureKey] || s.modelRequests[fixtureKey]) return;
+  s.modelRequests[fixtureKey] = true;
+  if (!fixtureModelLoader) fixtureModelLoader = new GLTFLoader();
+  fixtureModelLoader.load(
+    FIXTURE_MODELS[fixtureKey],
+    function (gltf) {
+      var template = gltf.scene;
+      template.traverse(function (child) {
+        if (child.isMesh) {
+          child.material = s.mat.porcelainGloss;
+          child.userData.finishBase = s.mat.porcelainGloss;
+        }
+      });
+      if (fixtureKey === "Toilet_Quantity") {
+        // One real model replaces both procedural styles — the style
+        // switch only chooses between stand-ins, so it's hidden once a
+        // real toilet is showing (see rebuildFixtures()).
+        s.toiletTemplates.A = template;
+        s.toiletTemplates.B = template;
+      } else {
+        s.fixtureTemplates[fixtureKey] = template;
+      }
+      s.realModels[fixtureKey] = true;
+      markDirty();
+    },
+    undefined,
+    function (err) {
+      console.warn("3D preview: couldn't load " + FIXTURE_MODELS[fixtureKey] + ", keeping the stand-in.", err);
+    },
+  );
+}
+
+// ---------------------------------------------------------------------
+// Kohler product switcher
+// ---------------------------------------------------------------------
+// The Studio Kohler models (models/products/kohler/, converted from the
+// Restor .obj downloads — see that folder's manifest.json for each one's
+// name, source and conversion flags), grouped into slots the visitor can
+// flip between with a button row per slot above the canvas. Purely visual:
+// nothing here feeds the estimate's pricing.
+//
+// Positions are in the fixture's own frame (feet, back on the wall at
+// z = 0), and some depend on another slot's pick — a tub faucet sits on
+// whichever tub is showing, a sink faucet behind whichever bowl is in the
+// vanity — so each option's place() gets every slot's current option.
+//   body:      this slot's model IS the fixture (replaces the stand-in or
+//              the default model), rather than being added onto it
+//   footprint: a body's real size, fed to Layout.computeLayout() so
+//              clearance/fit checks follow the picked product
+//   deckLine:  a deck-mounted faucet's mounting-hole line, measured from
+//              its model's back edge
+//   dropIn:    a drop-in tub ("oval" or "rect" basin) — drawn set into a
+//              stone tub deck (see buildTubDeck) instead of floating on its
+//              bare shell
+var PRODUCT_SLOTS = [
+  {
+    id: "tub",
+    fixtureKey: "Bathtub_Quantity",
+    label: "Tub",
+    body: true,
+    options: [
+      // The freestanding tub PR #9 shipped; its footprint is the layout's
+      // default one. rimY: top of the back rim; deckZ: that rim's middle.
+      {
+        id: "freestanding",
+        label: "Freestanding 60 in.",
+        url: "models/fixtures/bathtub.glb",
+        rimY: 2.08,
+        deckZ: 0.235,
+      },
+      {
+        id: "K-1184-0",
+        dropIn: "rect",
+        label: "Devonshire 60 in. alcove",
+        url: "models/products/kohler/K-1184-0.glb",
+        footprint: { wallSpan: 5.1, depth: 2.75 },
+        rimY: 1.65,
+        deckZ: 0.145,
+      },
+      {
+        id: "K-1163-0",
+        dropIn: "oval",
+        label: "Sunward 60 in. oval",
+        url: "models/products/kohler/K-1163-0.glb",
+        footprint: { wallSpan: 5.1, depth: 3.55 },
+        rimY: 1.75,
+        deckZ: 0.2,
+      },
+      {
+        id: "K-1165-0",
+        dropIn: "oval",
+        label: "Sunward 72 in. oval",
+        url: "models/products/kohler/K-1165-0.glb",
+        footprint: { wallSpan: 6.1, depth: 3.6 },
+        rimY: 1.76,
+        deckZ: 0.21,
+      },
+    ],
+  },
+  {
+    id: "tubFaucet",
+    fixtureKey: "Bathtub_Quantity",
+    label: "Tub faucet",
+    options: [
+      {
+        id: "K-14426-CP",
+        label: "Purist wall spout",
+        url: "models/products/kohler/K-14426-CP.glb",
+        material: "chrome",
+        place: function (sel) {
+          return [0, sel.tub.rimY + 0.2, 0];
+        },
+      },
+      {
+        id: "K-73081-4-CP",
+        label: "Composed deck-mount filler",
+        url: "models/products/kohler/K-73081-4-CP.glb",
+        material: "chrome",
+        deckLine: 0.105,
+        place: function (sel, opt) {
+          return [0, sel.tub.rimY, sel.tub.deckZ - opt.deckLine];
+        },
+      },
+    ],
+  },
+  {
+    id: "vanitySink",
+    fixtureKey: "Vanity_Quantity",
+    label: "Vanity sink",
+    options: [
+      // centerZ: where the bowl's center sits in the vanity; hole: the
+      // countertop cutout's radii, just inside the bowl's top opening;
+      // faucetLine: where the faucet's holes go, behind the cutout.
+      {
+        id: "K-2874-0",
+        label: "Canvas white",
+        url: "models/products/kohler/K-2874-0.glb",
+        material: "porcelainGloss",
+        height: 0.477,
+        depth: 1.284,
+        centerZ: 0.92,
+        hole: { rx: 0.67, rz: 0.54 },
+        faucetLine: 0.235,
+      },
+      {
+        id: "K-2608-SU-NA",
+        label: "Bachata stainless",
+        url: "models/products/kohler/K-2608-SU-NA.glb",
+        material: "stainless",
+        height: 0.492,
+        depth: 1.39,
+        centerZ: 0.88,
+        hole: { rx: 0.68, rz: 0.55 },
+        faucetLine: 0.2,
+      },
+    ],
+  },
+  {
+    id: "vanityFaucet",
+    fixtureKey: "Vanity_Quantity",
+    label: "Sink faucet",
+    options: [
+      {
+        id: "K-14410-4-CP",
+        label: "Purist widespread",
+        url: "models/products/kohler/K-14410-4-CP.glb",
+        material: "chrome",
+        deckLine: 0.17,
+      },
+      {
+        id: "K-77974-9-CP",
+        label: "Components handles only",
+        url: "models/products/kohler/K-77974-9-CP.glb",
+        material: "chrome",
+        deckLine: 0.11,
+      },
+    ],
+  },
+  {
+    id: "showerValve",
+    fixtureKey: "Shower_Quantity",
+    label: "Shower valve",
+    // Centered at a standard 48 in. valve height (see wallCenterY), just in
+    // front of the enclosure's back panel.
+    options: [
+      { id: "K-T73117-4-CP", label: "Composed", url: "models/products/kohler/K-T73117-4-CP.glb", material: "chrome" },
+      {
+        id: "K-T78027-9-CP",
+        label: "Components thermostatic",
+        url: "models/products/kohler/K-T78027-9-CP.glb",
+        material: "chrome",
+      },
+      {
+        id: "K-T72770-4-CP",
+        label: "Artifacts transfer valve",
+        url: "models/products/kohler/K-T72770-4-CP.glb",
+        material: "chrome",
+      },
+    ],
+  },
+];
+
+// Sink bowls and the vanity's own faucet have no place() of their own:
+// both hang off the picked bowl, laid out here in one spot.
+PRODUCT_SLOTS[2].options.forEach(function (sink) {
+  sink.place = function () {
+    // Rim tucked just under the 2.5 ft countertop's cutout.
+    return [0, 2.5 - sink.height, sink.centerZ - sink.depth / 2];
+  };
+});
+PRODUCT_SLOTS[3].options.forEach(function (faucet) {
+  faucet.place = function (sel) {
+    return [0, 2.6, sel.vanitySink.faucetLine - faucet.deckLine];
+  };
+});
+PRODUCT_SLOTS[4].options.forEach(function (valve) {
+  valve.wallCenterY = 4;
+  valve.place = function (sel, opt, size) {
+    return [0, valve.wallCenterY - size.y / 2, 0.06];
+  };
+});
+
+function defaultProductPicks() {
+  var picks = {};
+  PRODUCT_SLOTS.forEach(function (slot) {
+    picks[slot.id] = slot.options[0].id;
+  });
+  return picks;
+}
+
+function productSlot(slotId) {
+  for (var i = 0; i < PRODUCT_SLOTS.length; i++) if (PRODUCT_SLOTS[i].id === slotId) return PRODUCT_SLOTS[i];
+  return null;
+}
+
+function productOption(slot, optionId) {
+  for (var i = 0; i < slot.options.length; i++) if (slot.options[i].id === optionId) return slot.options[i];
+  return null;
+}
+
+// slotId -> the currently picked option object.
+function selectedProducts() {
+  var sel = {};
+  PRODUCT_SLOTS.forEach(function (slot) {
+    sel[slot.id] = productOption(slot, state.productPicks[slot.id]) || slot.options[0];
+  });
+  return sel;
+}
+
+// Footprint overrides for Layout.computeLayout(): only a non-default body
+// pick that declares its own size changes anything. picks defaults to
+// state.productPicks.
+function productFootprints(picks) {
+  picks = picks || state.productPicks;
+  var out = {};
+  PRODUCT_SLOTS.forEach(function (slot) {
+    var opt = productOption(slot, picks[slot.id]);
+    if (slot.body && opt && opt.footprint) out[slot.fixtureKey] = opt.footprint;
+  });
+  return out;
+}
+
+// productFootprints() for a layout about to be computed from layoutInput
+// (no footprints yet), with any body pick that no longer fits — the room
+// shrank, or more fixtures were added — treated as its slot's default, so
+// a visual pick never makes a priced fixture disappear from the room or
+// fail the estimate's fit check. commit: also put that pick back to the
+// default in state (the real rebuild does; checkFit()'s what-if doesn't).
+function fittedProductFootprints(layoutInput, commit) {
+  var picks = Object.assign({}, state.productPicks);
+  PRODUCT_SLOTS.forEach(function (slot) {
+    var opt = productOption(slot, picks[slot.id]);
+    if (!slot.body || !opt || opt === slot.options[0]) return;
+    var others = productFootprints(picks);
+    delete others[slot.fixtureKey];
+    if (productWouldDrop(Object.assign({}, layoutInput, { footprints: others }), slot, opt)) {
+      picks[slot.id] = slot.options[0].id;
+    }
+  });
+  if (commit) state.productPicks = picks;
+  return productFootprints(picks);
+}
+
+var productModelLoader = null;
+
+// Fetched lazily — only the picked option of a slot whose fixture is
+// actually placed — and cached for the life of the scene, so flipping back
+// to an option is instant. s.productModels[url] is the loaded template
+// (with its bounding-box size in userData.size), or false while in flight.
+function ensureProductModel(s, opt) {
+  if (opt.url in s.productModels) return;
+  s.productModels[opt.url] = false;
+  if (!productModelLoader) productModelLoader = new GLTFLoader();
+  productModelLoader.load(
+    opt.url,
+    function (gltf) {
+      var model = gltf.scene;
+      var material = s.mat[opt.material || "porcelainGloss"];
+      model.traverse(function (child) {
+        if (child.isMesh) {
+          child.material = material;
+          // Porcelain bodies stay retintable by setFixtureFinish(); chrome
+          // and steel trim keep their finish.
+          if (!opt.material) child.userData.finishBase = material;
+        }
+      });
+      model.userData.size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+      s.productModels[opt.url] = model;
+      markDirty();
+    },
+    undefined,
+    function (err) {
+      console.warn("3D preview: couldn't load " + opt.url + ", leaving it out.", err);
+    },
+  );
+}
+
+// The fixture template to clone for fixtureKey, when a product slot owns
+// its body: the picked tub model, or a vanity cut out for the picked bowl.
+// null = no slot owns it (or its model hasn't arrived yet), so the caller
+// keeps whatever it would otherwise use.
+function productBodyTemplate(s, fixtureKey, sel) {
+  if (fixtureKey === "Bathtub_Quantity") {
+    ensureProductModel(s, sel.tub);
+    var tub = s.productModels[sel.tub.url];
+    if (!tub || !sel.tub.dropIn) return tub || null;
+    if (!s.tubTemplates[sel.tub.id]) {
+      var g = new THREE.Group();
+      g.add(tub.clone(true), buildTubDeck(s.mat, tub.userData.size, sel.tub));
+      s.tubTemplates[sel.tub.id] = g;
+    }
+    return s.tubTemplates[sel.tub.id];
+  }
+  if (fixtureKey === "Vanity_Quantity") {
+    ensureProductModel(s, sel.vanitySink);
+    if (!s.productModels[sel.vanitySink.url]) return null;
+    var key = sel.vanitySink.id;
+    if (!s.vanityTemplates[key]) s.vanityTemplates[key] = buildUndermountVanity(s.geo, s.mat, sel.vanitySink);
+    return s.vanityTemplates[key];
+  }
+  return null;
+}
+
+// Adds every non-body slot's picked model onto one placed instance. Parts
+// on a fixture whose body comes from a slot wait for that body, since
+// their positions are measured against it.
+function addProductParts(s, instance, fixtureKey, sel, bodyReady) {
+  PRODUCT_SLOTS.forEach(function (slot) {
+    if (slot.fixtureKey !== fixtureKey || slot.body) return;
+    var opt = sel[slot.id];
+    ensureProductModel(s, opt);
+    var model = s.productModels[opt.url];
+    if (!model || !bodyReady) return;
+    var part = model.clone(true);
+    var p = opt.place(sel, opt, model.userData.size);
+    part.position.set(p[0], p[1], p[2]);
+    instance.add(part);
+  });
+}
+
+// One button row per slot, shown only while that slot's fixture is placed.
+function buildProductSwitcher(panel, wrap) {
+  var container = document.createElement("div");
+  container.className = "ai-chat-room-3d-products";
+  container.hidden = true;
+  var rows = {};
+  PRODUCT_SLOTS.forEach(function (slot) {
+    var row = document.createElement("div");
+    row.className = "ai-chat-room-3d-product-row";
+    row.hidden = true;
+    var label = document.createElement("span");
+    label.className = "ai-chat-room-3d-product-label";
+    label.textContent = slot.label;
+    var buttonsWrap = document.createElement("div");
+    buttonsWrap.className = "ai-chat-room-3d-style-switch";
+    buttonsWrap.setAttribute("role", "group");
+    buttonsWrap.setAttribute("aria-label", slot.label);
+    var buttons = {};
+    slot.options.forEach(function (opt) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ai-chat-room-3d-style-btn";
+      btn.textContent = opt.label;
+      btn.addEventListener("click", function () {
+        window.BathroomRoom3D.setProductPick(slot.id, opt.id);
+      });
+      buttons[opt.id] = btn;
+      buttonsWrap.appendChild(btn);
+    });
+    row.appendChild(label);
+    row.appendChild(buttonsWrap);
+    container.appendChild(row);
+    rows[slot.id] = { row: row, buttons: buttons };
+  });
+  panel.insertBefore(container, wrap);
+  return { container: container, rows: rows };
+}
+
+// Reflects state.productPicks and which fixtures are placed onto the rows.
+// A body option too big for the room (the layout would drop a fixture it
+// otherwise places) is disabled rather than silently not drawn.
+function syncProductSwitcher(s, layoutInput, placedKeys) {
+  var ui = s.productSwitcher;
+  if (!ui) return;
+  var anyShown = false;
+  PRODUCT_SLOTS.forEach(function (slot) {
+    var entry = ui.rows[slot.id];
+    var shown = !!placedKeys[slot.fixtureKey];
+    entry.row.hidden = !shown;
+    anyShown = anyShown || shown;
+    slot.options.forEach(function (opt) {
+      var btn = entry.buttons[opt.id];
+      var picked = state.productPicks[slot.id] === opt.id;
+      btn.classList.toggle("selected", picked);
+      btn.setAttribute("aria-pressed", picked ? "true" : "false");
+      var tooBig = shown && slot.body && !picked && productWouldDrop(layoutInput, slot, opt);
+      btn.disabled = tooBig;
+      btn.title = tooBig ? "Too big for this room" : "";
+    });
+  });
+  ui.container.hidden = !anyShown;
+}
+
+function productWouldDrop(layoutInput, slot, opt) {
+  var footprints = Object.assign({}, layoutInput.footprints);
+  if (opt.footprint) footprints[slot.fixtureKey] = opt.footprint;
+  else delete footprints[slot.fixtureKey];
+  var current = Layout.computeLayout(layoutInput).droppedCounts;
+  var withOpt = Layout.computeLayout(Object.assign({}, layoutInput, { footprints: footprints })).droppedCounts;
+  // Per fixture type, not a total: a bigger tub that no longer fits could
+  // otherwise "free up" room for two other fixtures and look like a win.
+  return Object.keys(withOpt).some(function (k) {
+    return withOpt[k] > (current[k] || 0);
+  });
+}
+
+// The deck a drop-in tub is set into: stone side panels from the floor up
+// to just under the rim, and a top with a cutout a little inside the rim's
+// outer edge — so the rim rests on it and the bare underside of the shell
+// is hidden, as it would be installed. Sized from the tub model itself.
+function buildTubDeck(mat, size, tub) {
+  var w = size.x;
+  var d = size.z;
+  var topY = tub.rimY - 0.06;
+  var g = new THREE.Group();
+  var t = 0.05;
+  var front = new THREE.Mesh(new THREE.BoxGeometry(w, topY, t), mat.countertop);
+  front.position.set(0, topY / 2, d - t / 2);
+  var left = new THREE.Mesh(new THREE.BoxGeometry(t, topY, d - t), mat.countertop);
+  left.position.set(-w / 2 + t / 2, topY / 2, (d - t) / 2);
+  var right = left.clone();
+  right.position.x = w / 2 - t / 2;
+  // Top plate, drawn in x/y and laid flat like the vanity countertop.
+  var shape = new THREE.Shape();
+  shape.moveTo(-w / 2, 0);
+  shape.lineTo(w / 2, 0);
+  shape.lineTo(w / 2, -d);
+  shape.lineTo(-w / 2, -d);
+  shape.closePath();
+  var inset = 0.15;
+  var hole = new THREE.Path();
+  if (tub.dropIn === "oval") {
+    hole.absellipse(0, -d / 2, w / 2 - inset, d / 2 - inset, 0, Math.PI * 2, true);
+  } else {
+    var hx = w / 2 - inset;
+    var hz = d - inset;
+    var r = 0.3;
+    hole.moveTo(-hx + r, -inset);
+    hole.lineTo(hx - r, -inset);
+    hole.quadraticCurveTo(hx, -inset, hx, -inset - r);
+    hole.lineTo(hx, -hz + r);
+    hole.quadraticCurveTo(hx, -hz, hx - r, -hz);
+    hole.lineTo(-hx + r, -hz);
+    hole.quadraticCurveTo(-hx, -hz, -hx, -hz + r);
+    hole.lineTo(-hx, -inset - r);
+    hole.quadraticCurveTo(-hx, -inset, -hx + r, -inset);
+  }
+  shape.holes.push(hole);
+  var top = new THREE.Mesh(
+    new THREE.ExtrudeGeometry(shape, { depth: 0.04, bevelEnabled: false, curveSegments: 32 }),
+    mat.countertop,
+  );
+  top.rotation.x = -Math.PI / 2;
+  top.position.y = topY - 0.04;
+  g.add(front, left, right, top);
+  return g;
+}
+
+// The vanity once a real undermount bowl is going in: the same 2.5 x 2.6 x
+// 1.6 ft cabinet, but solid only up to just under the bowl, with thin
+// aprons around an open top and a stone countertop with an oval cutout
+// sized to that bowl — so looking down you see into the bowl rather than a
+// solid box top.
+function buildUndermountVanity(geo, mat, sink) {
+  var g = new THREE.Group();
+  var body = new THREE.Mesh(geo.vanityLowerBody, mat.cabinetWood);
+  body.position.set(0, 1.0, 0.8);
+  var front = new THREE.Mesh(geo.vanityApronX, mat.cabinetWood);
+  front.position.set(0, 2.25, 1.575);
+  var back = front.clone();
+  back.position.z = 0.025;
+  var left = new THREE.Mesh(geo.vanityApronZ, mat.cabinetWood);
+  left.position.set(-1.225, 2.25, 0.8);
+  var right = left.clone();
+  right.position.x = 1.225;
+  var top = new THREE.Mesh(vanityCountertopGeometry(sink), mat.countertop);
+  top.rotation.x = -Math.PI / 2;
+  top.position.set(0, 2.5, 0);
+  g.add(body, front, back, left, right, top);
+  return g;
+}
+
+function vanityCountertopGeometry(sink) {
+  // Drawn in x/y then laid flat (rotation.x = -PI/2 maps y -> -z), so the
+  // shape's y runs from 0 at the wall to -1.6 at the front edge.
+  var shape = new THREE.Shape();
+  shape.moveTo(-1.25, 0);
+  shape.lineTo(1.25, 0);
+  shape.lineTo(1.25, -1.6);
+  shape.lineTo(-1.25, -1.6);
+  shape.closePath();
+  var hole = new THREE.Path();
+  hole.absellipse(0, -sink.centerZ, sink.hole.rx, sink.hole.rz, 0, Math.PI * 2, true);
+  shape.holes.push(hole);
+  return new THREE.ExtrudeGeometry(shape, { depth: 0.1, bevelEnabled: false, curveSegments: 32 });
+}
+
 function buildToiletTemplates(geo, mat) {
   return { A: buildToiletStyleA(geo, mat), B: buildToiletStyleB(geo, mat) };
 }
@@ -578,6 +1143,11 @@ var state = {
   // works today (one product choice covers however many units of that
   // category were ordered, not a different product per unit).
   fixtureFinishes: {},
+  // materials-picker categoryKey (floorTile, wallPaint, ...) -> the picked
+  // product's surface spec (js/surface-finishes.js), see setSurfaceFinish().
+  surfacePicks: {},
+  // PRODUCT_SLOTS id -> picked option id (the 3D switcher's buttons).
+  productPicks: defaultProductPicks(),
 };
 // Transient wall-click picking session, entirely separate from `state`
 // (the room's own data) — null when no picking UI is active.
@@ -785,6 +1355,7 @@ function ensureScene() {
     scene.add(shellGroup);
 
     var toiletStyleSwitch = buildToiletStyleSwitch(panel, wrap);
+    var productSwitcher = buildProductSwitcher(panel, wrap);
     var cameraControls = buildCameraModeControls(panel, wrap);
 
     // Persistent (not recreated per rebuildShell call, unlike wall geometry
@@ -863,6 +1434,12 @@ function ensureScene() {
       mat: mat,
       fixtureTemplates: fixtureTemplates,
       toiletTemplates: toiletTemplates,
+      realModels: {}, // fixtureKey -> true once its real model replaced the stand-in
+      modelRequests: {}, // fixtureKey -> true once its model fetch has started
+      productModels: {}, // PRODUCT_SLOTS option url -> loaded template, or false while loading
+      vanityTemplates: {}, // vanity sink option id -> buildUndermountVanity() template
+      tubTemplates: {}, // drop-in tub option id -> tub model + buildTubDeck()
+      productSwitcher: productSwitcher,
       fixtureGroup: fixtureGroup,
       shellMaterials: shellMaterials,
       shellGroup: shellGroup,
@@ -900,10 +1477,20 @@ function disposeShellGeometries(s) {
   }
 }
 
+function feetUVs(geometry, uFt, vFt) {
+  var uv = geometry.attributes.uv;
+  for (var i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * uFt, uv.getY(i) * vFt);
+  uv.needsUpdate = true;
+  return geometry;
+}
+
 function rebuildShell(s, widthFt, lengthFt, heightFt) {
   disposeShellGeometries(s);
 
-  var floorGeo = new THREE.PlaneGeometry(widthFt, lengthFt);
+  // UVs are rescaled to feet on the floor and walls, so a picked product's
+  // texture (see applySurfaceFinish()) lands at its real size whatever the
+  // room's dimensions — one shared repeat per material instead of one per wall.
+  var floorGeo = feetUVs(new THREE.PlaneGeometry(widthFt, lengthFt), widthFt, lengthFt);
   var floor = new THREE.Mesh(floorGeo, s.shellMaterials.floor);
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(widthFt / 2, 0, lengthFt / 2);
@@ -921,7 +1508,7 @@ function rebuildShell(s, widthFt, lengthFt, heightFt) {
 
   s.wallMeshesById = {};
   shellWalls(widthFt, lengthFt).forEach(function (w) {
-    var wallGeo = new THREE.PlaneGeometry(w.spanFt, heightFt);
+    var wallGeo = feetUVs(new THREE.PlaneGeometry(w.spanFt, heightFt), w.spanFt, heightFt);
     var wall = new THREE.Mesh(wallGeo, s.shellMaterials.wall);
     wall.rotation.y = w.rotY;
     wall.position.set(w.x, heightFt / 2, w.z);
@@ -948,6 +1535,325 @@ function rebuildShell(s, widthFt, lengthFt, heightFt) {
   });
 }
 
+// ---------------------------------------------------------------------
+// Real-product surface finishes
+// ---------------------------------------------------------------------
+// A picked floor tile / wall tile / flooring / paint (see
+// js/surface-finishes.js for the per-product specs) renders as PBR texture
+// maps generated here on a canvas at the product's true unit size: albedo
+// (tone-varied tiles or planks, grout, stone/wood/motif character), a
+// normal map (grout joints recessed, subtle surface relief) and a
+// roughness map (grout rougher than a glazed face). Shell UVs are in feet
+// (see rebuildShell()), so repeat = 12 / repeat-unit-inches puts one real
+// inch of product on one real inch of room. Generated once per product
+// and cached; a spec with real `maps` files loads those instead.
+var Surfaces = window.SurfaceFinishes;
+var SURFACE_TEXTURE_MAX_PX = 1024;
+// Aim for a repeat unit about this big so tile-to-tile tone variation
+// doesn't visibly repeat every tile or two.
+var SURFACE_UNIT_TARGET_IN = 36;
+var surfaceTextureCache = {}; // spec.id -> { map, normalMap, roughnessMap }
+
+// Deterministic per-product PRNG (mulberry32 over a string hash), so a
+// product's generated texture is the same on every load.
+function seededRandom(seedText) {
+  var h = 2166136261;
+  for (var i = 0; i < seedText.length; i++) {
+    h ^= seedText.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return function () {
+    h = (h + 0x6d2b79f5) | 0;
+    var t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// "#rrggbb" scaled by (1 + f), still as "#rrggbb" (canvas takes it as-is).
+function shadeHex(hex, f) {
+  var n = parseInt(hex.slice(1), 16);
+  var out = "#";
+  [16, 8, 0].forEach(function (shift) {
+    var c = clamp(Math.round(((n >> shift) & 255) * (1 + f)), 0, 255);
+    out += ("0" + c.toString(16)).slice(-2);
+  });
+  return out;
+}
+
+function grayCss(v01) {
+  var v = clamp(Math.round(v01 * 255), 0, 255);
+  return "rgb(" + v + "," + v + "," + v + ")";
+}
+
+// Long side of the tile/plank runs along U (horizontally on walls, along
+// the room's width on the floor), which is how these products are
+// normally laid.
+function surfaceRepeatUnit(spec) {
+  var tileW = Math.max(spec.sizeIn[0], spec.sizeIn[1]);
+  var tileH = Math.min(spec.sizeIn[0], spec.sizeIn[1]);
+  var cols = Math.max(1, Math.round(SURFACE_UNIT_TARGET_IN / tileW));
+  var rows = Math.max(2, Math.round(SURFACE_UNIT_TARGET_IN / tileH));
+  if (spec.layout === "offset" && rows % 2) rows++; // half-bond needs pairs
+  return { tileW: tileW, tileH: tileH, cols: cols, rows: rows, unitW: cols * tileW, unitH: rows * tileH };
+}
+
+function drawTileCharacter(ctx, spec, rand, x, y, w, h, base) {
+  var i;
+  if (spec.character === "stone") {
+    for (i = 0; i < 26; i++) {
+      var cx = x + rand() * w;
+      var cy = y + rand() * h;
+      var rad = (0.15 + rand() * 0.45) * h;
+      var grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+      // Fades to the SAME tone at zero alpha — fading to transparent black
+      // would drag a dark ring into every blob.
+      var blob = shadeHex(base, (rand() - 0.5) * 0.1);
+      grad.addColorStop(0, blob);
+      grad.addColorStop(1, blob + "00");
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = grad;
+      ctx.fillRect(x, y, w, h);
+    }
+    ctx.globalAlpha = 0.22;
+    ctx.strokeStyle = shadeHex(base, 0.12);
+    for (i = 0; i < 3; i++) {
+      ctx.lineWidth = 0.5 + rand() * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x, y + rand() * h);
+      ctx.bezierCurveTo(x + w * 0.33, y + rand() * h, x + w * 0.66, y + rand() * h, x + w, y + rand() * h);
+      ctx.stroke();
+    }
+  } else if (spec.character === "wood") {
+    // Grain runs along the plank's length (U).
+    ctx.strokeStyle = spec.accent || shadeHex(base, -0.2);
+    for (i = 0; i < 22; i++) {
+      var gy = y + rand() * h;
+      var amp = rand() * h * 0.08;
+      var phase = rand() * Math.PI * 2;
+      ctx.globalAlpha = 0.12 + rand() * 0.25;
+      ctx.lineWidth = 0.4 + rand() * 1.4;
+      ctx.beginPath();
+      for (var sx = 0; sx <= w; sx += Math.max(2, w / 40)) {
+        var sy = gy + Math.sin(phase + (sx / w) * Math.PI * 2 * (1 + rand() * 0.3)) * amp;
+        if (sx === 0) ctx.moveTo(x + sx, sy);
+        else ctx.lineTo(x + sx, sy);
+      }
+      ctx.stroke();
+    }
+  } else if (spec.character === "handmade") {
+    // Glaze pooling toward the edges, a touch darker than the face.
+    var edge = ctx.createRadialGradient(x + w / 2, y + h / 2, h * 0.2, x + w / 2, y + h / 2, w * 0.6);
+    var pooled = shadeHex(base, -0.06);
+    edge.addColorStop(0, pooled + "00");
+    edge.addColorStop(1, pooled);
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = edge;
+    ctx.fillRect(x, y, w, h);
+  } else if (spec.character === "encaustic") {
+    // A printed quatrefoil: a center ring, quarter rings at each corner
+    // (which join into full rings across neighboring tiles), and a center
+    // diamond — the same repeat-across-the-grid read the real tile has.
+    var s = Math.min(w, h);
+    ctx.globalAlpha = 0.95;
+    ctx.strokeStyle = spec.accent;
+    ctx.fillStyle = spec.accent;
+    ctx.lineWidth = s * 0.07;
+    ctx.beginPath();
+    ctx.arc(x + w / 2, y + h / 2, s * 0.26, 0, Math.PI * 2);
+    ctx.stroke();
+    [
+      [x, y],
+      [x + w, y],
+      [x, y + h],
+      [x + w, y + h],
+    ].forEach(function (c) {
+      ctx.beginPath();
+      ctx.arc(c[0], c[1], s * 0.2, 0, Math.PI * 2);
+      ctx.stroke();
+    });
+    ctx.beginPath();
+    ctx.moveTo(x + w / 2, y + h / 2 - s * 0.1);
+    ctx.lineTo(x + w / 2 + s * 0.1, y + h / 2);
+    ctx.lineTo(x + w / 2, y + h / 2 + s * 0.1);
+    ctx.lineTo(x + w / 2 - s * 0.1, y + h / 2);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// Tangent-space normal map from a grayscale height canvas (Sobel). Canvas
+// rows run down while V runs up (CanvasTexture flips Y), hence the sign
+// on the V gradient.
+function normalCanvasFromHeight(heightCanvas, strength) {
+  var w = heightCanvas.width;
+  var h = heightCanvas.height;
+  var src = heightCanvas.getContext("2d").getImageData(0, 0, w, h).data;
+  var out = document.createElement("canvas");
+  out.width = w;
+  out.height = h;
+  var octx = out.getContext("2d");
+  var img = octx.createImageData(w, h);
+  var d = img.data;
+  function at(px, py) {
+    px = (px + w) % w;
+    py = (py + h) % h;
+    return src[(py * w + px) * 4] / 255;
+  }
+  for (var py = 0; py < h; py++) {
+    for (var px = 0; px < w; px++) {
+      var du = (at(px + 1, py) - at(px - 1, py)) * strength;
+      var dv = -(at(px, py + 1) - at(px, py - 1)) * strength;
+      var len = Math.sqrt(du * du + dv * dv + 1);
+      var i = (py * w + px) * 4;
+      d[i] = Math.round(((-du / len) * 0.5 + 0.5) * 255);
+      d[i + 1] = Math.round(((-dv / len) * 0.5 + 0.5) * 255);
+      d[i + 2] = Math.round(((1 / len) * 0.5 + 0.5) * 255);
+      d[i + 3] = 255;
+    }
+  }
+  octx.putImageData(img, 0, 0);
+  return out;
+}
+
+function makeCanvas(w, h) {
+  var c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  return c;
+}
+
+function generateSurfaceCanvases(spec) {
+  var unit = surfaceRepeatUnit(spec);
+  var pxPerIn = Math.min(SURFACE_TEXTURE_MAX_PX / unit.unitW, SURFACE_TEXTURE_MAX_PX / unit.unitH);
+  var W = Math.max(2, Math.round(unit.unitW * pxPerIn));
+  var H = Math.max(2, Math.round(unit.unitH * pxPerIn));
+  var albedo = makeCanvas(W, H);
+  var height = makeCanvas(W, H);
+  var rough = makeCanvas(W, H);
+  var a = albedo.getContext("2d");
+  var hctx = height.getContext("2d");
+  var r = rough.getContext("2d");
+  var rand = seededRandom(spec.id || spec.color);
+  var grout = spec.grout || shadeHex(spec.color, -0.2);
+  var groutPx = Math.max(1, (spec.groutIn || 0.0625) * pxPerIn);
+  var tileW = unit.tileW * pxPerIn;
+  var tileH = unit.tileH * pxPerIn;
+
+  // Background = the joints: grout color, recessed, rough.
+  a.fillStyle = grout;
+  a.fillRect(0, 0, W, H);
+  hctx.fillStyle = grayCss(0.1);
+  hctx.fillRect(0, 0, W, H);
+  r.fillStyle = grayCss(0.95);
+  r.fillRect(0, 0, W, H);
+
+  for (var row = 0; row < unit.rows; row++) {
+    var rowOffset = 0;
+    if (spec.layout === "offset") rowOffset = (row % 2) * (tileW / 2);
+    else if (spec.layout === "stagger") rowOffset = rand() * tileW;
+    for (var col = 0; col < unit.cols; col++) {
+      var tone = shadeHex(spec.color, (rand() - 0.5) * 2 * (spec.variation || 0));
+      var tileSeed = rand();
+      var x0 = col * tileW + rowOffset;
+      var y0 = row * tileH;
+      // Drawn again one repeat unit to the left when it spills past the
+      // right edge, so the texture wraps seamlessly.
+      [x0, x0 - W].forEach(function (x) {
+        if (x >= W || x + tileW <= 0) return;
+        var gx = x + groutPx / 2;
+        var gy = y0 + groutPx / 2;
+        var gw = tileW - groutPx;
+        var gh = tileH - groutPx;
+        a.save();
+        a.beginPath();
+        a.rect(gx, gy, gw, gh);
+        a.clip();
+        a.fillStyle = tone;
+        a.fillRect(gx, gy, gw, gh);
+        drawTileCharacter(a, spec, seededRandom(String(tileSeed)), gx, gy, gw, gh, tone);
+        a.restore();
+
+        // Face raised above the joint, with a one-joint-wide eased edge.
+        var bevel = Math.max(1, groutPx);
+        for (var b = 0; b < 3; b++) {
+          hctx.fillStyle = grayCss(0.55 + b * 0.2);
+          hctx.fillRect(gx + (b * bevel) / 3, gy + (b * bevel) / 3, gw - (2 * b * bevel) / 3, gh - (2 * b * bevel) / 3);
+        }
+        r.fillStyle = grayCss(clamp(spec.roughness + (tileSeed - 0.5) * 0.06, 0.02, 1));
+        r.fillRect(gx, gy, gw, gh);
+      });
+    }
+  }
+  return {
+    albedo: albedo,
+    normal: normalCanvasFromHeight(height, spec.kind === "plank" ? 1.5 : 3),
+    rough: rough,
+    unit: unit,
+  };
+}
+
+function configureSurfaceTexture(s, tex, unitWIn, unitHIn, isColor) {
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(12 / unitWIn, 12 / unitHIn);
+  tex.anisotropy = s.renderer.capabilities.getMaxAnisotropy();
+  if (isColor) tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function getSurfaceTextures(s, spec) {
+  if (surfaceTextureCache[spec.id]) return surfaceTextureCache[spec.id];
+  var textures;
+  if (spec.maps) {
+    var loader = new THREE.TextureLoader();
+    var onLoad = function () {
+      needsRender = true;
+    };
+    var mw = spec.maps.sizeIn[0];
+    var mh = spec.maps.sizeIn[1];
+    textures = {
+      map: configureSurfaceTexture(s, loader.load(spec.maps.albedo, onLoad), mw, mh, true),
+      normalMap: spec.maps.normal ? configureSurfaceTexture(s, loader.load(spec.maps.normal, onLoad), mw, mh) : null,
+      roughnessMap: spec.maps.roughness
+        ? configureSurfaceTexture(s, loader.load(spec.maps.roughness, onLoad), mw, mh)
+        : null,
+    };
+  } else {
+    var c = generateSurfaceCanvases(spec);
+    textures = {
+      map: configureSurfaceTexture(s, new THREE.CanvasTexture(c.albedo), c.unit.unitW, c.unit.unitH, true),
+      normalMap: configureSurfaceTexture(s, new THREE.CanvasTexture(c.normal), c.unit.unitW, c.unit.unitH),
+      roughnessMap: configureSurfaceTexture(s, new THREE.CanvasTexture(c.rough), c.unit.unitW, c.unit.unitH),
+    };
+  }
+  surfaceTextureCache[spec.id] = textures;
+  return textures;
+}
+
+// Dresses one shell material with a picked product's spec, or (spec null)
+// back to the generic scope-driven color/roughness it had before.
+function applySurfaceFinish(s, material, spec, fallbackHex, fallbackRoughness) {
+  var hadMaps = !!material.map;
+  if (spec && spec.kind !== "paint") {
+    var t = getSurfaceTextures(s, spec);
+    material.color.setHex(0xffffff);
+    material.roughness = 1; // the roughness map carries the real values
+    material.map = t.map;
+    material.normalMap = t.normalMap;
+    material.roughnessMap = t.roughnessMap;
+  } else {
+    if (spec) material.color.set(spec.color);
+    else material.color.setHex(fallbackHex);
+    material.roughness = spec ? spec.roughness : fallbackRoughness;
+    material.map = null;
+    material.normalMap = null;
+    material.roughnessMap = null;
+  }
+  if (hadMaps !== !!material.map) material.needsUpdate = true;
+}
+
 // Roughness per finish — tile reads glossier/more reflective, paint and
 // bare flooring read more matte, so the same scope-driven colors respond
 // believably under the new image-based lighting instead of looking like
@@ -970,12 +1876,30 @@ function roughnessForCeiling(paintCeilingBool) {
 
 function rebuildFinishes(s) {
   var isDark = s.isDark;
-  s.shellMaterials.floor.color.setHex(Layout.colorForFloorFinish(state.scope.floorFinish, isDark));
-  s.shellMaterials.floor.roughness = roughnessForFloorFinish(state.scope.floorFinish);
-  s.shellMaterials.wall.color.setHex(Layout.colorForWalls(state.scope.walls, isDark));
-  s.shellMaterials.wall.roughness = roughnessForWalls(state.scope.walls);
-  s.shellMaterials.ceiling.color.setHex(Layout.colorForCeiling(state.scope.paintCeiling, isDark));
-  s.shellMaterials.ceiling.roughness = roughnessForCeiling(state.scope.paintCeiling);
+  var picked = Surfaces
+    ? Surfaces.resolveSurfaces(state.scope, state.surfacePicks)
+    : { floor: null, walls: null, ceiling: null };
+  applySurfaceFinish(
+    s,
+    s.shellMaterials.floor,
+    picked.floor,
+    Layout.colorForFloorFinish(state.scope.floorFinish, isDark),
+    roughnessForFloorFinish(state.scope.floorFinish),
+  );
+  applySurfaceFinish(
+    s,
+    s.shellMaterials.wall,
+    picked.walls,
+    Layout.colorForWalls(state.scope.walls, isDark),
+    roughnessForWalls(state.scope.walls),
+  );
+  applySurfaceFinish(
+    s,
+    s.shellMaterials.ceiling,
+    picked.ceiling,
+    Layout.colorForCeiling(state.scope.paintCeiling, isDark),
+    roughnessForCeiling(state.scope.paintCeiling),
+  );
 }
 
 function setShadowFlags(object3d) {
@@ -993,18 +1917,25 @@ function rebuildFixtures(s, widthFt, lengthFt) {
     disposeFixtureInstance(old);
     s.fixtureGroup.remove(old);
   }
-  var layout = Layout.computeLayout({
+  var layoutInput = {
     widthFt: widthFt,
     lengthFt: lengthFt,
     fixtureCounts: state.fixtures,
     plumbingWallIds: state.plumbingWallIds,
     entryPoints: state.entryPoints,
-  });
+  };
+  layoutInput.footprints = fittedProductFootprints(layoutInput, true);
+  var layout = Layout.computeLayout(layoutInput);
   s.lastEntryPlacements = layout.placements.filter(function (p) {
     return p.fixtureKey === "Door_Quantity";
   });
   var toiletCount = 0;
+  var placedKeys = {};
+  var sel = selectedProducts();
   layout.placements.forEach(function (p) {
+    placedKeys[p.fixtureKey] = true;
+    ensureFixtureModel(s, p.fixtureKey);
+    var productBody = productBodyTemplate(s, p.fixtureKey, sel);
     // An entry point without a door renders as a trimmed open archway —
     // no slab or knob — instead of the normal door template.
     var archway = p.fixtureKey === "Door_Quantity" && p.hasDoor === false;
@@ -1012,7 +1943,7 @@ function rebuildFixtures(s, widthFt, lengthFt) {
       ? s.fixtureTemplates.Door_Quantity_Archway
       : p.fixtureKey === "Toilet_Quantity"
         ? s.toiletTemplates[state.selectedToiletStyle]
-        : s.fixtureTemplates[p.fixtureKey];
+        : productBody || s.fixtureTemplates[p.fixtureKey];
     if (!template) return;
     if (p.fixtureKey === "Toilet_Quantity") toiletCount++;
     var footprint = Layout.FIXTURE_LAYOUT[p.fixtureKey];
@@ -1023,6 +1954,8 @@ function rebuildFixtures(s, widthFt, lengthFt) {
     // the vertical offset already baked into the template's meshes.
     var y = footprint && footprint.mount === "wall" ? p.y : 0;
     var instance = template.clone(true);
+    var ownsBody = p.fixtureKey === "Bathtub_Quantity" || p.fixtureKey === "Vanity_Quantity";
+    addProductParts(s, instance, p.fixtureKey, sel, !ownsBody || !!productBody);
     instance.position.set(p.x, y, p.z);
     instance.rotation.y = p.rotationY;
     if (p.depthOffset) {
@@ -1036,7 +1969,8 @@ function rebuildFixtures(s, widthFt, lengthFt) {
     setShadowFlags(instance);
     s.fixtureGroup.add(instance);
   });
-  if (s.toiletStyleSwitch) s.toiletStyleSwitch.hidden = toiletCount === 0;
+  if (s.toiletStyleSwitch) s.toiletStyleSwitch.hidden = toiletCount === 0 || !!s.realModels.Toilet_Quantity;
+  syncProductSwitcher(s, layoutInput, placedKeys);
   syncCameraControls(s);
 }
 
@@ -1236,6 +2170,8 @@ window.BathroomRoom3D = {
       cameraMode: "orbit",
       walkInEntryIndex: 0,
       fixtureFinishes: {},
+      surfacePicks: {},
+      productPicks: defaultProductPicks(),
     };
     picking = null;
     hoveredWallId = null;
@@ -1282,13 +2218,15 @@ window.BathroomRoom3D = {
   // Pricing.validateJob) — this does no input sanitizing of its own.
   checkFit: function (fixtureCounts) {
     var dims = Layout.computeRoomDimensions(state.dims);
-    var result = Layout.computeLayout({
+    var layoutInput = {
       widthFt: dims.widthFt,
       lengthFt: dims.lengthFt,
       fixtureCounts: fixtureCounts,
       plumbingWallIds: state.plumbingWallIds,
       entryPoints: state.entryPoints,
-    });
+    };
+    layoutInput.footprints = fittedProductFootprints(layoutInput, false);
+    var result = Layout.computeLayout(layoutInput);
     return result.droppedCounts;
   },
 
@@ -1298,6 +2236,20 @@ window.BathroomRoom3D = {
   // above). colorHex is typically MaterialsPricing.guessFinishColor()'s
   // result; pass null/undefined to clear back to the default color (e.g.
   // if the pick is changed to a product with no recognizable finish word).
+  // The 3D product switcher (PRODUCT_SLOTS): shows optionId in slotId's
+  // place. Unknown ids are ignored. Visual only — the estimate never reads
+  // these picks.
+  setProductPick: function (slotId, optionId) {
+    var slot = productSlot(slotId);
+    if (!slot || !productOption(slot, optionId) || state.productPicks[slotId] === optionId) return;
+    state.productPicks[slotId] = optionId;
+    markDirty();
+  },
+
+  getProductPicks: function () {
+    return Object.assign({}, state.productPicks);
+  },
+
   setFixtureFinish: function (fixtureKey, colorHex) {
     if (colorHex == null) delete state.fixtureFinishes[fixtureKey];
     else state.fixtureFinishes[fixtureKey] = colorHex;
@@ -1312,6 +2264,38 @@ window.BathroomRoom3D = {
     } else {
       markDirty();
     }
+  },
+
+  // Applies once a real floor tile / wall tile / flooring / paint product is
+  // picked in the chat's materials flow (categoryKey is the picker's
+  // category key; product is the catalog option). The room's floor, walls
+  // or ceiling then render as that product — its real tile size, layout,
+  // color, grout and sheen — for as long as the matching scope answer
+  // holds (see SurfaceFinishes.resolveSurfaces()). A product with no
+  // surface spec, or product null, clears back to the generic finish.
+  setSurfaceFinish: function (categoryKey, product) {
+    var spec = Surfaces ? Surfaces.specFor(product) : null;
+    if (spec) state.surfacePicks[categoryKey] = spec;
+    else delete state.surfacePicks[categoryKey];
+    if (threeState) {
+      rebuildFinishes(threeState);
+      needsRender = true;
+    } else {
+      markDirty();
+    }
+  },
+
+  // Which picked product (by catalog id) each surface currently shows —
+  // null where the generic scope color is showing instead. For tests.
+  getSurfaceFinishes: function () {
+    var picked = Surfaces
+      ? Surfaces.resolveSurfaces(state.scope, state.surfacePicks)
+      : { floor: null, walls: null, ceiling: null };
+    return {
+      floor: picked.floor ? picked.floor.id : null,
+      walls: picked.walls ? picked.walls.id : null,
+      ceiling: picked.ceiling ? picked.ceiling.id : null,
+    };
   },
 
   // --- Wall-click picking (plumbing walls + entry points) ---------------
