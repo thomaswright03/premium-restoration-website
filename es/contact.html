@@ -1,19 +1,20 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
+  <!-- i18n-source: c4b4e0530446 -->
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Get a Quote | Premium Restoration</title>
+    <title>Pedir cotización | Premium Restoration</title>
     <meta
       name="description"
-      content="Request a quote from Premium Restoration for your bathroom restoration project."
+      content="Solicite una cotización a Premium Restoration para el proyecto de remodelación de su baño."
     />
     <!-- chrome:head -->
     <meta name="theme-color" content="#15130f" />
     <meta name="color-scheme" content="light dark" />
-    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="icon" href="favicon.ico" sizes="32x32" />
-    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="../favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
     <script>
       (function () {
         try {
@@ -28,7 +29,7 @@
     <link rel="alternate" hreflang="x-default" href="https://premium-restoration.vercel.app/contact.html" />
     <script>
       (function () {
-        var here = "en";
+        var here = "es";
         var pages = { en: "/contact.html", es: "/es/contact.html", pt: "/pt/contact.html" };
         try {
           var chosen = /[?&]lang=(en|es|pt)\b/.exec(location.search);
@@ -53,26 +54,26 @@
         } catch (e) {}
       })();
     </script>
-    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="../css/style.css" />
     <!-- /chrome:head -->
   </head>
   <body>
     <!-- chrome:header -->
-    <a class="skip-link" href="#main">Skip to content</a>
+    <a class="skip-link" href="#main">Saltar al contenido</a>
     <header class="site-header">
-      <nav class="nav" aria-label="Main">
+      <nav class="nav" aria-label="Principal">
         <a href="index.html" class="nav-brand">Premium Restoration</a>
-        <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+        <button class="nav-toggle" type="button" aria-label="Menú" aria-expanded="false" aria-controls="nav-links">
           <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
             <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
           </svg>
         </button>
         <ul class="nav-links" id="nav-links">
-          <li><a href="index.html">Home</a></li>
-          <li><a href="index.html#pricing">How We Price</a></li>
-          <li><a href="about.html">About Us</a></li>
-          <li><a href="faq.html">FAQs</a></li>
-          <li><a href="contact.html" class="nav-cta current" aria-current="page">Get a Quote</a></li>
+          <li><a href="index.html">Inicio</a></li>
+          <li><a href="index.html#pricing">Cómo cobramos</a></li>
+          <li><a href="about.html">Quiénes somos</a></li>
+          <li><a href="faq.html">Preguntas</a></li>
+          <li><a href="contact.html" class="nav-cta current" aria-current="page">Pedir cotización</a></li>
           <li class="nav-lang">
             <details class="lang-menu">
               <summary>
@@ -85,17 +86,17 @@
                     stroke-width="1.6"
                   />
                 </svg>
-                <span class="visually-hidden">Language: </span>EN<span class="visually-hidden"> English</span>
+                <span class="visually-hidden">Idioma: </span>ES<span class="visually-hidden"> Español</span>
               </summary>
-              <ul class="lang-menu-list" aria-label="Language">
+              <ul class="lang-menu-list" aria-label="Idioma">
+                <li><a href="../contact.html?lang=en" hreflang="en" lang="en" data-lang-choice="en">English</a></li>
                 <li>
-                  <a href="contact.html?lang=en" hreflang="en" lang="en" data-lang-choice="en" aria-current="true"
-                    >English</a
+                  <a href="../es/contact.html?lang=es" hreflang="es" lang="es" data-lang-choice="es" aria-current="true"
+                    >Español</a
                   >
                 </li>
-                <li><a href="es/contact.html?lang=es" hreflang="es" lang="es" data-lang-choice="es">Español</a></li>
                 <li>
-                  <a href="pt/contact.html?lang=pt" hreflang="pt-BR" lang="pt-BR" data-lang-choice="pt">Português</a>
+                  <a href="../pt/contact.html?lang=pt" hreflang="pt-BR" lang="pt-BR" data-lang-choice="pt">Português</a>
                 </li>
               </ul>
             </details>
@@ -108,9 +109,9 @@
     <main id="main">
       <section class="hero hero-page">
         <div class="hero-inner">
-          <p class="eyebrow center">Let's Talk</p>
-          <h1>Get a <em>Quote</em></h1>
-          <p>Tell us a bit about your bathroom project and send it to us, or call us directly.</p>
+          <p class="eyebrow center">Hablemos</p>
+          <h1>Pedir <em>cotización</em></h1>
+          <p>Cuéntenos un poco sobre el proyecto de su baño y envíenoslo, o llámenos directamente.</p>
         </div>
       </section>
 
@@ -121,17 +122,18 @@
 
             <form id="lead-form" novalidate>
               <p id="estimate-prefill-note" class="form-prefill-note" hidden>
-                We've added your estimate to the project details below. Edit it as you like before sending.
+                Agregamos su estimación a los detalles del proyecto más abajo. Modifíquela como quiera antes de
+                enviarla.
               </p>
 
               <div class="form-group">
-                <label for="name">Full Name</label>
+                <label for="name">Nombre completo</label>
                 <input type="text" id="name" name="name" autocomplete="name" required aria-describedby="name-error" />
                 <p class="field-error" id="name-error" hidden></p>
               </div>
 
               <div class="form-group">
-                <label for="phone">Phone Number</label>
+                <label for="phone">Número de teléfono</label>
                 <input
                   type="tel"
                   id="phone"
@@ -145,7 +147,7 @@
               </div>
 
               <div class="form-group">
-                <label for="email">Email Address</label>
+                <label for="email">Correo electrónico</label>
                 <input
                   type="email"
                   id="email"
@@ -158,59 +160,61 @@
               </div>
 
               <div class="form-group">
-                <label for="service">Bathroom Work Needed</label>
+                <label for="service">Trabajo que necesita en el baño</label>
                 <select id="service" name="service">
-                  <option value="full-bathroom">Full bathroom restoration</option>
-                  <option value="partial-bathroom">Part of a bathroom (e.g. fixtures, tile, or flooring)</option>
-                  <option value="other-bathroom">Other bathroom work / not sure yet</option>
+                  <option value="full-bathroom">Remodelación completa del baño</option>
+                  <option value="partial-bathroom">Parte de un baño (p. ej., accesorios, azulejo o piso)</option>
+                  <option value="other-bathroom">Otro trabajo en el baño / aún no estoy seguro</option>
                 </select>
               </div>
 
               <div class="form-group">
-                <label for="message">Tell Us About Your Project</label>
+                <label for="message">Cuéntenos sobre su proyecto</label>
                 <textarea
                   id="message"
                   name="message"
-                  placeholder="Property type, rough timeline, and anything else we should know..."
+                  placeholder="Tipo de propiedad, plazo aproximado y cualquier otra cosa que debamos saber..."
                 ></textarea>
               </div>
 
               <div class="form-honeypot" aria-hidden="true">
-                <label for="company-website">Leave this empty</label>
+                <label for="company-website">Deje esto en blanco</label>
                 <input type="text" id="company-website" name="_gotcha" tabindex="-1" autocomplete="off" />
               </div>
 
               <p class="form-consent" data-show-unless="leadForm.endpoint">
-                <strong>How this form works:</strong> this website doesn't store or send your details. When you press
-                the button, your own email app opens a message to us containing what you entered above, and we only
-                receive it if you press Send. We use your details to respond to your enquiry and prepare your quote,
-                and, if you hire us, to carry out and manage the work and keep the business records we are required to
-                keep. We don't sell them. See our <a href="privacy.html">Privacy Notice</a> for how long we keep them
-                and how to ask us to access or delete them.
+                <strong>Cómo funciona este formulario:</strong> este sitio web no guarda ni envía sus datos. Al
+                presionar el botón, su propia aplicación de correo abre un mensaje dirigido a nosotros con lo que usted
+                escribió arriba, y solo lo recibimos si usted presiona Enviar. Usamos sus datos para responder a su
+                consulta y preparar su cotización y, si nos contrata, para realizar y administrar el trabajo y conservar
+                los registros del negocio que estamos obligados a conservar. No los vendemos. Consulte nuestro
+                <a href="privacy.html">Aviso de privacidad</a> para saber cuánto tiempo los conservamos y cómo pedirnos
+                acceso a ellos o su eliminación.
               </p>
               <p class="form-consent" data-show-if="leadForm.endpoint" hidden>
-                <strong>How this form works:</strong> when you press Send Request, what you entered above is sent to us
-                through <span data-fill="leadForm.serviceName"></span>, the form service we use, which stores it and
-                emails it to us. We use your details to respond to your enquiry and prepare your quote, and, if you hire
-                us, to carry out and manage the work and keep the business records we are required to keep. We don't
-                sell them. See our <a href="privacy.html">Privacy Notice</a> for how long we keep them and how to ask us
-                to access or delete them.
+                <strong>Cómo funciona este formulario:</strong> al presionar Enviar solicitud, lo que usted escribió
+                arriba se nos envía a través de <span data-fill="leadForm.serviceName"></span>, el servicio de
+                formularios que usamos, que lo guarda y nos lo reenvía por correo electrónico. Usamos sus datos para
+                responder a su consulta y preparar su cotización y, si nos contrata, para realizar y administrar el
+                trabajo y conservar los registros del negocio que estamos obligados a conservar. No los vendemos.
+                Consulte nuestro <a href="privacy.html">Aviso de privacidad</a> para saber cuánto tiempo los conservamos
+                y cómo pedirnos acceso a ellos o su eliminación.
               </p>
 
               <button type="submit" class="btn btn-primary btn-block" id="lead-submit">
-                <span data-show-unless="leadForm.endpoint">Open Email to Send Request</span>
-                <span data-show-if="leadForm.endpoint" hidden>Send Request</span>
+                <span data-show-unless="leadForm.endpoint">Abrir el correo para enviar la solicitud</span>
+                <span data-show-if="leadForm.endpoint" hidden>Enviar solicitud</span>
               </button>
               <p class="form-note">
-                <span data-show-unless="leadForm.endpoint">Prefer not to use email?</span>
-                <span data-show-if="leadForm.endpoint" hidden>Prefer to talk?</span>
-                Call us at <a href="tel:+13853568733">(385) 356-8733</a>.
+                <span data-show-unless="leadForm.endpoint">¿Prefiere no usar el correo electrónico?</span>
+                <span data-show-if="leadForm.endpoint" hidden>¿Prefiere hablar?</span>
+                Llámenos al <a href="tel:+13853568733">(385) 356-8733</a>.
               </p>
             </form>
           </div>
 
           <div class="contact-info-card">
-            <h2 class="contact-info-title">Contact Us Directly</h2>
+            <h2 class="contact-info-title">Contáctenos directamente</h2>
             <div class="contact-info-row">
               <span class="icon" aria-hidden="true">&#128222;</span>
               <a href="tel:+13853568733">(385) 356-8733</a>
@@ -220,8 +224,8 @@
               <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
             </div>
             <p class="note">
-              Prefer to talk it through first? Give us a call or send an email and we'll get back to you as soon as
-              possible.
+              ¿Prefiere conversarlo primero? Llámenos o envíenos un correo electrónico y le responderemos lo antes
+              posible.
             </p>
           </div>
         </div>
@@ -233,57 +237,57 @@
       <div class="footer-grid">
         <div class="footer-col">
           <p class="footer-brand">Premium Restoration</p>
-          <p class="footer-tagline">Bathroom restoration services.</p>
+          <p class="footer-tagline">Servicios de remodelación de baños.</p>
           <p class="footer-identity">
-            Operated by
+            Operado por
             <span data-show-if="owner.legalName" hidden><span data-fill="owner.legalName"></span>,</span>
-            an individual<br />
-            (not a registered company)
+            una persona física<br />
+            (no una empresa registrada)
             <span data-show-if="owner.contactAddress" hidden><br /><span data-fill="owner.contactAddress"></span></span>
             <!-- There is currently no contractor licence. Add a licence line here only once a licence is
              actually issued, as <br />Contractor License # [CONTRACTOR LICENSE #] ([LICENSE CLASSIFICATION]) -->
           </p>
         </div>
         <div class="footer-col">
-          <h2 class="footer-heading">Explore</h2>
-          <a href="index.html">Home</a>
-          <a href="index.html#pricing">How We Price</a>
-          <a href="about.html">About Us</a>
-          <a href="faq.html">FAQs</a>
-          <a href="contact.html">Get a Quote</a>
+          <h2 class="footer-heading">Explorar</h2>
+          <a href="index.html">Inicio</a>
+          <a href="index.html#pricing">Cómo cobramos</a>
+          <a href="about.html">Quiénes somos</a>
+          <a href="faq.html">Preguntas frecuentes</a>
+          <a href="contact.html">Pedir cotización</a>
         </div>
         <div class="footer-col">
-          <h2 class="footer-heading">Contact</h2>
+          <h2 class="footer-heading">Contacto</h2>
           <a href="tel:+13853568733">(385) 356-8733</a>
           <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
         </div>
         <div class="footer-col">
           <h2 class="footer-heading">Legal</h2>
-          <a href="privacy.html">Privacy Notice</a>
-          <a href="terms.html">Terms of Use</a>
-          <a href="privacy.html#your-rights">Access or Delete My Data</a>
+          <a href="privacy.html">Aviso de privacidad</a>
+          <a href="terms.html">Términos de uso</a>
+          <a href="privacy.html#your-rights">Ver o borrar mis datos</a>
         </div>
       </div>
       <div class="footer-bottom">
         <p class="footer-copy">
           &copy; <span data-year>2026</span> Premium Restoration<span data-show-if="owner.legalName" hidden
-            >, operated by <span data-fill="owner.legalName"></span></span
+            >, operado por <span data-fill="owner.legalName"></span></span
           >.
         </p>
-        <div class="theme-switch" role="group" aria-label="Colour theme">
-          <span class="theme-switch-label" aria-hidden="true">Theme</span>
-          <button type="button" data-theme-choice="system" aria-pressed="true">System</button>
-          <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
-          <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+        <div class="theme-switch" role="group" aria-label="Tema de color">
+          <span class="theme-switch-label" aria-hidden="true">Tema</span>
+          <button type="button" data-theme-choice="system" aria-pressed="true">Sistema</button>
+          <button type="button" data-theme-choice="light" aria-pressed="false">Claro</button>
+          <button type="button" data-theme-choice="dark" aria-pressed="false">Oscuro</button>
         </div>
       </div>
     </footer>
     <!-- /chrome:footer -->
 
-    <script src="js/i18n.js"></script>
+    <script src="../js/i18n.js"></script>
 
-    <script src="js/site-config.js"></script>
-    <script src="js/theme.js"></script>
-    <script src="js/script.js"></script>
+    <script src="../js/site-config.js"></script>
+    <script src="../js/theme.js"></script>
+    <script src="../js/script.js"></script>
   </body>
 </html>

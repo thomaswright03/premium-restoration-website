@@ -31,6 +31,17 @@
     privacy: { responsePeriod: "" },
   };
 
+  var T = window.I18n.t;
+
+  // The owner writes the privacy response period in English ("30 days");
+  // the Spanish and Portuguese Privacy Notices need it in their language.
+  function localPeriod(text) {
+    var m = /^(\d+)\s*(day|days|business days|week|weeks|month|months)$/i.exec(text);
+    if (!m) return text;
+    var unit = m[2].toLowerCase().replace(/s$/, "").replace(" day", "Day");
+    return T("config.period." + unit + (m[1] === "1" ? "" : "s"), { n: m[1] });
+  }
+
   function clean(value) {
     return typeof value === "string" ? value.trim() : "";
   }
@@ -52,11 +63,11 @@
       leadForm: {
         // Only an https:// address is used; anything else keeps the email-app form.
         endpoint: /^https:\/\/[^\s]+$/.test(endpoint) ? endpoint : "",
-        serviceName: clean(lf.serviceName) || "our form service provider",
+        serviceName: clean(lf.serviceName) || T("config.formService"),
         servicePrivacyUrl: /^https:\/\//.test(clean(lf.servicePrivacyUrl)) ? clean(lf.servicePrivacyUrl) : "",
       },
       owner: { legalName: clean(owner.legalName), contactAddress: clean(owner.contactAddress) },
-      privacy: { responsePeriod: clean(privacy.responsePeriod) },
+      privacy: { responsePeriod: localPeriod(clean(privacy.responsePeriod)) },
     };
   }
 

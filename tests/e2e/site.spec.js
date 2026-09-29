@@ -5,7 +5,7 @@ const AxeBuilder = require("@axe-core/playwright").default;
 const Pricing = require("../../js/bathroom-pricing.js");
 const { useConfig } = require("./helpers");
 
-const PUBLIC_PAGES = [
+const ENGLISH_PAGES = [
   "index.html",
   "about.html",
   "faq.html",
@@ -15,6 +15,8 @@ const PUBLIC_PAGES = [
   "gallery.html",
   "404.html",
 ];
+// Every page also exists in Spanish (es/) and Portuguese (pt/).
+const PUBLIC_PAGES = ENGLISH_PAGES.flatMap((f) => [f, "es/" + f, "pt/" + f]);
 const PLACEHOLDER = /\[[A-Z][A-Z0-9 #/-]*[A-Z#]\]/;
 
 test.describe("every public page", () => {
@@ -79,7 +81,7 @@ test.describe("every public page", () => {
   });
 
   test("no link leads to the empty Our Work page", async ({ page }) => {
-    for (const file of PUBLIC_PAGES.filter((f) => f !== "gallery.html")) {
+    for (const file of PUBLIC_PAGES.filter((f) => !f.endsWith("gallery.html"))) {
       await page.goto("/" + file);
       await expect(page.locator('a[href*="gallery.html"]')).toHaveCount(0);
     }

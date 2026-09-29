@@ -356,6 +356,18 @@ p {
   padding: 0;
 }
 
+.nav-brand,
+.nav-links a,
+.lang-menu summary {
+  white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .nav-links {
+    gap: var(--space-4);
+  }
+}
+
 .nav-links a {
   display: inline-flex;
   align-items: center;
@@ -406,6 +418,76 @@ p {
   color: var(--color-dark);
 }
 
+/* Language menu: a <details> at the end of the nav links. */
+.lang-menu {
+  position: relative;
+}
+
+.lang-menu summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  color: var(--color-on-dark-soft);
+  font-weight: 500;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  list-style: none;
+}
+
+.lang-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.lang-menu summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+
+.lang-menu[open] summary::after {
+  transform: translateY(1px) rotate(-135deg);
+}
+
+.lang-menu summary:hover,
+.lang-menu[open] summary {
+  color: var(--color-on-dark);
+}
+
+.lang-menu-list {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  min-width: 11rem;
+  margin: 0;
+  padding: var(--space-2) 0;
+  list-style: none;
+  background: rgba(21, 19, 15, 0.97);
+  border: 1px solid var(--color-on-dark-line);
+  border-radius: var(--radius);
+}
+
+.nav-links .lang-menu-list a {
+  display: flex;
+  padding: 0 var(--space-4);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--fs-base);
+}
+
+.nav-links .lang-menu-list a::after {
+  display: none;
+}
+
+.nav-links .lang-menu-list a[aria-current="true"] {
+  color: var(--color-accent-bright);
+}
+
 .nav-toggle {
   display: none;
   align-items: center;
@@ -420,7 +502,9 @@ p {
   color: var(--color-on-dark);
 }
 
-@media (max-width: 860px) {
+/* The menu button takes over below 1080px: the Spanish and Portuguese nav
+   labels (plus the language menu) need about that much room on one line. */
+@media (max-width: 1080px) {
   .nav-toggle {
     display: inline-flex;
   }
@@ -445,6 +529,17 @@ p {
   .nav-links a.nav-cta {
     justify-content: center;
     margin-top: var(--space-2);
+  }
+
+  .nav-lang {
+    margin-top: var(--space-2);
+  }
+
+  .lang-menu-list {
+    position: static;
+    border: 0;
+    background: none;
+    padding: 0 0 0 var(--space-5);
   }
 }
 

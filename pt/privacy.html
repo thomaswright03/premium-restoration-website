@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="pt-BR">
+  <!-- i18n-source: c33f1ac5ba80 -->
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aviso de Privacidade | Premium Restoration</title>
+    <meta name="description" content="Como a Premium Restoration coleta, usa, guarda e exclui informações pessoais." />
+    <!-- chrome:head -->
+    <meta name="theme-color" content="#15130f" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="../favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("pr_theme");
+          if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="alternate" hreflang="en" href="https://premium-restoration.vercel.app/privacy.html" />
+    <link rel="alternate" hreflang="es" href="https://premium-restoration.vercel.app/es/privacy.html" />
+    <link rel="alternate" hreflang="pt-BR" href="https://premium-restoration.vercel.app/pt/privacy.html" />
+    <link rel="alternate" hreflang="x-default" href="https://premium-restoration.vercel.app/privacy.html" />
+    <script>
+      (function () {
+        var here = "pt";
+        var pages = { en: "/privacy.html", es: "/es/privacy.html", pt: "/pt/privacy.html" };
+        try {
+          var chosen = /[?&]lang=(en|es|pt)\b/.exec(location.search);
+          if (chosen) {
+            localStorage.setItem("pr_lang", chosen[1]);
+            var rest = location.search.replace(/([?&])lang=[a-z]+&?/, "$1").replace(/[?&]$/, "");
+            history.replaceState(null, "", location.pathname + rest + location.hash);
+            return;
+          }
+          var want = localStorage.getItem("pr_lang");
+          if (!want && here === "en") {
+            var prefs = navigator.languages || [navigator.language || ""];
+            for (var i = 0; i < prefs.length; i++) {
+              var code = String(prefs[i]).slice(0, 2).toLowerCase();
+              if (code === "en" || code === "es" || code === "pt") {
+                want = code;
+                break;
+              }
+            }
+          }
+          if (want && want !== here && pages[want]) location.replace(pages[want] + location.search + location.hash);
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="../css/style.css" />
+    <!-- /chrome:head -->
+  </head>
+  <body>
+    <!-- chrome:header -->
+    <a class="skip-link" href="#main">Pular para o conteúdo</a>
+    <header class="site-header">
+      <nav class="nav" aria-label="Principal">
+        <a href="index.html" class="nav-brand">Premium Restoration</a>
+        <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+            <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <ul class="nav-links" id="nav-links">
+          <li><a href="index.html">Início</a></li>
+          <li><a href="index.html#pricing">Como cobramos</a></li>
+          <li><a href="about.html">Sobre nós</a></li>
+          <li><a href="faq.html">Dúvidas</a></li>
+          <li><a href="contact.html" class="nav-cta">Pedir orçamento</a></li>
+          <li class="nav-lang">
+            <details class="lang-menu">
+              <summary>
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6" />
+                  <path
+                    d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                  />
+                </svg>
+                <span class="visually-hidden">Idioma: </span>PT<span class="visually-hidden"> Português</span>
+              </summary>
+              <ul class="lang-menu-list" aria-label="Idioma">
+                <li><a href="../privacy.html?lang=en" hreflang="en" lang="en" data-lang-choice="en">English</a></li>
+                <li><a href="../es/privacy.html?lang=es" hreflang="es" lang="es" data-lang-choice="es">Español</a></li>
+                <li>
+                  <a
+                    href="../pt/privacy.html?lang=pt"
+                    hreflang="pt-BR"
+                    lang="pt-BR"
+                    data-lang-choice="pt"
+                    aria-current="true"
+                    >Português</a
+                  >
+                </li>
+              </ul>
+            </details>
+          </li>
+        </ul>
+      </nav>
+    </header>
+    <!-- /chrome:header -->
+
+    <main id="main">
+      <section class="hero hero-page">
+        <div class="hero-inner">
+          <p class="eyebrow center">Suas informações</p>
+          <h1>Aviso de <em>Privacidade</em></h1>
+          <p>O que coletamos, como usamos essas informações e como nos pedir para acessá-las ou excluí-las.</p>
+        </div>
+      </section>
+
+      <section class="section legal-content">
+        <p class="legal-updated">Última atualização: 24 de setembro de 2026</p>
+
+        <h2>Quem somos</h2>
+        <p>
+          Este site e o negócio Premium Restoration são administrados por uma única pessoa, seu proprietário<span
+            data-show-if="owner.legalName"
+            hidden
+            >, <span data-fill="owner.legalName"></span
+          ></span>
+          (&ldquo;nós&rdquo;).<span data-show-if="owner.contactAddress" hidden>
+            Nosso endereço de contato é <span data-fill="owner.contactAddress"></span>.</span
+          >
+          No momento, a Premium Restoration é um negócio não registrado: não é uma empresa, LLC nem outra entidade
+          registrada, e não tem nome empresarial registrado nem endereço registrado. O proprietário<span
+            data-show-if="owner.legalName"
+            hidden
+            >, <span data-fill="owner.legalName"></span>,</span
+          >
+          é a pessoa responsável pelas informações pessoais descritas neste aviso. Este aviso explica quais informações
+          pessoais coletamos por meio deste site e quando você entra em contato conosco, como as usamos, por quanto
+          tempo as guardamos e como você pode nos pedir para acessá-las ou excluí-las. Esta tradução é oferecida para
+          sua conveniência. Em caso de divergência com a versão em inglês, prevalece a versão em inglês.
+        </p>
+        <p>
+          Dúvidas sobre este aviso ou sobre as suas informações: envie um e-mail para
+          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a> ou ligue para
+          <a href="tel:+13853568733">(385) 356-8733</a>.
+        </p>
+
+        <h2>O que coletamos</h2>
+        <ul>
+          <li>
+            <strong>Quando você entra em contato conosco.</strong> Se você nos envia um e-mail, liga ou manda uma
+            mensagem de texto, inclusive usando o formulário da nossa página <a href="contact.html">Pedir orçamento</a>,
+            recebemos o seu nome, número de telefone, endereço de e-mail, o serviço de banheiro que lhe interessa e
+            qualquer outra coisa que você decida nos contar, inclusive em qualquer mensagem de voz ou de texto que você
+            deixar.
+            <span data-show-unless="leadForm.endpoint"
+              >O formulário em si não armazena nem envia nada: ele abre o seu próprio aplicativo de e-mail com uma
+              mensagem para nós, e só a recebemos se você a enviar.</span
+            >
+            <span data-show-if="leadForm.endpoint" hidden
+              >Quando você aperta Enviar solicitação no formulário, o que você preencheu é enviado para nós por meio de
+              <span data-fill="leadForm.serviceName"></span>, o serviço de formulários que usamos, que armazena essas
+              informações e as envia para nós por e-mail.</span
+            >
+          </li>
+          <li>
+            <strong>Quando preparamos um orçamento.</strong> Se preparamos um orçamento para você, registramos o
+            endereço do imóvel e os detalhes do serviço (como as medidas do cômodo e as louças e metais) na nossa
+            ferramenta interna de orçamentos.
+          </li>
+          <li>
+            <strong>O assistente de chat.</strong> O chat da nossa página inicial é uma ferramenta automatizada com
+            respostas pré-programadas. Ele funciona inteiramente no seu navegador. O que você digita nele, e qualquer
+            estimativa ou PDF que ele gera, não é enviado para nós nem é salvo por nós. Se você escolher &ldquo;Fale
+            conosco sobre isto&rdquo; depois de uma estimativa, o seu navegador leva um resumo da estimativa para o
+            nosso formulário Pedir orçamento durante essa visita; ele só chega até nós se você enviar o formulário.
+          </li>
+        </ul>
+
+        <h2>Cookies, ferramentas de análise e serviços de terceiros</h2>
+        <p>
+          Não usamos cookies, ferramentas de análise, pixels de publicidade nem outras ferramentas de rastreamento neste
+          site. O seu navegador guarda, no seu próprio dispositivo, a sua escolha de tema de cores claro/escuro; essa
+          escolha nunca é enviada para nós. Ainda assim, alguns serviços de terceiros recebem informações técnicas
+          básicas (como o seu endereço IP, o tipo de navegador e a página solicitada) quando você visita o site:
+        </p>
+        <ul>
+          <li>
+            <strong>Vercel</strong> hospeda este site e pode manter registros (logs) do servidor.
+            <a href="https://vercel.com/legal/privacy-policy" rel="noopener" target="_blank"
+              >Política de privacidade da Vercel</a
+            >.
+          </li>
+          <li data-show-if="leadForm.endpoint" hidden>
+            <strong><span data-fill="leadForm.serviceName"></span></strong> recebe e armazena o que você envia pelo
+            formulário da nossa página Pedir orçamento e o envia para nós por e-mail.
+            <a
+              data-show-if="leadForm.servicePrivacyUrl"
+              data-fill-href="leadForm.servicePrivacyUrl"
+              rel="noopener"
+              target="_blank"
+              hidden
+              >Política de privacidade desse serviço</a
+            >
+          </li>
+          <li>
+            <strong>Google (Gmail)</strong> fornece o nosso serviço de e-mail, por isso os e-mails que você nos envia
+            são armazenados pelo Google.
+          </li>
+          <li>
+            <strong>Nossa operadora de telefonia</strong> transmite as ligações e mensagens de texto para o (385)
+            356-8733, por isso lida com o seu número de telefone e com qualquer mensagem de voz ou de texto que você
+            deixar.
+          </li>
+        </ul>
+        <p>
+          As fontes e a ferramenta de PDF deste site são fornecidas a partir do mesmo local que o próprio site (Vercel),
+          então carregar uma página ou exportar uma estimativa em PDF não envia as suas informações para um provedor
+          separado.
+        </p>
+        <p>
+          A configuração &ldquo;Não rastrear&rdquo; (Do Not Track) do seu navegador não altera o funcionamento deste
+          site, porque não rastreamos visitantes entre sites.
+        </p>
+
+        <h2>Como usamos as suas informações</h2>
+        <ul>
+          <li>Para responder à sua consulta e preparar o seu orçamento.</li>
+          <li>
+            Se você nos contratar, para executar e gerenciar o serviço e para manter os registros comerciais que somos
+            obrigados a manter.
+          </li>
+        </ul>
+        <p>
+          Não vendemos as suas informações pessoais e não as compartilhamos para fins de publicidade. Só as
+          compartilhamos:
+        </p>
+        <ul>
+          <li>com os prestadores de serviço listados acima;</li>
+          <li>
+            se você nos contratar e alguém que não seja nós for fazer parte do seu serviço (por exemplo, o encanamento
+            ou a parte elétrica), com essa pessoa ou empresa, e somente com os dados de que ela precisa para esse
+            trabalho, como o seu nome, número de telefone, o endereço do imóvel e os detalhes do serviço. Informaremos a
+            você quem são antes que qualquer trabalho seja acordado; e
+          </li>
+          <li>quando a lei nos obrigar a isso.</li>
+        </ul>
+
+        <h2>Por quanto tempo guardamos as informações</h2>
+        <ul>
+          <li>
+            Consultas que não resultam em serviço (no nosso e-mail, em quaisquer mensagens de voz ou de texto,
+            <span data-show-if="leadForm.endpoint" hidden>em pedidos mantidos pelo nosso serviço de formulários, </span
+            >e qualquer orçamento que tenhamos preparado para elas na nossa ferramenta de orçamentos): nós as guardamos
+            por cerca de um mês após o nosso último contato com você e depois as excluímos. Nós as excluímos
+            manualmente, portanto nada neste site exclui informações automaticamente.
+          </li>
+          <li>
+            Se você se tornar cliente, guardamos os registros de que precisamos para o serviço e quaisquer registros que
+            a lei nos obrigue a guardar. Ainda não definimos um prazo fixo para os registros de clientes.
+          </li>
+        </ul>
+        <p>Você pode nos pedir para excluir as suas informações antes disso, a qualquer momento (veja abaixo).</p>
+        <!-- Once a customer-record period is chosen, replace the second bullet with:
+          <li>If you become a customer: kept for [CUSTOMER RECORD RETENTION PERIOD] after the work is completed, or longer only where the law requires it, then deleted.</li>
+        -->
+
+        <h2 id="your-rights">Acessar ou excluir as suas informações</h2>
+        <p>
+          Você pode nos pedir para informar quais informações pessoais temos sobre você, fornecer uma cópia delas,
+          corrigi-las ou excluí-las. Isso inclui proprietários de imóveis cujo endereço conste em um orçamento que
+          preparamos. Para fazer um pedido, envie um e-mail para
+          <a href="mailto:eduardo.moroni77@gmail.com?subject=Privacy%20request">eduardo.moroni77@gmail.com</a> com o
+          assunto &ldquo;Privacy request&rdquo; (pedido de privacidade) ou ligue para
+          <a href="tel:+13853568733">(385) 356-8733</a>. Podemos pedir que você confirme a sua identidade antes de
+          atendermos a um pedido (por exemplo, entrando em contato conosco pelo endereço de e-mail ou número de telefone
+          que você usou antes, ou confirmando detalhes da sua consulta)<span
+            data-show-if="privacy.responsePeriod"
+            hidden
+            >, e responderemos em até <span data-fill="privacy.responsePeriod"></span></span
+          >. Se tivermos que guardar algumas informações por exigência legal, diremos a você quais e por quê.
+        </p>
+
+        <h2>Crianças</h2>
+        <p>
+          Este site não é direcionado a crianças menores de 13 anos, e não coletamos intencionalmente as informações
+          pessoais delas.
+        </p>
+
+        <h2>Alterações neste aviso</h2>
+        <p>
+          Se alterarmos este aviso, publicaremos a nova versão nesta página com uma nova data de &ldquo;última
+          atualização&rdquo;.
+        </p>
+      </section>
+    </main>
+
+    <!-- chrome:footer -->
+    <footer class="site-footer">
+      <div class="footer-grid">
+        <div class="footer-col">
+          <p class="footer-brand">Premium Restoration</p>
+          <p class="footer-tagline">Serviços de reforma de banheiros.</p>
+          <p class="footer-identity">
+            Operado por
+            <span data-show-if="owner.legalName" hidden><span data-fill="owner.legalName"></span>,</span>
+            uma pessoa física<br />
+            (não é uma empresa registrada)
+            <span data-show-if="owner.contactAddress" hidden><br /><span data-fill="owner.contactAddress"></span></span>
+            <!-- There is currently no contractor licence. Add a licence line here only once a licence is
+             actually issued, as <br />Contractor License # [CONTRACTOR LICENSE #] ([LICENSE CLASSIFICATION]) -->
+          </p>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Navegar</h2>
+          <a href="index.html">Início</a>
+          <a href="index.html#pricing">Como cobramos</a>
+          <a href="about.html">Sobre nós</a>
+          <a href="faq.html">Perguntas frequentes</a>
+          <a href="contact.html">Pedir orçamento</a>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Contato</h2>
+          <a href="tel:+13853568733">(385) 356-8733</a>
+          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Informações legais</h2>
+          <a href="privacy.html">Aviso de Privacidade</a>
+          <a href="terms.html">Termos de Uso</a>
+          <a href="privacy.html#your-rights">Acessar ou excluir meus dados</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">
+          &copy; <span data-year>2026</span> Premium Restoration<span data-show-if="owner.legalName" hidden
+            >, operado por <span data-fill="owner.legalName"></span></span
+          >.
+        </p>
+        <div class="theme-switch" role="group" aria-label="Tema de cores">
+          <span class="theme-switch-label" aria-hidden="true">Tema</span>
+          <button type="button" data-theme-choice="system" aria-pressed="true">Sistema</button>
+          <button type="button" data-theme-choice="light" aria-pressed="false">Claro</button>
+          <button type="button" data-theme-choice="dark" aria-pressed="false">Escuro</button>
+        </div>
+      </div>
+    </footer>
+    <!-- /chrome:footer -->
+
+    <script src="../js/i18n.js"></script>
+
+    <script src="../js/site-config.js"></script>
+    <script src="../js/theme.js"></script>
+    <script src="../js/script.js"></script>
+  </body>
+</html>

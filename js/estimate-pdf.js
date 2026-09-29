@@ -11,6 +11,7 @@
 (function () {
   "use strict";
 
+  var T = window.I18n.t;
   var script = document.currentScript;
   var JSPDF_SRC =
     script && script.src ? new URL("vendor/jspdf.umd.min.js", script.src).href : "js/vendor/jspdf.umd.min.js";
@@ -92,7 +93,7 @@
     doc.text("Premium Restoration", left, y);
     y += 22;
     paragraph(spec.title, 13, 80, "normal", 2);
-    if (spec.preparedFor) paragraph("Prepared for: " + spec.preparedFor, 11, 60, "normal", 2);
+    if (spec.preparedFor) paragraph(T("pdf.preparedFor", { name: spec.preparedFor }), 11, 60, "normal", 2);
     y += 4;
     rule(200);
     if (spec.intro) paragraph(spec.intro, 11, 60, "italic", 10);
@@ -180,8 +181,8 @@
       doc.setFont("times", "normal");
       doc.setFontSize(9);
       doc.setTextColor(90);
-      doc.text("Generated " + f.date + "  •  " + f.phone + "  •  " + f.email, left, pageHeight - 38);
-      doc.text("Page " + i + " of " + total, right, pageHeight - 38, { align: "right" });
+      doc.text(T("pdf.generated", { date: f.date }) + "  •  " + f.phone + "  •  " + f.email, left, pageHeight - 38);
+      doc.text(T("pdf.page", { i: i, n: total }), right, pageHeight - 38, { align: "right" });
       doc.text(doc.splitTextToSize(f.business || "Premium Restoration", width)[0], left, pageHeight - 26);
     }
     return doc;
