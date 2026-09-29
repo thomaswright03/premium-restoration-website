@@ -26,6 +26,7 @@ The site says "Get a Quote" / "Request a Quote", not "Free Quote": nothing confi
 
 ```
 ├── index.html, about.html, faq.html, contact.html, privacy.html, terms.html, gallery.html, 404.html
+├── es/, pt/                  the Spanish and Portuguese pages (see "Languages")
 ├── admin/index.html
 ├── api/materials-options.js  Vercel serverless function stub for live materials pricing (not implemented yet)
 ├── .env.example               env vars api/ expects (copy to .env.local; real values are gitignored)
@@ -40,6 +41,7 @@ The site says "Get a Quote" / "Request a Quote", not "Free Quote": nothing confi
 ├── js/chat-replies.js        scripted chat answers (pure function, unit-tested)
 ├── js/site-config.js         loads site-config.json and shows/hides owner details on the page
 ├── js/theme.js               Light / Dark / System switch
+├── js/i18n.js                every text the JavaScript shows, in English, Spanish and Portuguese
 ├── js/estimate-pdf.js        PDF layout shared by the chat estimate and admin quotes
 ├── js/script.js              public-page behaviour (nav, FAQ, chat, estimate card, contact form)
 ├── js/admin.js               admin tool
@@ -203,9 +205,24 @@ To connect Formspree: create a form at formspree.io with the business email as r
 
 `css/style.css` starts with the design tokens: colours for the light theme and a dark theme, a type scale of seven sizes (nothing below 14px) and a spacing scale. Change tokens rather than individual rules. The dark theme follows the device setting; visitors can choose **System / Light / Dark** in every page footer (and on the admin dashboard); the choice is remembered in that browser and applied before the page first paints. All text meets at least 4.5:1 contrast in both themes (checked by the browser tests), and every interactive element shows a visible focus ring for keyboard users.
 
-## Language
+## Languages
 
-The site is **English only**. Whether Spanish or French versions are needed hasn't been decided by the owner (see "Owner inputs still needed"). Until then, the chat replies to a Spanish or French message with a short note (in English, Spanish and French) that the assistant only understands English, and gives the phone number — it doesn't claim the business offers service in those languages.
+Every public page is available in **English**, **Spanish** (`es/`) and **Brazilian Portuguese** (`pt/`): the pages, the chat assistant and everything it says, the whole estimate (questions, validation, estimate card, the Contact form summary and the PDF), the materials picks, the 3D room's buttons, and the Contact form's messages. The admin tool stays English.
+
+- **Switcher:** a language menu at the end of the nav. Picking a language opens the same page in that language and remembers the choice in the browser (`localStorage "pr_lang"`), so later visits to any page open in it. Visitors who haven't picked one are sent to Spanish or Portuguese on their first visit to an English page if that's their browser's language. Search engines get `hreflang` links between the three versions.
+- **What stays as is:** the business name, Kohler and Home Depot product names (they come from the retailer's catalog), phone and email. Prices stay in US dollars, written the way each language writes numbers ($1,234.50 in Spanish, US$ 1.234,50 in Portuguese); room sizes stay in feet (the estimate also accepts 7,5 for 7.5).
+- **The chat** understands questions in each page's language, plus the English words for products and quotes people often use anyway ("vanity", "LVP", "quote"). A Spanish or Portuguese message typed on another language's page gets a reply, in that language, pointing to the language menu; French gets a note listing the languages it speaks.
+- **Legal pages:** the Spanish and Portuguese Privacy Notice and Terms say that the English version prevails if there's any difference.
+
+**Where the text lives:**
+
+- Page text: `es/*.html` and `pt/*.html` are hand-translated copies of the English pages, and `scripts/partials/es/` and `scripts/partials/pt/` hold the translated header and footer.
+- Text shown by JavaScript: `js/i18n.js`, one line per text with its English, Spanish and Portuguese side by side.
+
+**When you change English text,** update the Spanish and Portuguese too. The checks make sure this isn't forgotten:
+
+- `npm run check:pages` fails if a translated page's markup no longer matches its English page (an added or removed paragraph, link or field), or if the English text changed since the translation was last updated. After updating the translations, run `npm run pages -- --translated` to record that they're current.
+- The unit tests fail if a text in `js/i18n.js` is missing a translation or its placeholders don't match.
 
 ## Gallery photos
 
@@ -229,13 +246,13 @@ Development tools need Node 20+ and `npm install`.
 npm test          # everything below, in order
 npm run lint      # ESLint (zero warnings allowed)
 npm run format:check   # Prettier (npm run format to fix)
-npm run check:pages    # shared header/footer and published prices are in sync
+npm run check:pages    # shared header/footer, published prices and translations are in sync
 npm run check:placeholders   # no [BRACKETED PLACEHOLDER] visible on any page
 npm run test:unit      # pricing and chat-reply unit tests (node --test)
 npm run test:e2e       # Playwright browser tests (Chromium)
 ```
 
-The browser tests cover the chat estimate (including validation and the PDF), the estimator switch, the contact form in both modes, the admin tool (create/edit/save/delete, double save, Back, reload, cancel, old quotes, storage failure, export/import, phone layout), every page at 375/390/768/1280px (no sideways scroll, no placeholders, no console errors or missing files), prices in page text, the 404 page, favicon, focus rings, tap-target sizes, and colour contrast in light and dark themes (axe-core). First-time Playwright setup on a new machine: `npx playwright install chromium`.
+The browser tests cover the language menu and browser-language redirect, a whole estimate in Spanish, the chat estimate (including validation and the PDF), the estimator switch, the contact form in both modes, the admin tool (create/edit/save/delete, double save, Back, reload, cancel, old quotes, storage failure, export/import, phone layout), every page (in all three languages) at 375/390/768/1280px (no sideways scroll, no placeholders, no console errors or missing files), prices in page text, the 404 page, favicon, focus rings, tap-target sizes, and colour contrast in light and dark themes (axe-core). First-time Playwright setup on a new machine: `npx playwright install chromium`.
 
 **CI:** `.github/workflows/ci.yml` runs all of the above on every push and pull request. To make failures block merging, turn on branch protection for the production branch in GitHub (Settings → Branches → Add rule → "Require status checks to pass" → select the CI check).
 
@@ -262,7 +279,7 @@ These are decisions or facts only the owner can supply. Until then, the site lea
 - **Customer-record retention period** → then un-comment the wording in `privacy.html`.
 - **Governing state** for the Terms → then un-comment the clause in `terms.html`.
 - **Form service**: whether to use one (e.g. Formspree) and its endpoint → `leadForm.*`. Until then, the form uses the visitor's email app.
-- **Spanish / French**: whether customers need these languages. If yes, full translations of the pages, chat, estimate card and PDF (with a language switcher) are a separate piece of work; if English only, record that decision here.
+- **Translations**: the Spanish and Portuguese text was translated for the site, not by a professional translator. Have a native speaker read it, especially the Privacy Notice and Terms, before relying on them.
 - **Plumbing and licence position**: how plumbing/electrical work is handled (in-house with a licence, a named licensed subcontractor, or not at all), on legal advice — then update the wording (see "Licence line").
 - **Photos** of completed projects, with each client's written permission, before "Our Work" returns.
 - **Free quotes**: confirm whether quotes are always free before any page says "free".

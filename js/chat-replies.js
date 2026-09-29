@@ -1,111 +1,190 @@
 // Premium Restoration — scripted chat replies (no AI, no backend).
 //
-// Pure function: reply(message, { estimatorEnabled }) returns
+// Pure function: reply(message, { estimatorEnabled, lang }) returns
 //   { text, action }  where action is one of
 //   "startEstimate"  — start the guided bathroom estimate (no text shown)
 //   "offerEstimate"  — show the text, then an "estimate" button
 //   null             — just show the text
 //
+// lang ("en", "es" or "pt"; default: the page's language, see js/i18n.js)
+// picks the words the assistant understands and the language it answers
+// in. The Spanish and Portuguese assistants also understand the English
+// names of products and of an estimate ("vanity", "LVP", "quote"), which
+// people often use in any language.
+//
 // Matching is on whole words only (so "work" never matches "fireplace"-style
-// substrings, and "fire" does not match "fireplaces"). Prices come from
-// js/bathroom-pricing.js, the same published prices the estimate uses.
+// substrings, and "fire" does not match "fireplaces"), after lower-casing
+// and removing accents ("baño" -> "bano", "preço" -> "preco"). Prices come
+// from js/bathroom-pricing.js, the same published prices the estimate uses.
 //
 // Loads as a plain browser script (window.ChatReplies) and as a Node module.
 
 (function (root, factory) {
   "use strict";
-  var api = factory(root.BathroomPricing || (typeof require === "function" ? require("./bathroom-pricing.js") : null));
+  var req = typeof require === "function" ? require : null;
+  var api = factory(
+    root.BathroomPricing || (req ? req("./bathroom-pricing.js") : null),
+    root.I18n || (req ? req("./i18n.js") : null),
+  );
   if (typeof module === "object" && module.exports) {
     module.exports = api;
   } else {
     root.ChatReplies = api;
   }
-})(typeof globalThis !== "undefined" ? globalThis : this, function (Pricing) {
+})(typeof globalThis !== "undefined" ? globalThis : this, function (Pricing, I18n) {
   "use strict";
 
   var PHONE = "(385) 356-8733";
   var EMAIL = "eduardo.moroni77@gmail.com";
   var PRICES = Pricing.DEFAULT_PRICES;
-  var $ = Pricing.shortMoney;
-
-  var CALL_FOR_PRICE = "Call " + PHONE + " or use the Contact page for a price.";
-  var ESTIMATE_OFFER = "For a rough estimate of your whole job, tap the button below or say “bathroom quote”.";
-  var PLUMBING_EXTRA =
-    "Installing it also needs plumbing work, which isn't included in our online prices and will add to the cost.";
+  var CONTACT = { phone: PHONE, email: EMAIL };
 
   function has(text, pattern) {
-    return new RegExp(pattern).test(text);
+    return !!pattern && new RegExp(pattern).test(text);
   }
 
-  // Lower-case, straight apostrophes removed ("don't" -> "dont"), and every
-  // other non-letter/digit turned into a space.
+  // Lower-case, accents removed ("baño" -> "bano"), straight apostrophes
+  // removed ("don't" -> "dont"), and every other non-letter/digit turned
+  // into a space.
   function normalize(message) {
     return (
       " " +
       String(message || "")
         .toLowerCase()
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
         .replace(/[’']/g, "")
-        .replace(/[^a-z0-9áéíóúñüàâçèêëîïôûù¿¡$]+/g, " ")
+        .replace(/[^a-z0-9$]+/g, " ")
         .trim() +
       " "
     );
   }
 
-  var IDENTITY = "\\b(human|real person|a person|robot|bot|ai|chatgpt|automated|are you real)\\b";
-  var IDENTITY_REPLY =
-    "I'm an automated assistant with scripted replies — not a person, and not AI. Nothing you type here is sent to or read by us. To reach a person, call " +
-    PHONE +
-    " or email " +
-    EMAIL +
-    ".";
+  // ---------- what each language's assistant understands ----------
+  // One pattern per topic and language, matched against normalize()d text.
 
-  var OTHER_LANGUAGE =
-    "[¿¡ñ]|\\b(hola|cuanto|cuánto|cuesta|precio|baño|bano|necesito|quiero|gracias|usted|ustedes|hacen|remodelar|bonjour|combien|salle|merci|vous|voudrais|prix)\\b";
-  var OTHER_LANGUAGE_REPLY =
-    "Sorry — this automated assistant only understands English. Lo sentimos, este asistente automático solo entiende inglés. " +
-    "Désolé, cet assistant automatique ne comprend que l'anglais. Please call " +
-    PHONE +
-    ".";
+  var WORDS = {
+    en: {
+      identity: "\\b(human|real person|a person|robot|bot|ai|chatgpt|automated|are you real)\\b",
+      damage:
+        "\\b(water|fire|smoke|storm|flood|hail|wind|mold|mould)\\s+damage(d)?\\b|\\bflood(ed|ing|s)?\\b|\\bmou?ld(y)?\\b|\\bmildew\\b|\\bsewage\\b|\\basbestos\\b|\\b(damage|disaster)\\s+restoration\\b|\\bburst\\s+pipes?\\b",
+      notBathroom:
+        "\\b(kitchens?|exteriors?|roof(s|ing)?|siding|stucco|decks?|fences?|gutters?|basements?|garages?|fireplaces?|chimneys?|driveways?|patios?|landscaping|pools?|hvac|furnaces?|bedrooms?|living room|whole (home|house)|entire (home|house)|full (home|house)|remodel my (home|house))\\b",
+      fixture: "\\b(faucets?|taps?|toilets?|sinks?|showers?|tubs?|bathtubs?|pipes?|drains?|valves?|showerheads?)\\b",
+      problem: "\\b(leak(s|y|ing|ed)?|drip(s|py|ping)?|clogged|blocked|running|broken|cracked|not working)\\b",
+      price: "\\b(price|prices|pricing|cost|costs|charge|charges|rate|rates|how much|fee|fees)\\b|\\$",
+      trade:
+        "\\b(plumb(ing|er|ers)?|electric(al|ian|ians)?|wiring|outlets?|pipes?|valves?|drains?|faucets?|lights?|lighting|fans?|switch(es)?)\\b",
+      estimate: "\\b(estimate|estimates|quote|quotes|quotation|ballpark)\\b",
+      bathroom: "\\bbathrooms?\\b",
+      services:
+        "\\b(what (work|services|kind of work|do you do|can you do|jobs)|services?|do you (do|offer|handle)|what do you (do|offer)|remodel(ing)?|renovat(e|ion|ions|ing)|restor(e|ation|ations|ing))\\b",
+      licence: "\\b(licen[cs]e[ds]?|insured|insurance|bonded|permits?)\\b",
+      warranty: "\\b(warrant(y|ies)|guarantee[ds]?)\\b",
+      timeline: "\\b(how long|timeline|time frame|timeframe|duration|weeks?|days?|start)\\b",
+      privacy: "\\b(privacy|personal data|delete my|my data|my information)\\b",
+      contact: "\\b(contact|phone|call|email|e mail|reach|number|talk to)\\b",
+      hours: "\\b(hours?|open|opening|available|availability|weekends?|schedule)\\b",
+      area: "\\b(where|area|areas|located|location|serve|service area|cities|city)\\b",
+      photos:
+        "\\b(gallery|photos?|pictures?|pics|examples?|portfolio|past (work|jobs|projects)|previous (work|jobs|projects))\\b",
+      greeting: "^ (hi|hello|hey|hiya|good (morning|afternoon|evening))( there)? $",
+      thanks: "\\b(thanks|thank you|thx|cheers)\\b",
+      // Words only this language uses, to spot a visitor writing in it on
+      // another language's page.
+      spoken: null,
+    },
+    es: {
+      identity:
+        "\\b(humano|persona real|una persona|robot|bot|ia|inteligencia artificial|chatgpt|automatico|eres real|hablo con alguien)\\b",
+      damage:
+        "\\b(dano|danos|danad[oa]s?)\\s+(por|de|del)\\s+(el |la )?(agua|fuego|humo|tormenta|inundacion|granizo|viento|moho|hongos)\\b|\\binundaci(on|ones)\\b|\\binundad[oa]s?\\b|\\bmoho\\b|\\bhongos?\\b|\\baguas negras\\b|\\basbestos?\\b|\\bamianto\\b|\\b(tuberias?|tubos?|caneria) (rot[oa]s?|reventad[oa]s?)\\b|\\brestauracion de danos\\b|\\bincendios?\\b",
+      notBathroom:
+        "\\b(cocinas?|exterior(es)?|tejados?|techado|techos de la casa|estuco|terrazas?|cercas?|bardas?|canaletas?|sotanos?|garajes?|cocheras?|chimeneas?|entradas? de (auto|carro|coches?)|patios?|jardineria|jardin|piscinas?|albercas?|calefaccion|aire acondicionado|calentador de ambiente|recamaras?|dormitorios?|sala de estar|toda la casa|casa entera|casa completa|remodelar (mi|la) casa)\\b",
+      fixture:
+        "\\b(llaves?|grifos?|griferia|inodoros?|excusados?|tazas?|lavabos?|lavamanos|regaderas?|duchas?|tinas?|baneras?|tuberias?|tubos?|desagues?|drenajes?|valvulas?)\\b",
+      problem:
+        "\\b(fugas?|gotea|gotean|goteando|gotera|tapad[oa]s?|atascad[oa]s?|obstruid[oa]s?|rot[oa]s?|quebrad[oa]s?|agrietad[oa]s?|no funciona|no sirve|descompuest[oa]s?)\\b",
+      price:
+        "\\b(precio|precios|costo|costos|costar|costaria|costarian|cuesta|cuestan|cobran|cobra|cobrarian|tarifas?|cuanto (sale|saldria|seria|es|vale))\\b|\\$",
+      trade:
+        "\\b(plomeria|plomero|plomeros|fontaneria|fontanero|electricidad|electric[oa]s?|electricistas?|cableado|enchufes?|tomacorrientes?|tuberias?|valvulas?|desagues?|llaves?|grifos?|luces|luz|iluminacion|lamparas?|ventilador(es)?|extractor(es)?|interruptor(es)?|apagador(es)?)\\b",
+      estimate:
+        "\\b(estimado|estimados|estimacion|estimaciones|estimar|cotizacion|cotizaciones|cotizar|presupuesto|presupuestos|calcular)\\b",
+      bathroom: "\\b(bano|banos)\\b",
+      services:
+        "\\b(que (trabajos?|servicios|hacen|ofrecen)|servicios?|remodel(ar|acion|aciones|o)|renovar|renovacion|restaur(ar|acion|aciones)|reformas?|reformar)\\b",
+      licence: "\\b(licencia|licencias|licenciad[oa]s?|asegurad[oa]s?|seguro de responsabilidad|fianza|permisos?)\\b",
+      warranty: "\\b(garantia|garantias|garantizad[oa]s?|garantizan)\\b",
+      timeline: "\\b(cuanto tiempo|tiempo|plazos?|duracion|semanas?|dias?|empezar|comenzar|cuando)\\b",
+      privacy: "\\b(privacidad|datos personales|borrar mis|mis datos|mi informacion)\\b",
+      contact: "\\b(contacto|contactar|contactarlos|telefono|llamar|llamo|correo|email|e mail|hablar con|numero)\\b",
+      hours: "\\b(horarios?|horas|abiert[oa]s?|abren|disponibles?|disponibilidad|fines? de semana|agenda)\\b",
+      area: "\\b(donde|zonas?|areas?|ubicad[oa]s?|ubicacion|ciudad|ciudades|atienden|trabajan en)\\b",
+      photos: "\\b(galeria|fotos?|imagenes|ejemplos?|portafolio|trabajos anteriores|proyectos anteriores)\\b",
+      greeting: "^ (hola|buenas|buen dia|buenos dias|buenas tardes|buenas noches)( que tal)? $",
+      thanks: "\\b(gracias|te agradezco|se agradece)\\b",
+      spoken:
+        "[¿¡ñ]|\\b(hola|cuanto|cuesta|precio|bano|necesito|quiero|gracias|usted|ustedes|hacen|cotizacion|presupuesto)\\b",
+    },
+    pt: {
+      identity:
+        "\\b(humano|pessoa real|uma pessoa|robo|bot|ia|inteligencia artificial|chatgpt|automatico|voce e real|falar com alguem)\\b",
+      damage:
+        "\\b(dano|danos|danificad[oa]s?)\\s+(por|de|causad[oa]s? por)\\s+(agua|fogo|fumaca|tempestade|enchente|inundacao|granizo|vento|mofo)\\b|\\b(enchentes?|inundacao|inundacoes|alagamento|alagad[oa]s?)\\b|\\bmofo\\b|\\bbolor\\b|\\binfiltrac(ao|oes)\\b|\\bamianto\\b|\\b(cano|canos|tubulacao) (estourad[oa]s?|rompid[oa]s?)\\b|\\bincendios?\\b",
+      notBathroom:
+        "\\b(cozinhas?|fachadas?|area externa|telhados?|muros?|cercas?|calhas?|porao|poroes|garagens?|garagem|lareiras?|chamines?|patios?|quintal|jardinagem|paisagismo|piscinas?|aquecimento|ar condicionado|quartos?|sala de estar|casa (toda|inteira)|toda a casa|reforma da casa)\\b",
+      fixture:
+        "\\b(torneiras?|vasos?|privadas?|descargas?|pias?|cubas?|chuveiros?|box|banheiras?|canos?|tubos?|ralos?|registros?|valvulas?)\\b",
+      problem:
+        "\\b(vazando|vazamentos?|vaza|pingando|pinga|entupid[oa]s?|quebrad[oa]s?|rachad[oa]s?|trincad[oa]s?|nao funciona|estragad[oa]s?|com defeito)\\b",
+      price:
+        "\\b(preco|precos|custo|custos|custar|custaria|custariam|custa|custam|cobram|cobra|cobrariam|valor|valores|quanto (fica|sai|seria|e))\\b|\\$",
+      trade:
+        "\\b(encanamento|encanador(es)?|hidraulic[oa]|eletric[oa]|eletricistas?|fiacao|tomadas?|canos?|registros?|ralos?|torneiras?|luzes|luz|iluminacao|lampadas?|luminarias?|exaustor(es)?|ventilador(es)?|interruptor(es)?)\\b",
+      estimate: "\\b(estimativa|estimativas|estimar|orcamento|orcamentos|orcar|cotacao|cotacoes|calcular)\\b",
+      bathroom: "\\b(banheiros?|lavabos?)\\b",
+      services:
+        "\\b(o que (voces )?fazem|servicos?|reformas?|reformar|renovar|renovacao|restaur(ar|acao|acoes)|remodel(ar|acao))\\b",
+      licence:
+        "\\b(licenca|licencas|licenciad[oa]s?|alvara|segurad[oa]s?|seguro de responsabilidade|permissao|permissoes)\\b",
+      warranty: "\\b(garantia|garantias|garantid[oa]s?|garantem)\\b",
+      timeline: "\\b(quanto tempo|tempo|prazos?|duracao|semanas?|dias?|comecar|quando)\\b",
+      privacy: "\\b(privacidade|dados pessoais|apagar meus|excluir meus|meus dados|minhas informacoes)\\b",
+      contact: "\\b(contato|contatar|telefone|ligar|ligo|email|e mail|whatsapp|falar com|numero)\\b",
+      hours: "\\b(horarios?|horas|abert[oa]s?|abrem|disponivel|disponibilidade|fins? de semana|agenda)\\b",
+      area: "\\b(onde|regiao|regioes|areas?|localizad[oa]s?|localizacao|cidades?|atendem)\\b",
+      photos: "\\b(galeria|fotos?|imagens|exemplos?|portfolio|portifolio|trabalhos anteriores|projetos anteriores)\\b",
+      greeting: "^ (oi|ola|opa|bom dia|boa tarde|boa noite|e ai)( tudo bem)? $",
+      thanks: "\\b(obrigad[oa]s?|valeu|agradeco)\\b",
+      spoken: "[ãõ]|\\b(ola|oi|quanto|custa|preco|banheiros?|preciso|quero|obrigad[oa]|voce|voces|fazem|orcamento)\\b",
+    },
+  };
 
-  var DAMAGE =
-    "\\b(water|fire|smoke|storm|flood|hail|wind|mold|mould)\\s+damage(d)?\\b|\\bflood(ed|ing|s)?\\b|\\bmou?ld(y)?\\b|\\bmildew\\b|\\bsewage\\b|\\basbestos\\b|\\b(damage|disaster)\\s+restoration\\b|\\bburst\\s+pipes?\\b";
-  var DAMAGE_REPLY =
-    "Sorry, we don't take on damage restoration (such as water, fire, smoke or mold damage), so we can't help with that. " +
-    "We only do bathroom restorations — for a bathroom project without damage, say “bathroom quote” and I can give you a rough estimate.";
+  // French: the one other language visitors have tried; the assistant
+  // only says which languages it speaks.
+  var FRENCH = "\\b(bonjour|combien|salle|merci|vous|voudrais|prix|devis)\\b";
 
-  var NOT_BATHROOM =
-    "\\b(kitchens?|exteriors?|roof(s|ing)?|siding|stucco|decks?|fences?|gutters?|basements?|garages?|fireplaces?|chimneys?|driveways?|patios?|landscaping|pools?|hvac|furnaces?|bedrooms?|living room|whole (home|house)|entire (home|house)|full (home|house)|remodel my (home|house))\\b";
-  var NOT_BATHROOM_REPLY =
-    "Sorry, we currently only take on bathroom restorations — not kitchens, exteriors, roofing, other rooms, or damage restoration — so we can't help with that. " +
-    "For a bathroom project, say “bathroom quote” and I can give you a rough estimate.";
-
-  var FIXTURE_WORDS =
-    "\\b(faucets?|taps?|toilets?|sinks?|showers?|tubs?|bathtubs?|pipes?|drains?|valves?|showerheads?)\\b";
-  var PROBLEM_WORDS = "\\b(leak(s|y|ing|ed)?|drip(s|py|ping)?|clogged|blocked|running|broken|cracked|not working)\\b";
-  var FIXTURE_PROBLEM_REPLY =
-    "A leaking or broken faucet, toilet, sink, tub or shower is plumbing work. We can replace bathroom fixtures as part of a bathroom restoration, " +
-    "but plumbing isn't included in our online prices and adds to the cost, and we do not currently hold a contractor licence. " +
-    "Call " +
-    PHONE +
-    " to talk it through — we'll tell you who would do the plumbing and how it would be priced before any work is agreed. " +
-    "(We don't take on water-damage restoration.)";
-
-  var PRICE_WORDS = "\\b(price|prices|pricing|cost|costs|charge|charges|rate|rates|how much|fee|fees)\\b|\\$";
+  // Topics where the English words are understood on every page, because
+  // people use them in any language ("vanity", "LVP", "quote").
+  var ALSO_ENGLISH = { price: true, estimate: true };
 
   // Published per-item prices. Checked in this order so "shower door" wins
   // over "shower" and "floor tile" counts as tile.
   var ITEMS = [
     {
-      pattern: "\\bshower doors?\\b",
-      text: function () {
-        return "Shower door installation is " + $(PRICES.Shower_Door_Price) + " per door (labor only).";
-      },
+      key: "showerDoor",
+      price: "Shower_Door_Price",
+      en: "\\bshower doors?\\b",
+      es: "\\bpuertas? (de|para) (la )?(ducha|regadera)\\b|\\bmamparas?\\b|\\bcancel(es)?\\b",
+      pt: "\\bportas? (do|de|para) box\\b|\\bbox de vidro\\b|\\bblindex\\b",
     },
     {
-      pattern: "\\bshower (shelf|shelves|niches?)\\b",
-      text: function () {
-        return "A built-in shower shelf is " + $(PRICES.Shower_Shelf_Price) + " each (labor only).";
-      },
+      key: "showerShelf",
+      price: "Shower_Shelf_Price",
+      en: "\\bshower (shelf|shelves|niches?)\\b",
+      es: "\\b(repisas?|nichos?|estantes?)( empotrad[oa]s?)?( (de|en|para) (la )?(ducha|regadera))?\\b",
+      pt: "\\b(nichos?|prateleiras? (do|no|de|para) (box|chuveiro))\\b",
     },
     {
       // "floor|wall" consumed together with "tile" (not just as a separate
@@ -113,221 +192,199 @@
       // "floor tile" leaves "floor" behind to also match the flooring
       // pattern later, producing two contradictory price lines in one
       // reply (flooring's own text says "tile floors are priced as tile").
-      pattern: "\\b(?:floor|wall)\\s+(?:tile|tiles|tiling|tiled)\\b|\\b(?:tile|tiles|tiling|tiled)\\b",
-      text: function () {
-        return "Tile is " + $(PRICES.Tile_Price_Per_SqFt) + " per sq ft of floor or wall tiled (labor only).";
-      },
+      key: "tile",
+      price: "Tile_Price_Per_SqFt",
+      en: "\\b(?:floor|wall)\\s+(?:tile|tiles|tiling|tiled)\\b|\\b(?:tile|tiles|tiling|tiled)\\b",
+      es: "\\b(?:piso|pisos|pared|paredes)\\s+(?:de\\s+)?(?:azulejos?|losetas?|ceramica|porcelanato)\\b|\\b(?:azulejos?|losetas?|ceramica|porcelanato|mosaicos?|baldosas?)(?:\\s+(?:de|del|para|en)\\s+(?:el\\s+|la\\s+|las\\s+)?(?:piso|pisos|pared|paredes))?\\b",
+      pt: "\\b(?:piso|pisos|parede|paredes)\\s+(?:de\\s+)?(?:ceramica|porcelanato|azulejos?)\\b|\\b(?:azulejos?|ceramicas?|porcelanatos?|pastilhas?|revestimentos?)(?:\\s+(?:de|do|da|no|na|para)\\s+(?:o\\s+|a\\s+)?(?:piso|pisos|parede|paredes))?\\b",
     },
     {
-      pattern: "\\b(paint|painting|painted|painter)\\b",
-      text: function () {
-        return (
-          "Painting is " + $(PRICES.Painting_Price_Per_SqFt) + " per sq ft of wall or ceiling painted (labor only)."
-        );
-      },
+      key: "paint",
+      price: "Painting_Price_Per_SqFt",
+      en: "\\b(paint|painting|painted|painter)\\b",
+      es: "\\b(pintura|pintar|pintad[oa]s?|pintor|pintores)\\b",
+      pt: "\\b(pintura|pintar|pintad[oa]s?|pintor|pintores)\\b",
     },
     {
-      pattern: "\\b(demolition|demo|tear out|tearout|gut|gutting)\\b",
-      text: function () {
-        return "Demolition is " + $(PRICES.Demo_Price_Per_SqFt) + " per sq ft of bathroom floor (labor only).";
-      },
+      key: "demolition",
+      price: "Demo_Price_Per_SqFt",
+      en: "\\b(demolition|demo|tear out|tearout|gut|gutting)\\b",
+      es: "\\b(demolicion|demoler|derribar)\\b",
+      pt: "\\b(demolicao|demolir|quebrar tudo|quebra quebra)\\b",
     },
     {
-      pattern: "\\b(floor|floors|flooring|vinyl|laminate|lvp)\\b",
-      text: function () {
-        return (
-          "Bathroom flooring is " +
-          $(PRICES.Floor_Price_Per_SqFt) +
-          " per sq ft of bathroom floor (labor only; tile floors are priced as tile)."
-        );
-      },
+      key: "flooring",
+      price: "Floor_Price_Per_SqFt",
+      en: "\\b(floor|floors|flooring|vinyl|laminate|lvp)\\b",
+      es: "\\b(pisos?|suelos?|vinil|vinilo|laminado)\\b",
+      pt: "\\b(pisos?|chao|vinilico|laminado)\\b",
     },
     {
-      pattern: "\\b(cabinet|cabinets|cabinetry)\\b",
-      text: function () {
-        return "Bathroom cabinet installation is " + $(PRICES.Cabinet_Price) + " per cabinet (labor only).";
-      },
+      key: "cabinet",
+      price: "Cabinet_Price",
+      en: "\\b(cabinet|cabinets|cabinetry)\\b",
+      es: "\\b(gabinetes?|armarios?|alacenas?|botiquin)\\b",
+      pt: "\\b(armarios?|armarinhos?|espelheiras?)\\b",
     },
     {
-      pattern: "\\b(vanity|vanities)\\b",
-      text: function () {
-        return "Vanity installation is " + $(PRICES.Vanity_Price) + " per vanity (labor only).";
-      },
+      key: "vanity",
+      price: "Vanity_Price",
+      en: "\\b(vanity|vanities)\\b",
+      es: "\\b(tocador(es)?|muebles? (de|del|para el|para) (lavabo|bano|lavamanos))\\b",
+      pt: "\\b(gabinetes?|bancadas?)\\b",
     },
     {
-      pattern: "\\b(mirror|mirrors)\\b",
-      text: function () {
-        return (
-          "Mirror installation is " +
-          $(PRICES.Mirror_Price) +
-          " per standard mirror, or " +
-          $(PRICES.Mirror_Huge_Price) +
-          " for a huge/oversized one (labor only)."
-        );
-      },
+      key: "mirror",
+      en: "\\b(mirror|mirrors)\\b",
+      es: "\\bespejos?\\b",
+      pt: "\\bespelhos?\\b",
     },
     {
-      pattern: "\\b(toilet|toilets)\\b",
-      text: function () {
-        return "Toilet installation is " + $(PRICES.Toilet_Price) + " per toilet (labor only). " + PLUMBING_EXTRA;
-      },
+      key: "toilet",
+      price: "Toilet_Price",
+      plumbing: true,
+      en: "\\b(toilet|toilets)\\b",
+      es: "\\b(inodoros?|excusados?|tazas? de bano|retretes?|sanitarios?|wc)\\b",
+      pt: "\\b(vasos?( sanitarios?)?|privadas?|bacias?( sanitarias?)?)\\b",
     },
     {
-      pattern: "\\b(sink|sinks)\\b",
-      text: function () {
-        return "Sink installation is " + $(PRICES.Sink_Price) + " per sink (labor only). " + PLUMBING_EXTRA;
-      },
+      key: "sink",
+      price: "Sink_Price",
+      plumbing: true,
+      en: "\\b(sink|sinks)\\b",
+      es: "\\b(lavabos?|lavamanos|lavatorios?)\\b",
+      pt: "\\b(pias?|cubas?|lavatorios?)\\b",
     },
     {
-      pattern: "\\b(bathtub|bathtubs|tub|tubs|bath tub)\\b",
-      text: function () {
-        return (
-          "Bathtub installation is " + $(Pricing.bathtubPrice(PRICES)) + " per bathtub (labor only). " + PLUMBING_EXTRA
-        );
-      },
+      key: "bathtub",
+      plumbing: true,
+      en: "\\b(bathtub|bathtubs|tub|tubs|bath tub)\\b",
+      es: "\\b(baneras?|tinas?)\\b",
+      pt: "\\b(banheiras?|ofuros?)\\b",
     },
     {
-      pattern: "\\b(shower|showers)\\b",
-      text: function () {
-        return "Shower installation is " + $(PRICES.Shower_Price) + " per shower (labor only). " + PLUMBING_EXTRA;
-      },
+      key: "shower",
+      price: "Shower_Price",
+      plumbing: true,
+      en: "\\b(shower|showers)\\b",
+      es: "\\b(duchas?|regaderas?)\\b",
+      pt: "\\b(chuveiros?|box|boxes|duchas?)\\b",
     },
     {
-      pattern: "\\b(door|doors)\\b",
-      text: function () {
-        return "Installing the bathroom's entry door is " + $(PRICES.Door_Price) + " per door (labor only).";
-      },
+      key: "door",
+      price: "Door_Price",
+      en: "\\b(door|doors)\\b",
+      es: "\\bpuertas?\\b",
+      pt: "\\bportas?\\b",
     },
   ];
 
-  var TRADE =
-    "\\b(plumb(ing|er|ers)?|electric(al|ian|ians)?|wiring|outlets?|pipes?|valves?|drains?|faucets?|lights?|lighting|fans?|switch(es)?)\\b";
-  var TRADE_REPLY =
-    "Our online prices and estimates don't include plumbing or electrical work, and toilets, sinks, showers, and bathtubs also need plumbing work, so expect it to add to the cost. " +
-    "We do not currently hold a contractor licence. Tell us about your project on the Contact page and we'll tell you who will do that work and how it will be priced before any work is agreed.";
-
-  var ESTIMATE = "\\b(estimate|estimates|quote|quotes|quotation|ballpark)\\b";
-
-  var SERVICES =
-    "\\b(what (work|services|kind of work|do you do|can you do|jobs)|services?|do you (do|offer|handle)|what do you (do|offer)|remodel(ing)?|renovat(e|ion|ions|ing)|restor(e|ation|ations|ing))\\b";
-  var SERVICES_REPLY =
-    "We do bathroom restorations: demolition, installing fixtures (toilets, sinks, showers, bathtubs, vanities, mirrors, doors and cabinets), " +
-    "tile, flooring, and painting walls and ceilings. We don't take on kitchens, exteriors, roofing, or damage restoration. " +
-    "Plumbing and electrical work isn't included in our online estimates and adds to the cost.";
-
-  var LICENCE = "\\b(licen[cs]e[ds]?|insured|insurance|bonded|permits?)\\b";
-  var LICENCE_REPLY =
-    "We do not currently hold a contractor licence. Before any work is agreed, we'll tell you who will do any plumbing and electrical work, how it will be priced, " +
-    "and whether your job needs any permits. Ask us anything else about this when you get in touch: " +
-    PHONE +
-    ".";
-
-  var WARRANTY = "\\b(warrant(y|ies)|guarantee[ds]?)\\b";
-  var WARRANTY_REPLY =
-    "We don't advertise a standard warranty on this website. If you'd like one, ask us before you agree to the work, and make sure any warranty terms are given to you in writing.";
-
-  var TIMELINE = "\\b(how long|timeline|time frame|timeframe|duration|weeks?|days?|start)\\b";
-  var TIMELINE_REPLY =
-    "It depends on the size of the bathroom and the work involved. We'll give you an expected timeline once we've seen the job — call " +
-    PHONE +
-    " or use the Contact page.";
-
-  var PRIVACY = "\\b(privacy|personal data|delete my|my data|my information)\\b";
-  var PRIVACY_REPLY =
-    "Our Privacy Notice (linked at the bottom of every page) explains what we collect and how to ask us to access or delete your information.";
-
-  var CONTACT = "\\b(contact|phone|call|email|e mail|reach|number|talk to)\\b";
-  var CONTACT_REPLY =
-    "You can reach us at " + PHONE + " or " + EMAIL + ", or use the form on our Contact page to send us your request.";
-
-  var HOURS = "\\b(hours?|open|opening|available|availability|weekends?|schedule)\\b";
-  var HOURS_REPLY =
-    "Reach out through the Contact page or give us a call at " +
-    PHONE +
-    ", and we'll get back to you as soon as we can.";
-
-  var AREA = "\\b(where|area|areas|located|location|serve|service area|cities|city)\\b";
-  var AREA_REPLY =
-    "Call " + PHONE + " or use the Contact page with your address and we'll tell you whether we can take on your job.";
-
-  var PHOTOS =
-    "\\b(gallery|photos?|pictures?|pics|examples?|portfolio|past (work|jobs|projects)|previous (work|jobs|projects))\\b";
-  var PHOTOS_REPLY =
-    "We don't have photos of our own completed projects online yet — we'd rather show nothing than someone else's work. Ask us about past jobs when you get in touch.";
-
-  var GREETING = "^ (hi|hello|hey|hiya|good (morning|afternoon|evening))( there)? $";
-  var GREETING_REPLY = "Hello! Ask me about our bathroom work or prices, or get a rough estimate of your bathroom job.";
-
-  var THANKS = "\\b(thanks|thank you|thx|cheers)\\b";
-  var THANKS_REPLY = "You're welcome! If you'd like to talk to a person, call " + PHONE + ".";
-
-  var FALLBACK =
-    "Sorry, I didn't understand that. I can answer questions about our bathroom work and prices, or give you a rough estimate. To talk to a person, call " +
-    PHONE +
-    " or use the Contact page.";
-  var FALLBACK_NO_ESTIMATE =
-    "Sorry, I didn't understand that. I can answer questions about our bathroom work. To talk to a person, call " +
-    PHONE +
-    " or use the Contact page.";
+  function itemText(item, lang) {
+    var $ = function (value) {
+      return Pricing.shortMoney(value, I18n.locale(lang));
+    };
+    var vars = { price: item.price ? $(PRICES[item.price]) : "" };
+    if (item.key === "mirror") {
+      vars.price = $(PRICES.Mirror_Price);
+      vars.huge = $(PRICES.Mirror_Huge_Price);
+    }
+    if (item.key === "bathtub") vars.price = $(Pricing.bathtubPrice(PRICES));
+    var text = I18n.t("chat.item." + item.key, vars, lang);
+    return item.plumbing ? text + " " + I18n.t("chat.plumbingExtra", null, lang) : text;
+  }
 
   function reply(message, options) {
     options = options || {};
     var estimator = options.estimatorEnabled === true;
+    var lang = WORDS[options.lang] ? options.lang : I18n.lang();
+    var words = WORDS[lang];
     var t = normalize(message);
     if (!t.trim()) return null;
+    var raw = String(message).toLowerCase();
 
+    function T(key) {
+      return I18n.t(key, CONTACT, lang);
+    }
+    function is(topic) {
+      return has(t, words[topic]) || (lang !== "en" && ALSO_ENGLISH[topic] && has(t, WORDS.en[topic]));
+    }
+    function answer(key) {
+      return { text: T(key), action: null };
+    }
     function offer(text) {
-      return estimator ? { text: text + " " + ESTIMATE_OFFER, action: "offerEstimate" } : { text: text, action: null };
+      return estimator
+        ? { text: text + " " + T("chat.estimateOffer"), action: "offerEstimate" }
+        : { text: text, action: null };
+    }
+    function speaks(other) {
+      var pattern = WORDS[other].spoken;
+      return has(t, pattern) || has(raw, pattern);
     }
 
-    if (has(t, IDENTITY)) return { text: IDENTITY_REPLY, action: null };
-    if (has(t, OTHER_LANGUAGE)) return { text: OTHER_LANGUAGE_REPLY, action: null };
-    if (has(t, DAMAGE)) return { text: DAMAGE_REPLY, action: null };
-    if (has(t, NOT_BATHROOM)) return { text: NOT_BATHROOM_REPLY, action: null };
-    if (has(t, FIXTURE_WORDS) && has(t, PROBLEM_WORDS)) return { text: FIXTURE_PROBLEM_REPLY, action: null };
+    if (is("identity")) return answer("chat.identity");
+    // Written in one of the site's other languages: say so, in that language.
+    for (var i = 0; i < I18n.LANGS.length; i++) {
+      var other = I18n.LANGS[i];
+      if (other !== lang && other !== "en" && speaks(other)) {
+        return { text: I18n.t("chat.otherLanguage." + other, CONTACT, other), action: null };
+      }
+    }
+    if (has(t, FRENCH)) return answer("chat.french");
+    if (is("damage")) return answer("chat.damage");
+    if (is("notBathroom")) return answer("chat.notBathroom");
+    if (is("fixture") && is("problem")) return answer("chat.fixtureProblem");
 
     var matched = [];
     var matchedText = t;
     ITEMS.forEach(function (item) {
-      var re = new RegExp(item.pattern);
-      if (re.test(matchedText)) {
-        matched.push(item.text());
+      var patterns = lang === "en" ? [item.en] : [item[lang], item.en];
+      var hit = patterns.some(function (p) {
+        return new RegExp(p).test(matchedText);
+      });
+      if (hit) {
+        matched.push(itemText(item, lang));
         // "shower door" should not also answer "shower".
-        matchedText = matchedText.replace(new RegExp(item.pattern, "g"), " ");
+        patterns.forEach(function (p) {
+          matchedText = matchedText.replace(new RegExp(p, "g"), " ");
+        });
       }
     });
     if (matched.length) {
-      if (!estimator) return { text: CALL_FOR_PRICE, action: null };
+      if (!estimator) return answer("chat.callForPrice");
       return offer(matched.join(" "));
     }
 
-    if (has(t, TRADE)) return { text: TRADE_REPLY, action: null };
+    if (is("trade")) return answer("chat.trade");
 
-    var bathroomPrice = has(t, "\\bbathrooms?\\b") && has(t, PRICE_WORDS);
-    if (has(t, ESTIMATE) || bathroomPrice || has(t, PRICE_WORDS)) {
-      if (!estimator) return { text: CALL_FOR_PRICE, action: null };
+    var bathroomPrice = is("bathroom") && is("price");
+    if (is("estimate") || bathroomPrice || is("price")) {
+      if (!estimator) return answer("chat.callForPrice");
       return { text: null, action: "startEstimate" };
     }
 
-    if (has(t, LICENCE)) return { text: LICENCE_REPLY, action: null };
-    if (has(t, WARRANTY)) return { text: WARRANTY_REPLY, action: null };
-    if (has(t, PHOTOS)) return { text: PHOTOS_REPLY, action: null };
-    if (has(t, TIMELINE)) return { text: TIMELINE_REPLY, action: null };
-    if (has(t, SERVICES) || has(t, "\\bbathrooms?\\b")) return offer(SERVICES_REPLY);
-    if (has(t, PRIVACY)) return { text: PRIVACY_REPLY, action: null };
-    if (has(t, AREA)) return { text: AREA_REPLY, action: null };
-    if (has(t, HOURS)) return { text: HOURS_REPLY, action: null };
-    if (has(t, CONTACT)) return { text: CONTACT_REPLY, action: null };
-    if (has(t, THANKS)) return { text: THANKS_REPLY, action: null };
-    if (has(t, GREETING)) return offer(GREETING_REPLY);
+    if (is("licence")) return answer("chat.licence");
+    if (is("warranty")) return answer("chat.warranty");
+    if (is("photos")) return answer("chat.photos");
+    if (is("timeline")) return answer("chat.timeline");
+    if (is("services") || is("bathroom")) return offer(T("chat.services"));
+    if (is("privacy")) return answer("chat.privacy");
+    if (is("area")) return answer("chat.area");
+    if (is("hours")) return answer("chat.hours");
+    if (is("contact")) return answer("chat.contact");
+    if (is("thanks")) return answer("chat.thanks");
+    if (is("greeting")) return offer(T("chat.greeting"));
 
-    return estimator ? { text: FALLBACK, action: "offerEstimate" } : { text: FALLBACK_NO_ESTIMATE, action: null };
+    return estimator ? { text: T("chat.fallback"), action: "offerEstimate" } : answer("chat.fallbackNoEstimate");
   }
 
   return {
     reply: reply,
     normalize: normalize,
-    CALL_FOR_PRICE: CALL_FOR_PRICE,
+    // English text, kept for the existing callers and tests.
+    CALL_FOR_PRICE: I18n.t("chat.callForPrice", CONTACT, "en"),
+    callForPrice: function (lang) {
+      return I18n.t("chat.callForPrice", CONTACT, lang);
+    },
     PHONE: PHONE,
     EMAIL: EMAIL,
   };

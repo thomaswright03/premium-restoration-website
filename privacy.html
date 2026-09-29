@@ -22,6 +22,37 @@
         } catch (e) {}
       })();
     </script>
+    <link rel="alternate" hreflang="en" href="https://premium-restoration.vercel.app/privacy.html" />
+    <link rel="alternate" hreflang="es" href="https://premium-restoration.vercel.app/es/privacy.html" />
+    <link rel="alternate" hreflang="pt-BR" href="https://premium-restoration.vercel.app/pt/privacy.html" />
+    <link rel="alternate" hreflang="x-default" href="https://premium-restoration.vercel.app/privacy.html" />
+    <script>
+      (function () {
+        var here = "en";
+        var pages = { en: "/privacy.html", es: "/es/privacy.html", pt: "/pt/privacy.html" };
+        try {
+          var chosen = /[?&]lang=(en|es|pt)\b/.exec(location.search);
+          if (chosen) {
+            localStorage.setItem("pr_lang", chosen[1]);
+            var rest = location.search.replace(/([?&])lang=[a-z]+&?/, "$1").replace(/[?&]$/, "");
+            history.replaceState(null, "", location.pathname + rest + location.hash);
+            return;
+          }
+          var want = localStorage.getItem("pr_lang");
+          if (!want && here === "en") {
+            var prefs = navigator.languages || [navigator.language || ""];
+            for (var i = 0; i < prefs.length; i++) {
+              var code = String(prefs[i]).slice(0, 2).toLowerCase();
+              if (code === "en" || code === "es" || code === "pt") {
+                want = code;
+                break;
+              }
+            }
+          }
+          if (want && want !== here && pages[want]) location.replace(pages[want] + location.search + location.hash);
+        } catch (e) {}
+      })();
+    </script>
     <link rel="stylesheet" href="css/style.css" />
     <!-- /chrome:head -->
   </head>
@@ -42,6 +73,33 @@
           <li><a href="about.html">About Us</a></li>
           <li><a href="faq.html">FAQs</a></li>
           <li><a href="contact.html" class="nav-cta">Get a Quote</a></li>
+          <li class="nav-lang">
+            <details class="lang-menu">
+              <summary>
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6" />
+                  <path
+                    d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                  />
+                </svg>
+                <span class="visually-hidden">Language: </span>EN<span class="visually-hidden"> English</span>
+              </summary>
+              <ul class="lang-menu-list" aria-label="Language">
+                <li>
+                  <a href="privacy.html?lang=en" hreflang="en" lang="en" data-lang-choice="en" aria-current="true"
+                    >English</a
+                  >
+                </li>
+                <li><a href="es/privacy.html?lang=es" hreflang="es" lang="es" data-lang-choice="es">Español</a></li>
+                <li>
+                  <a href="pt/privacy.html?lang=pt" hreflang="pt-BR" lang="pt-BR" data-lang-choice="pt">Português</a>
+                </li>
+              </ul>
+            </details>
+          </li>
         </ul>
       </nav>
     </header>
@@ -271,6 +329,8 @@
       </div>
     </footer>
     <!-- /chrome:footer -->
+
+    <script src="js/i18n.js"></script>
 
     <script src="js/site-config.js"></script>
     <script src="js/theme.js"></script>

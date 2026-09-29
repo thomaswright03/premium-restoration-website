@@ -18,6 +18,9 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 var Layout = window.BathroomRoomLayout;
+// Button labels in the page's language (js/i18n.js). Kohler product names
+// stay as they are; only the words describing them are translated.
+var T = window.I18n.t;
 
 var PANEL_ID = "ai-chat-room-3d";
 var CANVAS_WRAP_ID = "ai-chat-room-3d-canvas-wrap";
@@ -577,12 +580,18 @@ var FIXTURE_MODELS = {
 // thread on slower devices.
 var fixtureModelLoader = null;
 
+// Model paths are relative to the site root; the Spanish and Portuguese
+// pages live one folder down (es/, pt/), so resolve them from this file.
+function siteUrl(path) {
+  return new URL("../" + path, import.meta.url).href;
+}
+
 function ensureFixtureModel(s, fixtureKey) {
   if (!FIXTURE_MODELS[fixtureKey] || s.modelRequests[fixtureKey]) return;
   s.modelRequests[fixtureKey] = true;
   if (!fixtureModelLoader) fixtureModelLoader = new GLTFLoader();
   fixtureModelLoader.load(
-    FIXTURE_MODELS[fixtureKey],
+    siteUrl(FIXTURE_MODELS[fixtureKey]),
     function (gltf) {
       var template = gltf.scene;
       template.traverse(function (child) {
@@ -872,7 +881,7 @@ function ensureProductModel(s, opt) {
   s.productModels[opt.url] = false;
   if (!productModelLoader) productModelLoader = new GLTFLoader();
   productModelLoader.load(
-    opt.url,
+    siteUrl(opt.url),
     function (gltf) {
       var model = gltf.scene;
       var material = s.mat[opt.material || "porcelainGloss"];
@@ -950,17 +959,17 @@ function buildProductSwitcher(panel, wrap) {
     row.hidden = true;
     var label = document.createElement("span");
     label.className = "ai-chat-room-3d-product-label";
-    label.textContent = slot.label;
+    label.textContent = T("room3d.slot." + slot.id);
     var buttonsWrap = document.createElement("div");
     buttonsWrap.className = "ai-chat-room-3d-style-switch";
     buttonsWrap.setAttribute("role", "group");
-    buttonsWrap.setAttribute("aria-label", slot.label);
+    buttonsWrap.setAttribute("aria-label", T("room3d.slot." + slot.id));
     var buttons = {};
     slot.options.forEach(function (opt) {
       var btn = document.createElement("button");
       btn.type = "button";
       btn.className = "ai-chat-room-3d-style-btn";
-      btn.textContent = opt.label;
+      btn.textContent = T("room3d.option." + opt.id);
       btn.addEventListener("click", function () {
         window.BathroomRoom3D.setProductPick(slot.id, opt.id);
       });
@@ -995,7 +1004,7 @@ function syncProductSwitcher(s, layoutInput, placedKeys) {
       btn.setAttribute("aria-pressed", picked ? "true" : "false");
       var tooBig = shown && slot.body && !picked && productWouldDrop(layoutInput, slot, opt);
       btn.disabled = tooBig;
-      btn.title = tooBig ? "Too big for this room" : "";
+      btn.title = tooBig ? T("room3d.tooBig") : "";
     });
   });
   ui.container.hidden = !anyShown;
@@ -1161,7 +1170,8 @@ var dirty = true;
 var needsRender = true;
 var threeState = null; // null = not tried yet, false = tried and failed, object = live scene
 
-var TOILET_STYLE_LABELS = { A: "Skirted two-piece", B: "One-piece seamless" };
+// Toilet styles: A = skirted two-piece, B = one-piece seamless.
+var TOILET_STYLE_LABELS = { A: "room3d.toilet.A", B: "room3d.toilet.B" };
 
 function buildToiletStyleSwitch(panel, wrap) {
   var container = document.createElement("div");
@@ -1172,7 +1182,7 @@ function buildToiletStyleSwitch(panel, wrap) {
     var btn = document.createElement("button");
     btn.type = "button";
     btn.className = "ai-chat-room-3d-style-btn";
-    btn.textContent = TOILET_STYLE_LABELS[key];
+    btn.textContent = T(TOILET_STYLE_LABELS[key]);
     btn.setAttribute("aria-pressed", key === state.selectedToiletStyle ? "true" : "false");
     btn.addEventListener("click", function () {
       if (state.selectedToiletStyle === key) return;
@@ -1202,7 +1212,7 @@ function buildCameraModeControls(panel, wrap) {
   var toggleBtn = document.createElement("button");
   toggleBtn.type = "button";
   toggleBtn.className = "ai-chat-room-3d-camera-toggle";
-  toggleBtn.textContent = "Walk in";
+  toggleBtn.textContent = T("room3d.walkIn");
   toggleBtn.addEventListener("click", function () {
     window.BathroomRoom3D.setCameraMode(state.cameraMode === "walkin" ? "orbit" : "walkin");
   });
@@ -1224,7 +1234,7 @@ function syncCameraControls(s) {
   if (!s.cameraControls) return;
   var placed = s.lastEntryPlacements || [];
   s.cameraControls.container.hidden = placed.length === 0;
-  s.cameraControls.toggleBtn.textContent = state.cameraMode === "walkin" ? "Overview" : "Walk in";
+  s.cameraControls.toggleBtn.textContent = T(state.cameraMode === "walkin" ? "room3d.overview" : "room3d.walkIn");
   s.cameraControls.toggleBtn.setAttribute("aria-pressed", state.cameraMode === "walkin" ? "true" : "false");
 
   var wrap = s.cameraControls.entrySwitch;
@@ -1234,7 +1244,7 @@ function syncCameraControls(s) {
     var btn = document.createElement("button");
     btn.type = "button";
     btn.className = "ai-chat-room-3d-style-btn";
-    btn.textContent = "Entry " + (i + 1);
+    btn.textContent = T("room3d.entry", { n: i + 1 });
     var isSelected = p.index === state.walkInEntryIndex;
     btn.classList.toggle("selected", isSelected);
     btn.setAttribute("aria-pressed", isSelected ? "true" : "false");

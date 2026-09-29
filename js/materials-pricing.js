@@ -27,13 +27,13 @@
 
 (function (root, factory) {
   "use strict";
-  var api = factory();
+  var api = factory(root.I18n || (typeof require === "function" ? require("./i18n.js") : null));
   if (typeof module === "object" && module.exports) {
     module.exports = api;
   } else {
     root.MaterialsPricing = api;
   }
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+})(typeof globalThis !== "undefined" ? globalThis : this, function (I18n) {
   "use strict";
 
   // Categories priced by the gallon (coverage in sq ft per gallon) instead
@@ -720,13 +720,18 @@
     return Math.round((Number(n) || 0) * 100) / 100;
   }
 
+  // Same formats as js/bathroom-pricing.js: US dollars, written the way the
+  // page's language writes numbers.
   function money(value) {
     var n = Number(value) || 0;
-    return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    var locale = I18n.locale();
+    var opts = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+    if (locale === "en-US") return "$" + n.toLocaleString("en-US", opts);
+    return n.toLocaleString(locale, Object.assign({ style: "currency", currency: "USD" }, opts));
   }
 
   function formatQty(n) {
-    return (Number(n) || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
+    return (Number(n) || 0).toLocaleString(I18n.locale(), { maximumFractionDigits: 2 });
   }
 
   // Best-effort guess at a product's real finish color, parsed from its
@@ -787,14 +792,13 @@
       var others = retailers.filter(function (r) {
         return r !== best;
       });
-      compareNote =
-        "Cheaper than " +
-        others
+      compareNote = I18n.t("materials.cheaperThan", {
+        others: others
           .map(function (r) {
             return r.name + " (" + money(r.price) + ")";
           })
-          .join(", ") +
-        " for the same product.";
+          .join(", "),
+      });
     }
     return { name: best.name, price: best.price, url: best.url, compareNote: compareNote };
   }
@@ -843,7 +847,7 @@
     if (gallonInfo) {
       var gallons = Math.max(1, Math.ceil((Number(qty) || 0) / gallonInfo.coverageSqFtPerGallon));
       return {
-        quantityLabel: gallons + (gallons === 1 ? " gallon" : " gallons"),
+        quantityLabel: gallons + " " + I18n.t(gallons === 1 ? "unit.gallon" : "unit.gallons"),
         cost: round2(gallons * unitPrice),
       };
     }
