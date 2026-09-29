@@ -93,6 +93,34 @@ test.describe("3D bathroom room preview", () => {
     expect(picks.tub).toBe("K-1184-0");
   });
 
+  test("picking a real toilet and sink product retints their real 3D models without errors", async ({ page }) => {
+    test.setTimeout(90000);
+    const errors = [];
+    page.on("pageerror", (err) => errors.push(err.message));
+    const modelsLoaded = Promise.all([
+      page.waitForResponse((res) => res.url().endsWith("models/fixtures/toilet.glb")),
+      page.waitForResponse((res) => res.url().endsWith("models/fixtures/sink.glb")),
+    ]);
+    await startEstimate(page);
+    await answerScope(page, { demolition: "No", floorFinish: "None", walls: "Neither", paintCeiling: "No" });
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Toilet_Quantity: 1, Sink_Quantity: 1 });
+    await modelsLoaded;
+    // The toilet style switch hides once the real toilet replaced the
+    // stand-ins, so the picks below retint the real models' clones.
+    await expect(page.locator("#ai-chat-room-3d .ai-chat-room-3d-style-switch").first()).toBeHidden();
+
+    await page.locator('input[autocomplete="postal-code"]').fill("84101");
+    await page.locator(".ai-chat-group-continue").last().click();
+    for (const category of ["Which toilets", "Which sinks"]) {
+      await expect(page.locator(".ai-chat-group-intro", { hasText: category })).toBeVisible();
+      await page.locator(".ai-chat-choice--material:enabled").last().click();
+      await page.locator(".ai-chat-group-continue").last().click();
+    }
+    await expect(page.getByTestId("estimate-card")).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
   test("off when bathroomVisualizer.enabled is false", async ({ page }) => {
     await useConfig(page, { bathroomVisualizer: { enabled: false } });
     await startEstimate(page);
