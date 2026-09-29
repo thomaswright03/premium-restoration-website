@@ -112,11 +112,11 @@ test.describe("chat in Spanish and Portuguese", () => {
     await expect(page.locator(".ai-chat-field-label", { hasText: "Código postal (ZIP)" })).toBeVisible();
     await page.locator('input[autocomplete="postal-code"]').fill("123");
     await page.locator('input[autocomplete="postal-code"]').press("Enter");
-    await expect(page.locator(".ai-chat-field-error")).toHaveText("Escriba un código postal de 5 dígitos.");
+    await expect(page.locator(".ai-chat-field-error:visible")).toHaveText("Escriba un código postal de 5 dígitos.");
     await page.locator('input[autocomplete="postal-code"]').fill("84101");
     await page.locator('input[autocomplete="postal-code"]').press("Enter");
+    await expect(page.getByText("Elija el producto para: piso (60 pies²)")).toBeVisible();
     const pick = page.locator(".ai-chat-group-form").last();
-    await expect(pick).toContainText("Elija el producto para: piso (60 pies²)");
     await pick.locator(".ai-chat-choice").first().click();
     await pick.getByRole("button", { name: "Ver mi estimación →" }).click();
 
