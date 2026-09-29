@@ -480,6 +480,10 @@ function buildShower(geo, mat) {
   var headDisc = new THREE.Mesh(geo.showerHeadDisc, mat.chrome);
   headDisc.rotation.x = Math.PI / 2.1;
   headDisc.position.set(0, 6.0, 0.48);
+  // Hidden when a Kohler showerhead is picked (see addProductParts()).
+  [headElbow, headArm, headDisc].forEach(function (m) {
+    m.userData.standardShowerHead = true;
+  });
   g.add(back, left, right, pan, headElbow, headArm, headDisc);
   return g;
 }
@@ -625,7 +629,7 @@ function ensureFixtureModel(s, fixtureKey) {
 // The Studio Kohler models (models/products/kohler/, converted from the
 // Restor .obj downloads — see that folder's manifest.json for each one's
 // name, source and conversion flags), grouped into slots the visitor can
-// flip between with a button row per slot above the canvas. Purely visual:
+// flip between with a dropdown per slot above the canvas. Purely visual:
 // nothing here feeds the estimate's pricing.
 //
 // Positions are in the fixture's own frame (feet, back on the wall at
@@ -634,43 +638,233 @@ function ensureFixtureModel(s, fixtureKey) {
 // vanity — so each option's place() gets every slot's current option.
 //   body:      this slot's model IS the fixture (replaces the stand-in or
 //              the default model), rather than being added onto it
+//   url: null  the slot's stand-in: the procedural/default model for a
+//              body slot, or nothing at all ("none") for an add-on
 //   footprint: a body's real size, fed to Layout.computeLayout() so
 //              clearance/fit checks follow the picked product
+//   available: (sel) -> false when the option doesn't go with another
+//              slot's pick (a 60 in. sliding door on a 36 in. base); the
+//              slot then shows its first option that does, and the
+//              dropdown says why (unavailableReason, an i18n key)
+//   extras:    more models placed with the option (a showerhead's arm)
+//   anchor:    "topCenter" — place() gives where the model's top center
+//              goes, for parts that are rotated before placing
 //   deckLine:  a deck-mounted faucet's mounting-hole line, measured from
 //              its model's back edge
-//   dropIn:    a drop-in tub ("oval" or "rect" basin) — drawn set into a
-//              stone tub deck (see buildTubDeck) instead of floating on its
-//              bare shell
+//   dropIn:    a drop-in or alcove tub ("oval" or "rect" basin) — drawn set
+//              into a stone tub deck (see buildTubDeck) instead of standing
+//              on its bare shell
+
+// Where a mirror's bottom edge goes: ~10 in. above a 31 in. vanity top.
+var MIRROR_BOTTOM_FT = 3.4;
+// Top of a shower arm's wall flange (about 80 in.).
+var SHOWER_ARM_TOP_FT = 6.75;
+
+// Deck-mounted sink faucets, shared by the vanity and the pedestal/wall
+// sink rows (each row gets its own copies, since place() differs).
+var SINK_FAUCETS = [
+  { id: "K-14410-4-CP", url: "models/products/kohler/K-14410-4-CP.glb", deckLine: 0.17 },
+  { id: "K-77974-9-CP", url: "models/products/kohler/K-77974-9-CP.glb", deckLine: 0.11 },
+  { id: "K-14402-4A-CP", url: "models/products/kohler/K-14402-4A-CP.glb", deckLine: 0.12 },
+  { id: "K-73167-4-CP", url: "models/products/kohler/K-73167-4-CP.glb", deckLine: 0.03 },
+  { id: "K-77958-4A-CP", url: "models/products/kohler/K-77958-4A-CP.glb", deckLine: 0.26 },
+  { id: "K-35951-4-CP", url: "models/products/kohler/K-35951-4-CP.glb", deckLine: 0.11 },
+  { id: "K-27388-4-CP", url: "models/products/kohler/K-27388-4-CP.glb", deckLine: 0.09 },
+  // Components spouts go in with the Components handles either side.
+  {
+    id: "K-77969-CP",
+    url: "models/products/kohler/K-77969-CP.glb",
+    deckLine: 0.08,
+    handles: { url: "models/products/kohler/K-77974-9-CP.glb", deckLine: 0.11 },
+  },
+  {
+    id: "K-77967-CP",
+    url: "models/products/kohler/K-77967-CP.glb",
+    deckLine: 0.1,
+    handles: { url: "models/products/kohler/K-77974-9-CP.glb", deckLine: 0.11 },
+  },
+];
+
+// deck(sel) -> { y, line }: the deck height and faucet-hole line (from the
+// wall) of whatever the faucets in this row sit on.
+function sinkFaucetOptions(deck) {
+  return SINK_FAUCETS.map(function (f) {
+    var opt = { id: f.id, url: f.url, material: "chrome", deckLine: f.deckLine };
+    opt.place = function (sel) {
+      var d = deck(sel);
+      return [0, d.y, d.line - f.deckLine];
+    };
+    if (f.handles) {
+      opt.extras = [
+        {
+          url: f.handles.url,
+          material: "chrome",
+          place: function (sel) {
+            var d = deck(sel);
+            return [0, d.y, d.line - f.handles.deckLine];
+          },
+        },
+      ];
+    }
+    return opt;
+  });
+}
+
+// Wall-hung accessories: centered on (x, centerY) on the wall behind.
+function onWall(x, centerY) {
+  return function (sel, opt, size) {
+    return [x, centerY - size.y / 2, 0];
+  };
+}
+
+function accessoryOptions(ids, material, place) {
+  return [{ id: "none", url: null }].concat(
+    ids.map(function (id) {
+      return { id: id, url: "models/products/kohler/" + id + ".glb", material: material, place: place };
+    }),
+  );
+}
+
+function noneLast(options) {
+  return options.slice(1).concat(options[0]);
+}
+
+var TOWEL_BARS = ["K-14436-CP", "K-14435-CP", "K-78373-CP", "K-14441-CP"];
+var PAPER_HOLDERS = ["K-14377-CP", "K-13504-CP", "K-73147-CP", "K-78382-CP"];
+var GRAB_BARS = ["K-10542-CP", "K-10544-CP", "K-11895-BS", "K-25161-CP"];
+var ROBE_HOOKS = ["K-14443-CP", "K-23529-CP"];
+
+// Each bar's overall length, flanges included (ft).
+var GRAB_BAR_LENGTHS = { "K-10542-CP": 2.23, "K-10544-CP": 3.23, "K-11895-BS": 3.2, "K-25161-CP": 3.2 };
+
+// fits(sel, length): whether a bar that long goes on this fixture's wall.
+function grabBarOptions(place, fits) {
+  return accessoryOptions(GRAB_BARS, "chrome", place).map(function (opt) {
+    // The Purist bar is brushed stainless, not chrome.
+    if (opt.id === "K-11895-BS") opt.material = "stainless";
+    if (opt.url && fits) {
+      opt.available = function (sel) {
+        return fits(sel, GRAB_BAR_LENGTHS[opt.id]);
+      };
+      opt.unavailableReason = "room3d.tooLong";
+    }
+    return opt;
+  });
+}
+
+function kohlerUrl(id) {
+  return "models/products/kohler/" + id + ".glb";
+}
+
+function tubDepth(tub) {
+  return tub.depth || (tub.footprint && tub.footprint.depth) || 2.85;
+}
+
+var isWideBase = function (sel) {
+  return !!sel.showerBase.wide;
+};
+var isNarrowShower = function (sel) {
+  return !sel.showerBase.wide;
+};
+
 var PRODUCT_SLOTS = [
+  {
+    id: "toilet",
+    fixtureKey: "Toilet_Quantity",
+    body: true,
+    options: [
+      // The generic toilet the room has always shown (models/fixtures/).
+      { id: "standard-toilet", url: null },
+      { id: "K-31648-0", url: kohlerUrl("K-31648-0"), footprint: { wallSpan: 1.7, depth: 2.45 } },
+      { id: "K-31626-DRY-0", url: kohlerUrl("K-31626-DRY-0"), footprint: { wallSpan: 1.7, depth: 2.45 } },
+      { id: "K-31641-0", url: kohlerUrl("K-31641-0") },
+      { id: "K-3619-0", url: kohlerUrl("K-3619-0"), footprint: { wallSpan: 1.7, depth: 2.5 } },
+      { id: "K-3981-0", url: kohlerUrl("K-3981-0"), footprint: { wallSpan: 1.7, depth: 2.35 } },
+      { id: "K-3940-0", url: kohlerUrl("K-3940-0"), footprint: { wallSpan: 1.7, depth: 2.35 } },
+    ],
+  },
+  {
+    id: "paperHolder",
+    fixtureKey: "Toilet_Quantity",
+    // Beside the toilet at the usual 26 in., clear of the tank.
+    options: accessoryOptions(PAPER_HOLDERS, "chrome", onWall(1.15, 2.15)),
+  },
+  {
+    id: "towelBar",
+    fixtureKey: "Toilet_Quantity",
+    // Over the toilet, about 55 in. up.
+    options: accessoryOptions(TOWEL_BARS, "chrome", onWall(0, 4.6)),
+  },
+  {
+    id: "exhaustFan",
+    fixtureKey: "Toilet_Quantity",
+    options: [
+      { id: "none", url: null },
+      {
+        id: "K-34454-NA",
+        url: kohlerUrl("K-34454-NA"),
+        material: "porcelain",
+        // Converted grille-forward; tipped up so the grille faces the
+        // floor, flush with the ceiling over the toilet.
+        rotation: [Math.PI / 2, 0, 0],
+        place: function (sel, opt, size, ctx) {
+          return [0, ctx.heightFt, 1.2 - size.y / 2];
+        },
+      },
+    ],
+  },
   {
     id: "tub",
     fixtureKey: "Bathtub_Quantity",
-    label: "Tub",
     body: true,
     options: [
-      // The freestanding tub PR #9 shipped; its footprint is the layout's
-      // default one. rimY: top of the back rim; deckZ: that rim's middle.
+      // The freestanding tub PR #9 shipped (Kohler's Stargaze K-24010-0);
+      // its footprint is the layout's default one. rimY: top of the back
+      // rim; deckZ: that rim's middle.
       {
         id: "freestanding",
-        label: "Freestanding 60 in.",
         url: "models/fixtures/bathtub.glb",
         rimY: 2.08,
         deckZ: 0.235,
+        depth: 2.85,
       },
+      { id: "K-8332-0", url: kohlerUrl("K-8332-0"), rimY: 1.99, deckZ: 0.1, depth: 2.83 },
       {
         id: "K-1184-0",
         dropIn: "rect",
-        label: "Devonshire 60 in. alcove",
-        url: "models/products/kohler/K-1184-0.glb",
+        url: kohlerUrl("K-1184-0"),
         footprint: { wallSpan: 5.1, depth: 2.75 },
         rimY: 1.65,
         deckZ: 0.145,
       },
       {
+        id: "K-R23217-RA-0",
+        dropIn: "rect",
+        url: kohlerUrl("K-R23217-RA-0"),
+        footprint: { wallSpan: 5.05, depth: 2.6 },
+        rimY: 1.21,
+        deckZ: 0.15,
+      },
+      {
+        id: "K-R23217-LA-0",
+        dropIn: "rect",
+        url: kohlerUrl("K-R23217-LA-0"),
+        footprint: { wallSpan: 5.05, depth: 2.6 },
+        rimY: 1.21,
+        deckZ: 0.15,
+      },
+      {
+        id: "K-1946-RA-0",
+        dropIn: "rect",
+        url: kohlerUrl("K-1946-RA-0"),
+        footprint: { wallSpan: 5.05, depth: 2.6 },
+        rimY: 1.57,
+        deckZ: 0.15,
+      },
+      {
         id: "K-1163-0",
         dropIn: "oval",
-        label: "Sunward 60 in. oval",
-        url: "models/products/kohler/K-1163-0.glb",
+        url: kohlerUrl("K-1163-0"),
         footprint: { wallSpan: 5.1, depth: 3.55 },
         rimY: 1.75,
         deckZ: 0.2,
@@ -678,8 +872,7 @@ var PRODUCT_SLOTS = [
       {
         id: "K-1165-0",
         dropIn: "oval",
-        label: "Sunward 72 in. oval",
-        url: "models/products/kohler/K-1165-0.glb",
+        url: kohlerUrl("K-1165-0"),
         footprint: { wallSpan: 6.1, depth: 3.6 },
         rimY: 1.76,
         deckZ: 0.21,
@@ -689,12 +882,10 @@ var PRODUCT_SLOTS = [
   {
     id: "tubFaucet",
     fixtureKey: "Bathtub_Quantity",
-    label: "Tub faucet",
     options: [
       {
         id: "K-14426-CP",
-        label: "Purist wall spout",
-        url: "models/products/kohler/K-14426-CP.glb",
+        url: kohlerUrl("K-14426-CP"),
         material: "chrome",
         place: function (sel) {
           return [0, sel.tub.rimY + 0.2, 0];
@@ -702,28 +893,48 @@ var PRODUCT_SLOTS = [
       },
       {
         id: "K-73081-4-CP",
-        label: "Composed deck-mount filler",
-        url: "models/products/kohler/K-73081-4-CP.glb",
+        url: kohlerUrl("K-73081-4-CP"),
         material: "chrome",
         deckLine: 0.105,
         place: function (sel, opt) {
           return [0, sel.tub.rimY, sel.tub.deckZ - opt.deckLine];
         },
       },
+      // Floor-mount fillers stand on the room side of the tub, turned so
+      // the spout reaches back over it. base: the riser's center in the
+      // model (x, z), before that half turn.
+      { id: "K-T97328-4-CP", url: kohlerUrl("K-T97328-4-CP"), material: "chrome", base: [0.06, 0.2] },
+      { id: "K-T73087-4-CP", url: kohlerUrl("K-T73087-4-CP"), material: "chrome", base: [0.04, 0.22] },
     ],
+  },
+  {
+    id: "tubValve",
+    fixtureKey: "Bathtub_Quantity",
+    // Above the spout (and any grab bar), centered on the tub. A trim by
+    // default, since the spout needs one; "none" goes last.
+    options: noneLast(
+      accessoryOptions(["K-T14501-4-CP", "K-TS14423-4-CP", "K-TS73115-4-CP"], "chrome", function (sel, opt, size) {
+        return [0, sel.tub.rimY + 1.4 - size.y / 2, 0];
+      }),
+    ),
+  },
+  {
+    id: "tubGrabBar",
+    fixtureKey: "Bathtub_Quantity",
+    options: grabBarOptions(function (sel, opt, size) {
+      return [0, sel.tub.rimY + 0.75 - size.y / 2, 0];
+    }),
   },
   {
     id: "vanitySink",
     fixtureKey: "Vanity_Quantity",
-    label: "Vanity sink",
     options: [
       // centerZ: where the bowl's center sits in the vanity; hole: the
       // countertop cutout's radii, just inside the bowl's top opening;
       // faucetLine: where the faucet's holes go, behind the cutout.
       {
         id: "K-2874-0",
-        label: "Canvas white",
-        url: "models/products/kohler/K-2874-0.glb",
+        url: kohlerUrl("K-2874-0"),
         material: "porcelainGloss",
         height: 0.477,
         depth: 1.284,
@@ -733,8 +944,7 @@ var PRODUCT_SLOTS = [
       },
       {
         id: "K-2608-SU-NA",
-        label: "Bachata stainless",
-        url: "models/products/kohler/K-2608-SU-NA.glb",
+        url: kohlerUrl("K-2608-SU-NA"),
         material: "stainless",
         height: 0.492,
         depth: 1.39,
@@ -742,70 +952,336 @@ var PRODUCT_SLOTS = [
         hole: { rx: 0.68, rz: 0.55 },
         faucetLine: 0.2,
       },
+      {
+        id: "K-2210-G-0",
+        url: kohlerUrl("K-2210-G-0"),
+        material: "porcelainGloss",
+        height: 0.615,
+        depth: 1.342,
+        centerZ: 0.92,
+        hole: { rx: 0.69, rz: 0.56 },
+        faucetLine: 0.22,
+      },
+      // Drop-in: its rim rests on the countertop instead of hanging under it.
+      {
+        id: "K-7806-0",
+        url: kohlerUrl("K-7806-0"),
+        material: "porcelainGloss",
+        dropIn: true,
+        height: 0.509,
+        depth: 1.445,
+        centerZ: 0.86,
+        hole: { rx: 0.62, rz: 0.62 },
+        faucetLine: 0.1,
+      },
+      // Vanity tops with the bowl cast in: they ARE the countertop, and the
+      // cabinet under them is stretched to their size.
+      { id: "K-3048-1-0", top: { width: 2.134, depth: 1.853, height: 0.544 }, faucetLine: 0.2 },
+      { id: "K-3049-1-0", top: { width: 2.636, depth: 1.853, height: 0.506 }, faucetLine: 0.25 },
+      { id: "K-3051-1-0", top: { width: 3.134, depth: 1.859, height: 0.541 }, faucetLine: 0.25 },
+      { id: "K-3052-1-0", top: { width: 3.633, depth: 1.853, height: 0.544 }, faucetLine: 0.2 },
+      { id: "K-3053-1-0", top: { width: 4.132, depth: 1.859, height: 0.555 }, faucetLine: 0.25 },
+      // A stone top cut for an undermount bowl: shown with the Caxton bowl
+      // (K-2210-G-0) under its round cutout.
+      {
+        id: "K-14031-BU-96",
+        material: "countertop",
+        top: { width: 2.583, depth: 1.822, height: 0.063, slab: true },
+        faucetLine: 0.2,
+        extras: [
+          {
+            url: kohlerUrl("K-2210-G-0"),
+            material: "porcelainGloss",
+            place: function () {
+              return [0, 2.5 - 0.615, 0.92 - 1.342 / 2];
+            },
+          },
+        ],
+      },
     ],
   },
   {
     id: "vanityFaucet",
     fixtureKey: "Vanity_Quantity",
-    label: "Sink faucet",
+    options: sinkFaucetOptions(function (sel) {
+      return { y: sel.vanitySink.deckY, line: sel.vanitySink.faucetLine };
+    }),
+  },
+  {
+    id: "sink",
+    fixtureKey: "Sink_Quantity",
+    body: true,
+    // deckY / faucetLine: the faucet deck's height and hole line. lift:
+    // raises a wall-hung model (converted floor-standing) to its rim height.
+    options: [
+      // The wall-hung sink the room already shows (models/fixtures/sink.glb
+      // is this Pinoir).
+      { id: "K-2035-4-0", url: null, deckY: 2.8, faucetLine: 0.24 },
+      { id: "K-2032-0", url: kohlerUrl("K-2032-0"), lift: 2.18, deckY: 2.81, faucetLine: 0.38 },
+      { id: "K-2362-8-0", url: kohlerUrl("K-2362-8-0"), deckY: 2.86, faucetLine: 0.22 },
+      { id: "K-5265-4-0", url: kohlerUrl("K-5265-4-0"), deckY: 2.94, faucetLine: 0.22 },
+    ],
+  },
+  {
+    id: "sinkFaucet",
+    fixtureKey: "Sink_Quantity",
+    options: sinkFaucetOptions(function (sel) {
+      return { y: sel.sink.deckY, line: sel.sink.faucetLine };
+    }),
+  },
+  {
+    id: "showerBase",
+    fixtureKey: "Shower_Quantity",
+    body: true,
+    // width/depth: the base's size; curbY: its threshold height, where a
+    // door stands. wide: a 60 in. alcove base (sliding doors, 60 in. walls).
+    options: [
+      // The glass enclosure and pan the room has always shown.
+      { id: "glass-enclosure", url: null, width: 3.2, depth: 3.2, curbY: 0.1 },
+      {
+        id: "K-8459-0",
+        url: kohlerUrl("K-8459-0"),
+        wide: true,
+        width: 5,
+        depth: 2.67,
+        curbY: 0.27,
+        footprint: { wallSpan: 5.05, depth: 2.7 },
+      },
+      {
+        id: "K-8458-0",
+        url: kohlerUrl("K-8458-0"),
+        wide: true,
+        width: 5,
+        depth: 2.67,
+        curbY: 0.27,
+        footprint: { wallSpan: 5.05, depth: 2.7 },
+      },
+      {
+        id: "K-9163-0",
+        url: kohlerUrl("K-9163-0"),
+        wide: true,
+        width: 5,
+        depth: 2.65,
+        curbY: 0.27,
+        footprint: { wallSpan: 5.05, depth: 2.7 },
+      },
+      {
+        id: "K-9396-0",
+        url: kohlerUrl("K-9396-0"),
+        width: 3,
+        depth: 3,
+        curbY: 0.23,
+        footprint: { wallSpan: 3.05, depth: 3.05 },
+      },
+      {
+        id: "K-8644-0",
+        url: kohlerUrl("K-8644-0"),
+        width: 3,
+        depth: 2.83,
+        curbY: 0.23,
+        footprint: { wallSpan: 3.05, depth: 2.9 },
+      },
+    ],
+  },
+  {
+    id: "showerWalls",
+    fixtureKey: "Shower_Quantity",
+    // Part of the shower's body (see showerBodyTemplate), only with a
+    // Kohler base: the Choreograph kit made for that base's size.
+    body: true,
+    showIf: function (sel) {
+      return !!sel.showerBase.url;
+    },
     options: [
       {
-        id: "K-14410-4-CP",
-        label: "Purist widespread",
-        url: "models/products/kohler/K-14410-4-CP.glb",
-        material: "chrome",
-        deckLine: 0.17,
+        id: "choreograph-72",
+        available: isWideBase,
+        kit: function () {
+          return kohlerUrl("K-97618-0");
+        },
       },
       {
-        id: "K-77974-9-CP",
-        label: "Components handles only",
-        url: "models/products/kohler/K-77974-9-CP.glb",
-        material: "chrome",
-        deckLine: 0.11,
+        id: "choreograph-96",
+        kit: function (base) {
+          return kohlerUrl(base.wide ? "K-97615-0" : "K-97611-0");
+        },
+        // The 96 in. kits' inside corners get the matching corner joints.
+        corners: kohlerUrl("K-97635-0"),
       },
+    ],
+  },
+  {
+    id: "showerDoor",
+    fixtureKey: "Shower_Door_Quantity",
+    body: true,
+    options: [
+      {
+        id: "standard-door",
+        url: null,
+        available: function (sel) {
+          return !sel.showerBase.url;
+        },
+      },
+      { id: "K-R706851-8L-BL", url: kohlerUrl("K-R706851-8L-BL"), material: "glass", available: isWideBase },
+      { id: "K-707615-8L-BL", url: kohlerUrl("K-707615-8L-BL"), material: "glass", available: isWideBase },
+      { id: "K-706015-L-BL", url: kohlerUrl("K-706015-L-BL"), material: "glass", available: isWideBase },
+      { id: "K-27582-10L-BL", url: kohlerUrl("K-27582-10L-BL"), material: "glass", available: isNarrowShower },
+      { id: "K-27583-10L-BL", url: kohlerUrl("K-27583-10L-BL"), material: "glass", available: isNarrowShower },
     ],
   },
   {
     id: "showerValve",
     fixtureKey: "Shower_Quantity",
-    label: "Shower valve",
-    // Centered at a standard 48 in. valve height (see wallCenterY), just in
-    // front of the enclosure's back panel.
+    // Centered at a standard 48 in. valve height, just in front of the
+    // enclosure's back panel.
+    options: ["K-T73117-4-CP", "K-T78027-9-CP", "K-T72770-4-CP"].map(function (id) {
+      return {
+        id: id,
+        url: kohlerUrl(id),
+        material: "chrome",
+        wallCenterY: 4,
+        place: function (sel, opt, size) {
+          return [0, opt.wallCenterY - size.y / 2, 0.06];
+        },
+      };
+    }),
+  },
+  {
+    id: "showerHead",
+    fixtureKey: "Shower_Quantity",
+    // Each head hangs from its arm's tip (arm tip: z out from the wall,
+    // y below the flange's top). Replaces the stand-in's own head.
     options: [
-      { id: "K-T73117-4-CP", label: "Composed", url: "models/products/kohler/K-T73117-4-CP.glb", material: "chrome" },
+      showerHeadOption("K-965-AK-CP", "K-933-CP", { z: 0.67, drop: 0.37 }),
+      showerHeadOption("K-24805-CP", "K-933-CP", { z: 0.67, drop: 0.37 }),
+      // The Occasion rainhead is modeled tipped 45 degrees; leveled here.
+      showerHeadOption("K-27051-CP", "K-26322-CP", { z: 1.12, drop: 0.3 }, [Math.PI / 4, 0, 0]),
       {
-        id: "K-T78027-9-CP",
-        label: "Components thermostatic",
-        url: "models/products/kohler/K-T78027-9-CP.glb",
+        id: "K-22166-CP",
+        url: kohlerUrl("K-22166-CP"),
         material: "chrome",
-      },
-      {
-        id: "K-T72770-4-CP",
-        label: "Artifacts transfer valve",
-        url: "models/products/kohler/K-T72770-4-CP.glb",
-        material: "chrome",
+        place: onWall(0.9, 4.4),
       },
     ],
   },
+  {
+    id: "showerGrabBar",
+    fixtureKey: "Shower_Quantity",
+    // Only bars that fit between the side walls.
+    options: grabBarOptions(
+      function (sel, opt, size) {
+        return [0, 2.9 - size.y / 2, 0.06];
+      },
+      function (sel, length) {
+        return length <= sel.showerBase.width - 0.2;
+      },
+    ),
+  },
+  {
+    id: "showerShelf",
+    fixtureKey: "Shower_Shelf_Quantity",
+    body: true,
+    options: [
+      { id: "standard-shelf", url: null },
+      { id: "K-97621", url: kohlerUrl("K-97621"), material: "porcelain" },
+      { id: "K-97622", url: kohlerUrl("K-97622"), material: "porcelain" },
+      { id: "K-97623", url: kohlerUrl("K-97623"), material: "porcelain" },
+      { id: "K-14440-CP", url: kohlerUrl("K-14440-CP"), material: "glass" },
+      // Floor-to-ceiling storage column.
+      { id: "K-97630", url: kohlerUrl("K-97630"), material: "porcelain", floorStanding: true },
+    ],
+  },
+  {
+    id: "mirror",
+    fixtureKey: "Mirror_Quantity",
+    body: true,
+    options: [
+      { id: "standard-mirror", url: null },
+      { id: "K-31364-BLL", url: kohlerUrl("K-31364-BLL"), material: "chrome" },
+      { id: "K-31367-BLL", url: kohlerUrl("K-31367-BLL"), material: "chrome" },
+      { id: "K-31368", url: kohlerUrl("K-31368"), material: "chrome" },
+    ],
+  },
+  {
+    id: "mirrorLarge",
+    fixtureKey: "Mirror_Huge_Quantity",
+    body: true,
+    options: [
+      { id: "standard-mirror", url: null },
+      { id: "K-31365-BLL", url: kohlerUrl("K-31365-BLL"), material: "chrome" },
+      { id: "K-31369-BLL", url: kohlerUrl("K-31369-BLL"), material: "chrome" },
+      { id: "K-99573-TL-NA", url: kohlerUrl("K-99573-TL-NA"), material: "chrome" },
+    ],
+  },
+  {
+    id: "robeHook",
+    fixtureKey: "Door_Quantity",
+    // On the entry door's room-side face, at about 66 in.; an open archway
+    // has no door to hang it on.
+    skip: function (p) {
+      return p.hasDoor === false;
+    },
+    options: accessoryOptions(ROBE_HOOKS, "chrome", function (sel, opt, size) {
+      return [-0.7, 5.5 - size.y / 2, 0.075];
+    }),
+  },
 ];
 
-// Sink bowls and the vanity's own faucet have no place() of their own:
-// both hang off the picked bowl, laid out here in one spot.
-PRODUCT_SLOTS[2].options.forEach(function (sink) {
+function showerHeadOption(headId, armId, tip, rotation) {
+  return {
+    id: headId,
+    url: kohlerUrl(headId),
+    material: "chrome",
+    rotation: rotation,
+    anchor: "topCenter",
+    place: function () {
+      return [0, SHOWER_ARM_TOP_FT - tip.drop + 0.03, tip.z];
+    },
+    extras: [
+      {
+        url: kohlerUrl(armId),
+        material: "chrome",
+        place: function (sel, opt, size) {
+          return [0, SHOWER_ARM_TOP_FT - size.y, 0];
+        },
+      },
+    ],
+  };
+}
+
+// Tub parts that need more than one number to place.
+productOption(productSlot("tubFaucet"), "K-T97328-4-CP").rotation = [0, Math.PI, 0];
+productOption(productSlot("tubFaucet"), "K-T73087-4-CP").rotation = [0, Math.PI, 0];
+["K-T97328-4-CP", "K-T73087-4-CP"].forEach(function (id) {
+  var filler = productOption(productSlot("tubFaucet"), id);
+  filler.place = function (sel) {
+    // The half turn maps the riser's (x, z) to (-x, -z): land it 4 in.
+    // in front of the tub's front edge.
+    return [filler.base[0], 0, tubDepth(sel.tub) + 0.35 + filler.base[1]];
+  };
+});
+
+// Sink bowls and vanity tops have no place() of their own: they all hang
+// off the 2.5 ft countertop line, laid out here in one spot.
+productSlot("vanitySink").options.forEach(function (sink) {
+  if (sink.top) {
+    sink.url = kohlerUrl(sink.id);
+    sink.material = sink.material || "porcelainGloss";
+    // A slab is set on the cabinet; a cast-iron top's bowl hangs below its
+    // surface, which is level with the other countertops.
+    sink.deckY = sink.top.slab ? 2.5 + sink.top.height : 2.6;
+    sink.footprint = { wallSpan: sink.top.width + 0.05, depth: sink.top.depth + 0.05 };
+    sink.place = function () {
+      return [0, sink.deckY - sink.top.height, 0];
+    };
+    return;
+  }
+  sink.deckY = 2.6;
   sink.place = function () {
-    // Rim tucked just under the 2.5 ft countertop's cutout.
-    return [0, 2.5 - sink.height, sink.centerZ - sink.depth / 2];
-  };
-});
-PRODUCT_SLOTS[3].options.forEach(function (faucet) {
-  faucet.place = function (sel) {
-    return [0, 2.6, sel.vanitySink.faucetLine - faucet.deckLine];
-  };
-});
-PRODUCT_SLOTS[4].options.forEach(function (valve) {
-  valve.wallCenterY = 4;
-  valve.place = function (sel, opt, size) {
-    return [0, valve.wallCenterY - size.y / 2, 0.06];
+    // Undermount: rim tucked just under the countertop's cutout. Drop-in:
+    // rim resting just on top of it.
+    var rimY = sink.dropIn ? 2.62 : 2.5;
+    return [0, rimY - sink.height, sink.centerZ - sink.depth / 2];
   };
 });
 
@@ -827,30 +1303,47 @@ function productOption(slot, optionId) {
   return null;
 }
 
-// slotId -> the currently picked option object.
-function selectedProducts() {
+// Whether any of a slot's options changes its fixture's size.
+function slotIsSized(slot) {
+  return slot.options.some(function (opt) {
+    return !!opt.footprint;
+  });
+}
+
+// slotId -> the option showing: the pick, unless it doesn't go with an
+// earlier slot's (the slot's first option that does, then). Slots are in
+// dependency order, so a door sees the base already resolved.
+function selectedProducts(picks) {
+  picks = picks || state.productPicks;
   var sel = {};
   PRODUCT_SLOTS.forEach(function (slot) {
-    sel[slot.id] = productOption(slot, state.productPicks[slot.id]) || slot.options[0];
+    var opt = productOption(slot, picks[slot.id]) || slot.options[0];
+    if (opt.available && !opt.available(sel)) {
+      opt =
+        slot.options.filter(function (o) {
+          return !o.available || o.available(sel);
+        })[0] || opt;
+    }
+    sel[slot.id] = opt;
   });
   return sel;
 }
 
-// Footprint overrides for Layout.computeLayout(): only a non-default body
-// pick that declares its own size changes anything. picks defaults to
+// Footprint overrides for Layout.computeLayout(): only a pick that
+// declares its own size changes anything. picks defaults to
 // state.productPicks.
 function productFootprints(picks) {
-  picks = picks || state.productPicks;
+  var sel = selectedProducts(picks);
   var out = {};
   PRODUCT_SLOTS.forEach(function (slot) {
-    var opt = productOption(slot, picks[slot.id]);
-    if (slot.body && opt && opt.footprint) out[slot.fixtureKey] = opt.footprint;
+    var opt = sel[slot.id];
+    if (opt && opt.footprint) out[slot.fixtureKey] = opt.footprint;
   });
   return out;
 }
 
 // productFootprints() for a layout about to be computed from layoutInput
-// (no footprints yet), with any body pick that no longer fits — the room
+// (no footprints yet), with any sized pick that no longer fits — the room
 // shrank, or more fixtures were added — treated as its slot's default, so
 // a visual pick never makes a priced fixture disappear from the room or
 // fail the estimate's fit check. commit: also put that pick back to the
@@ -858,8 +1351,8 @@ function productFootprints(picks) {
 function fittedProductFootprints(layoutInput, commit) {
   var picks = Object.assign({}, state.productPicks);
   PRODUCT_SLOTS.forEach(function (slot) {
-    var opt = productOption(slot, picks[slot.id]);
-    if (!slot.body || !opt || opt === slot.options[0]) return;
+    var opt = selectedProducts(picks)[slot.id];
+    if (!opt.footprint || opt === slot.options[0]) return;
     var others = productFootprints(picks);
     delete others[slot.fixtureKey];
     if (productWouldDrop(Object.assign({}, layoutInput, { footprints: others }), slot, opt)) {
@@ -904,10 +1397,53 @@ function ensureProductModel(s, opt) {
   );
 }
 
+// Every model an option places: its own plus any extras.
+function optionModels(opt) {
+  return opt.url ? [opt].concat(opt.extras || []) : [];
+}
+
+// Starts any of these models' fetches; true once all of them are loaded.
+function productModelsReady(s, models) {
+  var ready = true;
+  models.forEach(function (m) {
+    ensureProductModel(s, m);
+    if (!s.productModels[m.url]) ready = false;
+  });
+  return ready;
+}
+
+// Builds (once per key) and caches a body template.
+function cachedBodyTemplate(s, key, build) {
+  if (!s.bodyTemplates[key]) s.bodyTemplates[key] = build();
+  return s.bodyTemplates[key];
+}
+
+// A loaded model wrapped in a group so it can sit offset from the
+// fixture's origin.
+function offsetModel(model, x, y, z) {
+  var g = new THREE.Group();
+  var m = model.clone(true);
+  m.position.set(x, y, z);
+  g.add(m);
+  return g;
+}
+
+// Whether fixtureKey's body comes from a product slot pick (so parts on it
+// wait for that body to load): always for the tub and vanity, and for the
+// others once a Kohler model is picked over the stand-in.
+function productOwnsBody(fixtureKey, sel) {
+  if (fixtureKey === "Bathtub_Quantity" || fixtureKey === "Vanity_Quantity") return true;
+  if (fixtureKey === "Toilet_Quantity") return !!sel.toilet.url;
+  if (fixtureKey === "Sink_Quantity") return !!sel.sink.url;
+  if (fixtureKey === "Shower_Quantity") return !!sel.showerBase.url;
+  return false;
+}
+
 // The fixture template to clone for fixtureKey, when a product slot owns
-// its body: the picked tub model, or a vanity cut out for the picked bowl.
-// null = no slot owns it (or its model hasn't arrived yet), so the caller
-// keeps whatever it would otherwise use.
+// its body: the picked tub, toilet, sink, shower base, door, shelf or
+// mirror model, or a vanity cut out for the picked bowl. null = no slot
+// owns it, its pick is the stand-in, or its model hasn't arrived yet — so
+// the caller keeps whatever it would otherwise use.
 function productBodyTemplate(s, fixtureKey, sel) {
   if (fixtureKey === "Bathtub_Quantity") {
     ensureProductModel(s, sel.tub);
@@ -921,93 +1457,255 @@ function productBodyTemplate(s, fixtureKey, sel) {
     return s.tubTemplates[sel.tub.id];
   }
   if (fixtureKey === "Vanity_Quantity") {
-    ensureProductModel(s, sel.vanitySink);
-    if (!s.productModels[sel.vanitySink.url]) return null;
+    if (!productModelsReady(s, optionModels(sel.vanitySink))) return null;
     var key = sel.vanitySink.id;
     if (!s.vanityTemplates[key]) s.vanityTemplates[key] = buildUndermountVanity(s.geo, s.mat, sel.vanitySink);
     return s.vanityTemplates[key];
   }
+  if (fixtureKey === "Toilet_Quantity") {
+    if (!sel.toilet.url || !productModelsReady(s, [sel.toilet])) return null;
+    return s.productModels[sel.toilet.url];
+  }
+  if (fixtureKey === "Sink_Quantity") {
+    var sink = sel.sink;
+    if (!sink.url || !productModelsReady(s, [sink])) return null;
+    return cachedBodyTemplate(s, "sink|" + sink.id, function () {
+      return offsetModel(s.productModels[sink.url], 0, sink.lift || 0, 0);
+    });
+  }
+  if (fixtureKey === "Shower_Quantity") return showerBodyTemplate(s, sel);
+  if (fixtureKey === "Shower_Door_Quantity") {
+    var door = sel.showerDoor;
+    if (!door.url || !productModelsReady(s, [door])) return null;
+    // The door instance sits at the shower's open edge; the panel stands
+    // on the base's threshold, centered on that line.
+    return cachedBodyTemplate(s, "door|" + door.id + "|" + sel.showerBase.id, function () {
+      var model = s.productModels[door.url];
+      return offsetModel(model, 0, sel.showerBase.curbY, -model.userData.size.z / 2);
+    });
+  }
+  if (fixtureKey === "Shower_Shelf_Quantity") {
+    var shelf = sel.showerShelf;
+    if (!shelf.url || !productModelsReady(s, [shelf])) return null;
+    // The shelf instance is centered on the shower's back wall at the
+    // layout's 48 in. mount height. Kohler shelves go higher and off to one
+    // side, clear of the valve; the storage column stands on the floor.
+    return cachedBodyTemplate(s, "shelf|" + shelf.id + "|" + sel.showerBase.id, function () {
+      var model = s.productModels[shelf.url];
+      var size = model.userData.size;
+      var mountY = Layout.FIXTURE_LAYOUT.Shower_Shelf_Quantity.mountHeight;
+      var x = Math.max(0, sel.showerBase.width / 2 - 0.4 - size.x / 2);
+      var y = shelf.floorStanding ? -mountY : 0.9 - size.y / 2;
+      return offsetModel(model, x, y, 0.02);
+    });
+  }
+  if (fixtureKey === "Mirror_Quantity" || fixtureKey === "Mirror_Huge_Quantity") {
+    var mirror = fixtureKey === "Mirror_Quantity" ? sel.mirror : sel.mirrorLarge;
+    if (!mirror.url || !productModelsReady(s, [mirror])) return null;
+    // Wall-mounted instances sit at the layout's mountHeight; the Kohler
+    // mirror hangs its bottom edge at MIRROR_BOTTOM_FT instead, on the
+    // wall's face (its back at z = 0), not sunk into it.
+    return cachedBodyTemplate(s, "mirror|" + mirror.id, function () {
+      var mountY = Layout.FIXTURE_LAYOUT[fixtureKey].mountHeight;
+      return offsetModel(s.productModels[mirror.url], 0, MIRROR_BOTTOM_FT - mountY, 0.005);
+    });
+  }
   return null;
 }
 
-// Adds every non-body slot's picked model onto one placed instance. Parts
-// on a fixture whose body comes from a slot wait for that body, since
-// their positions are measured against it.
-function addProductParts(s, instance, fixtureKey, sel, bodyReady) {
-  PRODUCT_SLOTS.forEach(function (slot) {
-    if (slot.fixtureKey !== fixtureKey || slot.body) return;
-    var opt = sel[slot.id];
-    ensureProductModel(s, opt);
-    var model = s.productModels[opt.url];
-    if (!model || !bodyReady) return;
-    var part = model.clone(true);
-    var p = opt.place(sel, opt, model.userData.size);
-    part.position.set(p[0], p[1], p[2]);
-    instance.add(part);
+// A Kohler shower: the picked base, and around it the Choreograph wall kit
+// made for that base's size (plus corner joints on the 96 in. kits).
+function showerBodyTemplate(s, sel) {
+  var base = sel.showerBase;
+  if (!base.url) return null;
+  var walls = sel.showerWalls;
+  var kit = { url: walls.kit(base), material: "porcelain" };
+  var corners = walls.corners ? { url: walls.corners, material: "porcelain" } : null;
+  var models = [base, kit].concat(corners ? [corners] : []);
+  if (!productModelsReady(s, models)) return null;
+  return cachedBodyTemplate(s, "shower|" + base.id + "|" + kit.url, function () {
+    var g = new THREE.Group();
+    g.add(s.productModels[base.url].clone(true));
+    var kitModel = s.productModels[kit.url].clone(true);
+    g.add(kitModel);
+    if (corners) {
+      var halfW = s.productModels[kit.url].userData.size.x / 2 - 0.04;
+      [-halfW, halfW].forEach(function (x) {
+        var joint = s.productModels[corners.url].clone(true);
+        joint.position.set(x, 0, 0.02);
+        g.add(joint);
+      });
+    }
+    return g;
   });
 }
 
-// One button row per slot, shown only while that slot's fixture is placed.
+// Adds every non-body slot's picked model(s) onto one placed instance.
+// Parts on a fixture whose body comes from a slot wait for that body, since
+// their positions are measured against it. ctx: { heightFt } of the room.
+function addProductParts(s, instance, placement, sel, bodyReady, ctx) {
+  var fixtureKey = placement.fixtureKey;
+  PRODUCT_SLOTS.forEach(function (slot) {
+    if (slot.fixtureKey !== fixtureKey || slot.body) return;
+    if (slot.skip && slot.skip(placement)) return;
+    var opt = sel[slot.id];
+    var models = optionModels(opt);
+    if (!models.length || !productModelsReady(s, models) || !bodyReady) return;
+    models.forEach(function (m) {
+      var model = s.productModels[m.url];
+      var part = model.clone(true);
+      if (m.rotation) part.rotation.set(m.rotation[0], m.rotation[1], m.rotation[2]);
+      var p = m.place(sel, opt, model.userData.size, ctx);
+      part.position.set(p[0], p[1], p[2]);
+      if (m.anchor === "topCenter") {
+        // Rotated first, so line up by where it actually ends up.
+        part.updateMatrixWorld(true);
+        var box = new THREE.Box3().setFromObject(part);
+        part.position.x += p[0] - (box.min.x + box.max.x) / 2;
+        part.position.y += p[1] - box.max.y;
+        part.position.z += p[2] - (box.min.z + box.max.z) / 2;
+      }
+      instance.add(part);
+    });
+    // A real showerhead replaces the stand-in enclosure's own.
+    if (slot.id === "showerHead") {
+      instance.traverse(function (child) {
+        if (child.userData.standardShowerHead) child.visible = false;
+      });
+    }
+  });
+}
+
+// The switcher's fixture tabs: one per placed fixture, each showing only
+// that fixture's dropdowns, so the rows never crowd out the room itself.
+var PRODUCT_GROUPS = [
+  { id: "toilet", fixtureKeys: ["Toilet_Quantity"] },
+  { id: "tub", fixtureKeys: ["Bathtub_Quantity"] },
+  { id: "vanity", fixtureKeys: ["Vanity_Quantity"] },
+  { id: "sink", fixtureKeys: ["Sink_Quantity"] },
+  { id: "shower", fixtureKeys: ["Shower_Quantity", "Shower_Door_Quantity", "Shower_Shelf_Quantity"] },
+  { id: "mirror", fixtureKeys: ["Mirror_Quantity", "Mirror_Huge_Quantity"] },
+  { id: "door", fixtureKeys: ["Door_Quantity"] },
+];
+
+function productGroupOf(slot) {
+  for (var i = 0; i < PRODUCT_GROUPS.length; i++) {
+    if (PRODUCT_GROUPS[i].fixtureKeys.indexOf(slot.fixtureKey) !== -1) return PRODUCT_GROUPS[i].id;
+  }
+  return null;
+}
+
+// A row of fixture tabs, then one labelled dropdown per slot.
 function buildProductSwitcher(panel, wrap) {
   var container = document.createElement("div");
   container.className = "ai-chat-room-3d-products";
   container.hidden = true;
-  var rows = {};
+  var tabsWrap = document.createElement("div");
+  tabsWrap.className = "ai-chat-room-3d-style-switch";
+  tabsWrap.setAttribute("role", "group");
+  tabsWrap.setAttribute("aria-label", T("room3d.products"));
+  var ui = { container: container, rows: {}, tabs: {}, group: null };
+  PRODUCT_GROUPS.forEach(function (group) {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ai-chat-room-3d-style-btn";
+    btn.textContent = T("room3d.group." + group.id);
+    btn.hidden = true;
+    btn.addEventListener("click", function () {
+      ui.group = group.id;
+      applyProductGroup(ui);
+    });
+    ui.tabs[group.id] = btn;
+    tabsWrap.appendChild(btn);
+  });
+  var rowsWrap = document.createElement("div");
+  rowsWrap.className = "ai-chat-room-3d-product-rows";
   PRODUCT_SLOTS.forEach(function (slot) {
     var row = document.createElement("div");
     row.className = "ai-chat-room-3d-product-row";
     row.hidden = true;
-    var label = document.createElement("span");
+    var selectId = "ai-chat-room-3d-product-" + slot.id;
+    var label = document.createElement("label");
     label.className = "ai-chat-room-3d-product-label";
+    label.htmlFor = selectId;
     label.textContent = T("room3d.slot." + slot.id);
-    var buttonsWrap = document.createElement("div");
-    buttonsWrap.className = "ai-chat-room-3d-style-switch";
-    buttonsWrap.setAttribute("role", "group");
-    buttonsWrap.setAttribute("aria-label", T("room3d.slot." + slot.id));
-    var buttons = {};
+    var select = document.createElement("select");
+    select.className = "ai-chat-room-3d-product-select";
+    select.id = selectId;
+    var options = {};
     slot.options.forEach(function (opt) {
-      var btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "ai-chat-room-3d-style-btn";
-      btn.textContent = T("room3d.option." + opt.id);
-      btn.addEventListener("click", function () {
-        window.BathroomRoom3D.setProductPick(slot.id, opt.id);
-      });
-      buttons[opt.id] = btn;
-      buttonsWrap.appendChild(btn);
+      var el = document.createElement("option");
+      el.value = opt.id;
+      el.textContent = T("room3d.option." + opt.id);
+      options[opt.id] = el;
+      select.appendChild(el);
+    });
+    select.addEventListener("change", function () {
+      window.BathroomRoom3D.setProductPick(slot.id, select.value);
     });
     row.appendChild(label);
-    row.appendChild(buttonsWrap);
-    container.appendChild(row);
-    rows[slot.id] = { row: row, buttons: buttons };
+    row.appendChild(select);
+    rowsWrap.appendChild(row);
+    ui.rows[slot.id] = { row: row, select: select, options: options, group: productGroupOf(slot), shown: false };
   });
+  container.appendChild(tabsWrap);
+  container.appendChild(rowsWrap);
   panel.insertBefore(container, wrap);
-  return { container: container, rows: rows };
+  return ui;
 }
 
-// Reflects state.productPicks and which fixtures are placed onto the rows.
-// A body option too big for the room (the layout would drop a fixture it
-// otherwise places) is disabled rather than silently not drawn.
-function syncProductSwitcher(s, layoutInput, placedKeys) {
-  var ui = s.productSwitcher;
-  if (!ui) return;
-  var anyShown = false;
+// Shows the tabs of fixtures with something to pick, and the picked tab's
+// rows (the first tab, if the picked one's fixture is gone).
+function applyProductGroup(ui) {
+  var groupsShown = {};
   PRODUCT_SLOTS.forEach(function (slot) {
     var entry = ui.rows[slot.id];
-    var shown = !!placedKeys[slot.fixtureKey];
-    entry.row.hidden = !shown;
-    anyShown = anyShown || shown;
-    slot.options.forEach(function (opt) {
-      var btn = entry.buttons[opt.id];
-      var picked = state.productPicks[slot.id] === opt.id;
-      btn.classList.toggle("selected", picked);
-      btn.setAttribute("aria-pressed", picked ? "true" : "false");
-      var tooBig = shown && slot.body && !picked && productWouldDrop(layoutInput, slot, opt);
-      btn.disabled = tooBig;
-      btn.title = tooBig ? T("room3d.tooBig") : "";
-    });
+    if (entry.shown) groupsShown[entry.group] = true;
   });
-  ui.container.hidden = !anyShown;
+  if (!groupsShown[ui.group]) {
+    ui.group = null;
+    PRODUCT_GROUPS.forEach(function (group) {
+      if (!ui.group && groupsShown[group.id]) ui.group = group.id;
+    });
+  }
+  PRODUCT_GROUPS.forEach(function (group) {
+    var btn = ui.tabs[group.id];
+    var current = ui.group === group.id;
+    btn.hidden = !groupsShown[group.id];
+    btn.classList.toggle("selected", current);
+    btn.setAttribute("aria-pressed", current ? "true" : "false");
+  });
+  PRODUCT_SLOTS.forEach(function (slot) {
+    var entry = ui.rows[slot.id];
+    entry.row.hidden = !entry.shown || entry.group !== ui.group;
+  });
+  ui.container.hidden = !ui.group;
+}
+
+// Reflects what's showing and which fixtures are placed onto the
+// dropdowns. An option too big for the room (the layout would drop a
+// fixture it otherwise places), or one that doesn't go with another pick,
+// is disabled with the reason after its name rather than silently not
+// drawn.
+function syncProductSwitcher(s, layoutInput, placedKeys, sel) {
+  var ui = s.productSwitcher;
+  if (!ui) return;
+  PRODUCT_SLOTS.forEach(function (slot) {
+    var entry = ui.rows[slot.id];
+    entry.shown = !!placedKeys[slot.fixtureKey] && (!slot.showIf || slot.showIf(sel));
+    var sized = entry.shown && slotIsSized(slot);
+    slot.options.forEach(function (opt) {
+      var el = entry.options[opt.id];
+      var picked = sel[slot.id] === opt;
+      var reason = null;
+      if (opt.available && !opt.available(sel)) reason = T(opt.unavailableReason || "room3d.noFit");
+      else if (sized && !picked && productWouldDrop(layoutInput, slot, opt)) reason = T("room3d.tooBig");
+      el.disabled = !!reason;
+      el.textContent = T("room3d.option." + opt.id) + (reason ? " (" + reason + ")" : "");
+    });
+    entry.select.value = sel[slot.id].id;
+  });
+  applyProductGroup(ui);
 }
 
 function productWouldDrop(layoutInput, slot, opt) {
@@ -1075,13 +1773,15 @@ function buildTubDeck(mat, size, tub) {
   return g;
 }
 
-// The vanity once a real undermount bowl is going in: the same 2.5 x 2.6 x
-// 1.6 ft cabinet, but solid only up to just under the bowl, with thin
-// aprons around an open top and a stone countertop with an oval cutout
-// sized to that bowl — so looking down you see into the bowl rather than a
-// solid box top.
+// The vanity once a real bowl is going in: the same 2.5 x 2.6 x 1.6 ft
+// cabinet, but solid only up to just under the bowl, with thin aprons
+// around an open top and a stone countertop with a cutout sized to that
+// bowl — so looking down you see into the bowl rather than a solid box
+// top. A vanity top (sink.top) is its own countertop: the cabinet is
+// stretched to sit just inside it instead, with no stone top.
 function buildUndermountVanity(geo, mat, sink) {
   var g = new THREE.Group();
+  var cabinet = new THREE.Group();
   var body = new THREE.Mesh(geo.vanityLowerBody, mat.cabinetWood);
   body.position.set(0, 1.0, 0.8);
   var front = new THREE.Mesh(geo.vanityApronX, mat.cabinetWood);
@@ -1092,10 +1792,16 @@ function buildUndermountVanity(geo, mat, sink) {
   left.position.set(-1.225, 2.25, 0.8);
   var right = left.clone();
   right.position.x = 1.225;
+  cabinet.add(body, front, back, left, right);
+  if (sink.top) {
+    cabinet.scale.set((sink.top.width - 0.08) / 2.5, 1, (sink.top.depth - 0.06) / 1.6);
+    g.add(cabinet);
+    return g;
+  }
   var top = new THREE.Mesh(vanityCountertopGeometry(sink), mat.countertop);
   top.rotation.x = -Math.PI / 2;
   top.position.set(0, 2.5, 0);
-  g.add(body, front, back, left, right, top);
+  g.add(cabinet, top);
   return g;
 }
 
@@ -1449,6 +2155,7 @@ function ensureScene() {
       productModels: {}, // PRODUCT_SLOTS option url -> loaded template, or false while loading
       vanityTemplates: {}, // vanity sink option id -> buildUndermountVanity() template
       tubTemplates: {}, // drop-in tub option id -> tub model + buildTubDeck()
+      bodyTemplates: {}, // productBodyTemplate() cache for the other product bodies
       productSwitcher: productSwitcher,
       fixtureGroup: fixtureGroup,
       shellMaterials: shellMaterials,
@@ -1921,7 +2628,7 @@ function setShadowFlags(object3d) {
   });
 }
 
-function rebuildFixtures(s, widthFt, lengthFt) {
+function rebuildFixtures(s, widthFt, lengthFt, heightFt) {
   while (s.fixtureGroup.children.length) {
     var old = s.fixtureGroup.children[0];
     disposeFixtureInstance(old);
@@ -1942,6 +2649,7 @@ function rebuildFixtures(s, widthFt, lengthFt) {
   var toiletCount = 0;
   var placedKeys = {};
   var sel = selectedProducts();
+  var ctx = { heightFt: heightFt };
   layout.placements.forEach(function (p) {
     placedKeys[p.fixtureKey] = true;
     ensureFixtureModel(s, p.fixtureKey);
@@ -1951,9 +2659,10 @@ function rebuildFixtures(s, widthFt, lengthFt) {
     var archway = p.fixtureKey === "Door_Quantity" && p.hasDoor === false;
     var template = archway
       ? s.fixtureTemplates.Door_Quantity_Archway
-      : p.fixtureKey === "Toilet_Quantity"
-        ? s.toiletTemplates[state.selectedToiletStyle]
-        : productBody || s.fixtureTemplates[p.fixtureKey];
+      : productBody ||
+        (p.fixtureKey === "Toilet_Quantity"
+          ? s.toiletTemplates[state.selectedToiletStyle]
+          : s.fixtureTemplates[p.fixtureKey]);
     if (!template) return;
     if (p.fixtureKey === "Toilet_Quantity") toiletCount++;
     var footprint = Layout.FIXTURE_LAYOUT[p.fixtureKey];
@@ -1964,8 +2673,7 @@ function rebuildFixtures(s, widthFt, lengthFt) {
     // the vertical offset already baked into the template's meshes.
     var y = footprint && footprint.mount === "wall" ? p.y : 0;
     var instance = template.clone(true);
-    var ownsBody = p.fixtureKey === "Bathtub_Quantity" || p.fixtureKey === "Vanity_Quantity";
-    addProductParts(s, instance, p.fixtureKey, sel, !ownsBody || !!productBody);
+    addProductParts(s, instance, p, sel, !productOwnsBody(p.fixtureKey, sel) || !!productBody, ctx);
     instance.position.set(p.x, y, p.z);
     instance.rotation.y = p.rotationY;
     if (p.depthOffset) {
@@ -1979,8 +2687,11 @@ function rebuildFixtures(s, widthFt, lengthFt) {
     setShadowFlags(instance);
     s.fixtureGroup.add(instance);
   });
-  if (s.toiletStyleSwitch) s.toiletStyleSwitch.hidden = toiletCount === 0 || !!s.realModels.Toilet_Quantity;
-  syncProductSwitcher(s, layoutInput, placedKeys);
+  // The style switch only chooses between stand-ins: hidden once a real
+  // toilet (the default model or a Kohler pick) is showing.
+  if (s.toiletStyleSwitch)
+    s.toiletStyleSwitch.hidden = toiletCount === 0 || !!s.realModels.Toilet_Quantity || !!sel.toilet.url;
+  syncProductSwitcher(s, layoutInput, placedKeys, sel);
   syncCameraControls(s);
 }
 
@@ -2108,7 +2819,7 @@ function rebuild() {
   }
 
   rebuildFinishes(s);
-  rebuildFixtures(s, dims.widthFt, dims.lengthFt);
+  rebuildFixtures(s, dims.widthFt, dims.lengthFt, dims.heightFt);
   // Follows the room if it resizes while walking in, or if the layout's
   // entry-point placement shifted; a no-op re-pin when nothing moved.
   if (state.cameraMode === "walkin") applyCameraMode(s);

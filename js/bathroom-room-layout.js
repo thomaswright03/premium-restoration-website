@@ -511,7 +511,9 @@
     var showerDoorFootprint = FIXTURE_LAYOUT.Shower_Door_Quantity;
     var showerDoorCount = clamp(Math.floor(fixtureCounts.Shower_Door_Quantity || 0), 0, MAX_FIXTURE_COUNT);
     var placedShowers = placedByType.Shower_Quantity || [];
-    var showerFootprint = FIXTURE_LAYOUT.Shower_Quantity;
+    // The shower's own size, so a door follows a picked product's (see
+    // footprints above) to its open edge.
+    var showerFootprint = footprintFor("Shower_Quantity");
     for (var d = 0; d < showerDoorCount; d++) {
       var shower = placedShowers[d];
       if (!shower) {

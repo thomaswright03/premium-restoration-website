@@ -186,6 +186,16 @@ test("computeLayout: shower door pairs with the shower of the same index, extra 
   assert.equal(doors[0].z, shower.z);
 });
 
+test("computeLayout: a shower door sits at the open edge of a resized shower", () => {
+  var base = { widthFt: 10, lengthFt: 8, fixtureCounts: { Shower_Quantity: 1, Shower_Door_Quantity: 1 } };
+  var door = (layout) => layout.placements.filter((p) => p.fixtureKey === "Shower_Door_Quantity")[0];
+  assert.equal(door(L.computeLayout(base)).depthOffset, L.FIXTURE_LAYOUT.Shower_Quantity.depth);
+  var resized = L.computeLayout(
+    Object.assign({}, base, { footprints: { Shower_Quantity: { wallSpan: 5.05, depth: 2.7 } } }),
+  );
+  assert.equal(door(resized).depthOffset, 2.7);
+});
+
 test("computeLayout: extra showers with no matching door simply get none", () => {
   var result = L.computeLayout({
     widthFt: 12,

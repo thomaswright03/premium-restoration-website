@@ -64,7 +64,7 @@ test.describe("3D bathroom room preview", () => {
     await page.waitForFunction(() => window.BathroomRoom3D && window.BathroomRoom3D.available === true);
   });
 
-  test("Kohler product switcher shows a row per placed fixture and swaps the pick", async ({ page }) => {
+  test("Kohler product switcher shows a tab per placed fixture and swaps the pick", async ({ page }) => {
     // Loads the tub, vanity sink, faucet and valve models on top of the
     // usual scene — slow under CI's software WebGL, same as chat.spec.js's
     // full-estimate test.
@@ -78,19 +78,36 @@ test.describe("3D bathroom room preview", () => {
 
     const switcher = page.locator(".ai-chat-room-3d-products");
     await expect(switcher).toBeVisible();
-    for (const label of ["Tub", "Tub faucet", "Vanity sink", "Sink faucet", "Shower valve"]) {
-      await expect(switcher.getByRole("group", { name: label, exact: true })).toBeVisible();
+    const tabs = switcher.getByRole("group", { name: "Kohler products", exact: true });
+    for (const label of ["Tub", "Vanity", "Shower"]) {
+      await expect(tabs.getByRole("button", { name: label, exact: true })).toBeVisible();
     }
-    const tubs = switcher.getByRole("group", { name: "Tub", exact: true });
-    await expect(tubs.getByRole("button", { name: "Freestanding 60 in." })).toHaveAttribute("aria-pressed", "true");
-    await tubs.getByRole("button", { name: "Devonshire 60 in. alcove" }).click();
-    await expect(tubs.getByRole("button", { name: "Devonshire 60 in. alcove" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await expect(tubs.getByRole("button", { name: "Freestanding 60 in." })).toHaveAttribute("aria-pressed", "false");
+    // Fixtures that aren't placed get no tab.
+    await expect(tabs.getByRole("button", { name: "Toilet", exact: true })).toBeHidden();
+
+    await tabs.getByRole("button", { name: "Tub", exact: true }).click();
+    await expect(tabs.getByRole("button", { name: "Tub", exact: true })).toHaveAttribute("aria-pressed", "true");
+    for (const label of ["Tub faucet", "Tub valve", "Tub grab bar"]) {
+      await expect(switcher.getByLabel(label, { exact: true })).toBeVisible();
+    }
+    await expect(switcher.getByLabel("Shower base", { exact: true })).toBeHidden();
+    const tub = switcher.getByLabel("Tub", { exact: true });
+    await expect(tub).toHaveValue("freestanding");
+    await tub.selectOption("K-1184-0");
+    await expect(tub).toHaveValue("K-1184-0");
     const picks = await page.evaluate(() => window.BathroomRoom3D.getProductPicks());
     expect(picks.tub).toBe("K-1184-0");
+
+    // A 36 in. base only comes with the 96 in. wall kit: the 72 in. one is
+    // greyed out with the reason, and the walls show the 96 in. kit.
+    await tabs.getByRole("button", { name: "Shower", exact: true }).click();
+    await switcher.getByLabel("Shower base", { exact: true }).selectOption("K-9396-0");
+    const walls = switcher.getByLabel("Shower walls", { exact: true });
+    await expect(walls).toHaveValue("choreograph-96");
+    await expect(walls.locator('option[value="choreograph-72"]')).toBeDisabled();
+    await expect(walls.locator('option[value="choreograph-72"]')).toHaveText(
+      "Choreograph 72 in. walls (Not made for this base)",
+    );
   });
 
   test("off when bathroomVisualizer.enabled is false", async ({ page }) => {
