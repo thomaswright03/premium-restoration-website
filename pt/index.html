@@ -1,16 +1,17 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
+  <!-- i18n-source: 663628168a15 -->
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Premium Restoration | Bathroom Restoration</title>
-    <meta name="description" content="Premium Restoration — bathroom restoration, from demolition to finishing work." />
+    <title>Premium Restoration | Reforma de banheiros</title>
+    <meta name="description" content="Premium Restoration — reforma de banheiros, da demolição ao acabamento." />
     <!-- chrome:head -->
     <meta name="theme-color" content="#15130f" />
     <meta name="color-scheme" content="light dark" />
-    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="icon" href="favicon.ico" sizes="32x32" />
-    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="../favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
     <script>
       (function () {
         try {
@@ -25,7 +26,7 @@
     <link rel="alternate" hreflang="x-default" href="https://premium-restoration.vercel.app/index.html" />
     <script>
       (function () {
-        var here = "en";
+        var here = "pt";
         var pages = { en: "/index.html", es: "/es/index.html", pt: "/pt/index.html" };
         try {
           var chosen = /[?&]lang=(en|es|pt)\b/.exec(location.search);
@@ -50,7 +51,7 @@
         } catch (e) {}
       })();
     </script>
-    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="../css/style.css" />
     <!-- /chrome:head -->
     <!-- 3D bathroom room preview (index.html only — not part of the shared
          page chrome, see README "3D bathroom room preview"). The import map
@@ -61,20 +62,20 @@
     <script type="importmap">
       {
         "imports": {
-          "three": "./js/vendor/three/three.module.js",
-          "three/addons/": "./js/vendor/three/addons/"
+          "three": "../js/vendor/three/three.module.js",
+          "three/addons/": "../js/vendor/three/addons/"
         }
       }
     </script>
-    <link rel="modulepreload" href="js/vendor/three/three.module.js" />
-    <link rel="modulepreload" href="js/vendor/three/three.core.js" />
-    <link rel="modulepreload" href="js/vendor/three/addons/controls/OrbitControls.js" />
+    <link rel="modulepreload" href="../js/vendor/three/three.module.js" />
+    <link rel="modulepreload" href="../js/vendor/three/three.core.js" />
+    <link rel="modulepreload" href="../js/vendor/three/addons/controls/OrbitControls.js" />
   </head>
   <body>
     <!-- chrome:header -->
-    <a class="skip-link" href="#main">Skip to content</a>
+    <a class="skip-link" href="#main">Pular para o conteúdo</a>
     <header class="site-header">
-      <nav class="nav" aria-label="Main">
+      <nav class="nav" aria-label="Principal">
         <a href="index.html" class="nav-brand">Premium Restoration</a>
         <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
           <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
@@ -82,11 +83,11 @@
           </svg>
         </button>
         <ul class="nav-links" id="nav-links">
-          <li><a href="index.html" class="current" aria-current="page">Home</a></li>
-          <li><a href="index.html#pricing">How We Price</a></li>
-          <li><a href="about.html">About Us</a></li>
-          <li><a href="faq.html">FAQs</a></li>
-          <li><a href="contact.html" class="nav-cta">Get a Quote</a></li>
+          <li><a href="index.html" class="current" aria-current="page">Início</a></li>
+          <li><a href="index.html#pricing">Como cobramos</a></li>
+          <li><a href="about.html">Sobre nós</a></li>
+          <li><a href="faq.html">Dúvidas</a></li>
+          <li><a href="contact.html" class="nav-cta">Pedir orçamento</a></li>
           <li class="nav-lang">
             <details class="lang-menu">
               <summary>
@@ -99,17 +100,20 @@
                     stroke-width="1.6"
                   />
                 </svg>
-                <span class="visually-hidden">Language: </span>EN<span class="visually-hidden"> English</span>
+                <span class="visually-hidden">Idioma: </span>PT<span class="visually-hidden"> Português</span>
               </summary>
-              <ul class="lang-menu-list" aria-label="Language">
+              <ul class="lang-menu-list" aria-label="Idioma">
+                <li><a href="../index.html?lang=en" hreflang="en" lang="en" data-lang-choice="en">English</a></li>
+                <li><a href="../es/index.html?lang=es" hreflang="es" lang="es" data-lang-choice="es">Español</a></li>
                 <li>
-                  <a href="index.html?lang=en" hreflang="en" lang="en" data-lang-choice="en" aria-current="true"
-                    >English</a
+                  <a
+                    href="../pt/index.html?lang=pt"
+                    hreflang="pt-BR"
+                    lang="pt-BR"
+                    data-lang-choice="pt"
+                    aria-current="true"
+                    >Português</a
                   >
-                </li>
-                <li><a href="es/index.html?lang=es" hreflang="es" lang="es" data-lang-choice="es">Español</a></li>
-                <li>
-                  <a href="pt/index.html?lang=pt" hreflang="pt-BR" lang="pt-BR" data-lang-choice="pt">Português</a>
                 </li>
               </ul>
             </details>
@@ -122,27 +126,28 @@
     <main id="main">
       <section class="hero">
         <div class="hero-inner">
-          <p class="eyebrow center">Bathroom Restoration</p>
-          <h1>Restoring Bathrooms, <em>Renewing</em> Comfort</h1>
+          <p class="eyebrow center">Reforma de banheiros</p>
+          <h1>Reformando banheiros, <em>renovando</em> o conforto</h1>
           <p>
-            Premium Restoration focuses on one thing: bathroom restorations, from demolition through fixtures, tile, and
-            finishing work.
+            A Premium Restoration se dedica a uma coisa só: reforma de banheiros, da demolição às louças e metais, ao
+            revestimento cerâmico e ao acabamento.
           </p>
           <div class="hero-actions">
-            <a href="contact.html" class="btn btn-primary">Request a Quote</a>
-            <a href="#pricing" class="btn btn-outline">How We Price</a>
+            <a href="contact.html" class="btn btn-primary">Solicitar orçamento</a>
+            <a href="#pricing" class="btn btn-outline">Como cobramos</a>
           </div>
         </div>
       </section>
 
       <section class="ai-chat-section" aria-labelledby="ai-chat-title">
         <div class="ai-chat-header">
-          <p class="eyebrow center">Ask Us Anything</p>
-          <h2 class="section-title" id="ai-chat-title">Chat With Our Automated Assistant</h2>
+          <p class="eyebrow center">Pergunte o que quiser</p>
+          <h2 class="section-title" id="ai-chat-title">Converse com o nosso assistente automático</h2>
           <p class="section-subtitle">
-            Scripted replies, not a person and not AI. Nothing you type here is sent to us.
+            Respostas pré-programadas, não é uma pessoa nem uma IA. Nada do que você digita aqui é enviado para nós.
             <span data-show-if="priceEstimator.enabled" hidden
-              >Estimates are rough, non-binding labor figures — for a real quote, contact us directly.</span
+              >As estimativas são valores aproximados e não vinculantes de mão de obra — para um orçamento de verdade,
+              fale diretamente conosco.</span
             >
           </p>
         </div>
@@ -152,7 +157,7 @@
               <div
                 class="ai-chat-progress-track"
                 role="progressbar"
-                aria-label="Estimate progress"
+                aria-label="Progresso da estimativa"
                 aria-valuemin="0"
                 aria-valuemax="100"
                 aria-valuenow="0"
@@ -162,7 +167,7 @@
               </div>
               <span class="ai-chat-progress-label" id="ai-chat-progress-label"></span>
             </div>
-            <button type="button" id="ai-chat-close" class="ai-chat-close" aria-label="Close chat" hidden>
+            <button type="button" id="ai-chat-close" class="ai-chat-close" aria-label="Fechar chat" hidden>
               <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
                 <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
               </svg>
@@ -174,9 +179,9 @@
                 <div class="ai-chat-row-inner">
                   <div class="ai-chat-avatar" aria-hidden="true">PR</div>
                   <div class="ai-chat-text">
-                    Hi! I'm Remi, Premium Restoration's bathroom design assistant (automated, scripted replies — not a
-                    person). I'm here to help you visualize your dream bathroom renovation and bring your ideas to life.
-                    Let's get started!
+                    Olá! Eu sou o Remi, o assistente de projetos de banheiro da Premium Restoration (automático, com
+                    respostas pré-programadas — não sou uma pessoa). Estou aqui para ajudar você a visualizar a reforma
+                    do banheiro dos seus sonhos e tirar as suas ideias do papel. Vamos começar!
                   </div>
                 </div>
               </div>
@@ -184,31 +189,31 @@
                 <div class="ai-chat-row-inner">
                   <div class="ai-chat-avatar" aria-hidden="true">PR</div>
                   <button type="button" id="ai-chat-quote-starter" class="ai-chat-suggestion">
-                    Get a bathroom price estimate →
+                    Fazer uma estimativa de preço do banheiro →
                   </button>
                 </div>
               </div>
             </div>
             <div class="ai-chat-room-3d" id="ai-chat-room-3d" hidden>
               <p class="ai-chat-room-3d-disclosure">
-                A 3D preview built from what you've told us — not a rendering of your actual bathroom. Drag to look
-                around.
+                Uma prévia em 3D criada a partir do que você nos contou — não é uma imagem do seu banheiro real. Arraste
+                para olhar ao redor.
               </p>
               <div class="ai-chat-room-3d-canvas-wrap" id="ai-chat-room-3d-canvas-wrap"></div>
             </div>
           </div>
           <form class="ai-chat-input-bar" id="ai-chat-form">
             <div class="ai-chat-input-wrap">
-              <label for="ai-chat-input" class="visually-hidden">Message the automated assistant</label>
+              <label for="ai-chat-input" class="visually-hidden">Mensagem para o assistente automático</label>
               <input
                 type="text"
                 id="ai-chat-input"
-                placeholder="Ask about your bathroom…"
+                placeholder="Pergunte sobre o seu banheiro…"
                 autocomplete="off"
                 maxlength="300"
               />
             </div>
-            <button type="submit" class="ai-chat-send" id="ai-chat-send" aria-label="Send message">
+            <button type="submit" class="ai-chat-send" id="ai-chat-send" aria-label="Enviar mensagem">
               <svg
                 viewBox="0 0 24 24"
                 width="18"
@@ -230,79 +235,82 @@
       </section>
 
       <section class="section" aria-labelledby="services-title">
-        <p class="eyebrow center">What We Do</p>
-        <h2 class="section-title" id="services-title">Bathroom Restoration Services</h2>
+        <p class="eyebrow center">O que fazemos</p>
+        <h2 class="section-title" id="services-title">Serviços de reforma de banheiros</h2>
         <p class="section-subtitle">
-          Everything a bathroom restoration needs, from tearing out the old room to the finishing touches, priced per
-          item.
+          Tudo o que uma reforma de banheiro precisa, da retirada do banheiro antigo aos últimos acabamentos, com preço
+          por item.
         </p>
         <div class="grid">
           <div class="card">
             <span class="card-number">01</span>
-            <h3>Demolition &amp; Preparation</h3>
-            <p>Removing the old bathroom so the space is ready for new work.</p>
+            <h3>Demolição e preparação</h3>
+            <p>Retirada do banheiro antigo para deixar o espaço pronto para o novo serviço.</p>
           </div>
           <div class="card">
             <span class="card-number">02</span>
-            <h3>Fixtures &amp; Cabinets</h3>
-            <p>Installing toilets, sinks, showers, bathtubs, vanities, mirrors, doors, and cabinets.</p>
+            <h3>Louças, metais e armários</h3>
+            <p>
+              Instalação de vasos sanitários, pias, chuveiros, banheiras, gabinetes de pia, espelhos, portas e armários.
+            </p>
           </div>
           <div class="card">
             <span class="card-number">03</span>
-            <h3>Tile, Flooring &amp; Paint</h3>
-            <p>Wall and floor tile, bathroom flooring, and painting of walls and ceiling.</p>
+            <h3>Revestimento cerâmico, piso e pintura</h3>
+            <p>Revestimento cerâmico de paredes e chão, piso do banheiro e pintura de paredes e teto.</p>
           </div>
         </div>
         <aside class="scope-note" aria-labelledby="scope-note-title">
-          <h3 id="scope-note-title">Good to know before you ask for a price</h3>
+          <h3 id="scope-note-title">Bom saber antes de pedir um preço</h3>
           <ul>
-            <li>We currently take on bathroom restorations only.</li>
-            <li>We do not currently hold a contractor licence.</li>
+            <li>No momento, fazemos apenas reforma de banheiros.</li>
+            <li>No momento, não temos licença de empreiteiro.</li>
             <li>
-              Plumbing and electrical work is not included in our online estimates. Toilets, sinks, showers, and
-              bathtubs also need plumbing work, which costs extra. If your project needs any plumbing or electrical
-              work, it will add to the cost, and we'll tell you who will do it and how it will be priced before any work
-              is agreed.
+              Encanamento e serviço elétrico não estão incluídos nas nossas estimativas online. Vasos sanitários, pias,
+              chuveiros e banheiras também exigem serviço de encanamento, que é cobrado à parte. Se o seu projeto
+              precisar de encanamento ou serviço elétrico, o custo vai aumentar, e antes de qualquer serviço ser
+              combinado diremos a você quem vai fazê-lo e como ele será cobrado.
             </li>
           </ul>
         </aside>
       </section>
 
       <section class="section section-dark" id="pricing" aria-labelledby="pricing-title">
-        <p class="eyebrow center">How We Price</p>
-        <h2 class="section-title" id="pricing-title">Straightforward Labor Pricing</h2>
+        <p class="eyebrow center">Como cobramos</p>
+        <h2 class="section-title" id="pricing-title">Preços de mão de obra sem complicação</h2>
         <p class="section-subtitle">
-          Our labor prices are simple per-item rates. Materials, permits, and any applicable taxes are separate.
+          Os nossos preços de mão de obra são valores simples por item. Materiais, alvarás e eventuais impostos
+          aplicáveis são cobrados à parte.
         </p>
         <div class="grid">
           <div class="card">
             <span class="card-number">01</span>
-            <h3><span data-price="Cabinet_Price">$60</span> per Cabinet</h3>
-            <p>Labor to install each bathroom cabinet.</p>
+            <h3><span data-price="Cabinet_Price">US$ 60</span> por armário</h3>
+            <p>Mão de obra para instalar cada armário do banheiro.</p>
           </div>
           <div class="card">
             <span class="card-number">02</span>
-            <h3><span data-price="Floor_Price_Per_SqFt">$5</span> per Sq Ft of Flooring</h3>
-            <p>Labor for bathroom flooring, measured by the floor area of the room.</p>
+            <h3><span data-price="Floor_Price_Per_SqFt">US$ 5</span> por pé quadrado de piso</h3>
+            <p>Mão de obra para o piso do banheiro, medida pela área do chão do cômodo.</p>
           </div>
           <div class="card">
             <span class="card-number">03</span>
-            <h3>Written Price First</h3>
+            <h3>Preço por escrito antes de tudo</h3>
             <p>
-              Online estimates are rough and non-binding, and list the assumptions they're based on. Your actual price
-              is set in a written agreement after we see the job.
+              As estimativas online são aproximadas e não vinculantes, e listam as premissas em que se baseiam. O seu
+              preço real é definido em um acordo por escrito depois que virmos o serviço.
             </p>
           </div>
         </div>
       </section>
 
       <section class="cta-band">
-        <p class="eyebrow center">Get Started</p>
-        <h2 class="section-title">Ready to Restore Your Bathroom?</h2>
+        <p class="eyebrow center">Comece agora</p>
+        <h2 class="section-title">Pronto para reformar o seu banheiro?</h2>
         <p class="section-subtitle">
-          Tell us about your bathroom project, and we'll reply once we receive your request.
+          Conte sobre o projeto do seu banheiro, e responderemos assim que recebermos a sua solicitação.
         </p>
-        <a href="contact.html" class="btn btn-primary">Get Started</a>
+        <a href="contact.html" class="btn btn-primary">Começar</a>
       </section>
     </main>
 
@@ -311,64 +319,64 @@
       <div class="footer-grid">
         <div class="footer-col">
           <p class="footer-brand">Premium Restoration</p>
-          <p class="footer-tagline">Bathroom restoration services.</p>
+          <p class="footer-tagline">Serviços de reforma de banheiros.</p>
           <p class="footer-identity">
-            Operated by
+            Operado por
             <span data-show-if="owner.legalName" hidden><span data-fill="owner.legalName"></span>,</span>
-            an individual<br />
-            (not a registered company)
+            uma pessoa física<br />
+            (não é uma empresa registrada)
             <span data-show-if="owner.contactAddress" hidden><br /><span data-fill="owner.contactAddress"></span></span>
             <!-- There is currently no contractor licence. Add a licence line here only once a licence is
              actually issued, as <br />Contractor License # [CONTRACTOR LICENSE #] ([LICENSE CLASSIFICATION]) -->
           </p>
         </div>
         <div class="footer-col">
-          <h2 class="footer-heading">Explore</h2>
-          <a href="index.html">Home</a>
-          <a href="index.html#pricing">How We Price</a>
-          <a href="about.html">About Us</a>
-          <a href="faq.html">FAQs</a>
-          <a href="contact.html">Get a Quote</a>
+          <h2 class="footer-heading">Navegar</h2>
+          <a href="index.html">Início</a>
+          <a href="index.html#pricing">Como cobramos</a>
+          <a href="about.html">Sobre nós</a>
+          <a href="faq.html">Perguntas frequentes</a>
+          <a href="contact.html">Pedir orçamento</a>
         </div>
         <div class="footer-col">
-          <h2 class="footer-heading">Contact</h2>
+          <h2 class="footer-heading">Contato</h2>
           <a href="tel:+13853568733">(385) 356-8733</a>
           <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
         </div>
         <div class="footer-col">
-          <h2 class="footer-heading">Legal</h2>
-          <a href="privacy.html">Privacy Notice</a>
-          <a href="terms.html">Terms of Use</a>
-          <a href="privacy.html#your-rights">Access or Delete My Data</a>
+          <h2 class="footer-heading">Informações legais</h2>
+          <a href="privacy.html">Aviso de Privacidade</a>
+          <a href="terms.html">Termos de Uso</a>
+          <a href="privacy.html#your-rights">Acessar ou excluir meus dados</a>
         </div>
       </div>
       <div class="footer-bottom">
         <p class="footer-copy">
           &copy; <span data-year>2026</span> Premium Restoration<span data-show-if="owner.legalName" hidden
-            >, operated by <span data-fill="owner.legalName"></span></span
+            >, operado por <span data-fill="owner.legalName"></span></span
           >.
         </p>
-        <div class="theme-switch" role="group" aria-label="Colour theme">
-          <span class="theme-switch-label" aria-hidden="true">Theme</span>
-          <button type="button" data-theme-choice="system" aria-pressed="true">System</button>
-          <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
-          <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+        <div class="theme-switch" role="group" aria-label="Tema de cores">
+          <span class="theme-switch-label" aria-hidden="true">Tema</span>
+          <button type="button" data-theme-choice="system" aria-pressed="true">Sistema</button>
+          <button type="button" data-theme-choice="light" aria-pressed="false">Claro</button>
+          <button type="button" data-theme-choice="dark" aria-pressed="false">Escuro</button>
         </div>
       </div>
     </footer>
     <!-- /chrome:footer -->
 
-    <script src="js/i18n.js"></script>
+    <script src="../js/i18n.js"></script>
 
-    <script src="js/bathroom-pricing.js"></script>
-    <script src="js/materials-pricing.js"></script>
-    <script src="js/bathroom-room-layout.js"></script>
-    <script src="js/surface-finishes.js"></script>
-    <script src="js/chat-replies.js"></script>
-    <script src="js/site-config.js"></script>
-    <script src="js/theme.js"></script>
-    <script src="js/estimate-pdf.js"></script>
-    <script src="js/script.js"></script>
-    <script type="module" src="js/bathroom-room-3d.js"></script>
+    <script src="../js/bathroom-pricing.js"></script>
+    <script src="../js/materials-pricing.js"></script>
+    <script src="../js/bathroom-room-layout.js"></script>
+    <script src="../js/surface-finishes.js"></script>
+    <script src="../js/chat-replies.js"></script>
+    <script src="../js/site-config.js"></script>
+    <script src="../js/theme.js"></script>
+    <script src="../js/estimate-pdf.js"></script>
+    <script src="../js/script.js"></script>
+    <script type="module" src="../js/bathroom-room-3d.js"></script>
   </body>
 </html>

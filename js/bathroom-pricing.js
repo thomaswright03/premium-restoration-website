@@ -13,19 +13,35 @@
 //
 // Labor only. Materials, permits, and profit margin are never included.
 //
+// Text is in the page's language (js/i18n.js); labels below are read
+// through getters so they always follow it.
+//
 // Loads as a plain browser script (window.BathroomPricing) and as a Node
 // module (for the unit tests).
 
 (function (root, factory) {
   "use strict";
-  var api = factory();
+  var api = factory(root.I18n || (typeof require === "function" ? require("./i18n.js") : null));
   if (typeof module === "object" && module.exports) {
     module.exports = api;
   } else {
     root.BathroomPricing = api;
   }
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+})(typeof globalThis !== "undefined" ? globalThis : this, function (I18n) {
   "use strict";
+
+  var T = I18n.t;
+
+  // obj[prop] reads the translation of `key` in the page's language.
+  function translated(obj, prop, key) {
+    Object.defineProperty(obj, prop, {
+      enumerable: true,
+      get: function () {
+        return T(key);
+      },
+    });
+    return obj;
+  }
 
   var RATES_KEY = "pr_business_rates";
 
@@ -113,61 +129,66 @@
   // needsPlumbing: installing it also needs plumbing work (priced per point
   // in the admin tool, never priced publicly).
   var FIXTURES = [
-    { key: "Toilet_Quantity", label: "Toilet", plural: "Toilets", priceKey: "Toilet_Price", needsPlumbing: true },
-    { key: "Sink_Quantity", label: "Sink", plural: "Sinks", priceKey: "Sink_Price", needsPlumbing: true },
-    { key: "Bathtub_Quantity", label: "Bathtub", plural: "Bathtubs", derivedPrice: bathtubPrice, needsPlumbing: true },
-    { key: "Shower_Quantity", label: "Shower", plural: "Showers", priceKey: "Shower_Price", needsPlumbing: true },
-    { key: "Shower_Door_Quantity", label: "Shower door", plural: "Shower doors", priceKey: "Shower_Door_Price" },
-    { key: "Door_Quantity", label: "Entry door", plural: "Entry doors", priceKey: "Door_Price" },
-    { key: "Vanity_Quantity", label: "Vanity", plural: "Vanities", priceKey: "Vanity_Price" },
-    { key: "Cabinet_Quantity", label: "Cabinet", plural: "Cabinets", priceKey: "Cabinet_Price" },
-    { key: "Mirror_Quantity", label: "Mirror (standard)", plural: "Standard mirrors", priceKey: "Mirror_Price" },
-    { key: "Mirror_Huge_Quantity", label: "Mirror (huge)", plural: "Huge mirrors", priceKey: "Mirror_Huge_Price" },
-    {
-      key: "Shower_Shelf_Quantity",
-      label: "Shower shelf",
-      plural: "Shower shelves",
-      priceKey: "Shower_Shelf_Price",
-    },
+    { key: "Toilet_Quantity", priceKey: "Toilet_Price", needsPlumbing: true },
+    { key: "Sink_Quantity", priceKey: "Sink_Price", needsPlumbing: true },
+    { key: "Bathtub_Quantity", derivedPrice: bathtubPrice, needsPlumbing: true },
+    { key: "Shower_Quantity", priceKey: "Shower_Price", needsPlumbing: true },
+    { key: "Shower_Door_Quantity", priceKey: "Shower_Door_Price" },
+    { key: "Door_Quantity", priceKey: "Door_Price" },
+    { key: "Vanity_Quantity", priceKey: "Vanity_Price" },
+    { key: "Cabinet_Quantity", priceKey: "Cabinet_Price" },
+    { key: "Mirror_Quantity", priceKey: "Mirror_Price" },
+    { key: "Mirror_Huge_Quantity", priceKey: "Mirror_Huge_Price" },
+    { key: "Shower_Shelf_Quantity", priceKey: "Shower_Shelf_Price" },
   ];
+  // label: "Toilet", plural: "Toilets" (and their translations).
+  FIXTURES.forEach(function (f) {
+    translated(f, "label", "fixture." + f.key);
+    translated(f, "plural", "fixtures." + f.key);
+  });
 
-  var YES_NO = [
-    { value: true, label: "Yes" },
-    { value: false, label: "No" },
-  ];
+  function option(value, key) {
+    return translated({ value: value }, "label", key);
+  }
+
+  var YES_NO = [option(true, "choice.yes"), option(false, "choice.no")];
 
   // The work questions, asked the same way in the public chat and the admin
   // quote. Nothing is pre-selected; every question must be answered.
   var SCOPE_QUESTIONS = [
-    { key: "demolition", label: "Remove the existing bathroom first (demolition)?", options: YES_NO },
+    { key: "demolition", options: YES_NO },
     {
       key: "floorFinish",
-      label: "New floor?",
       options: [
-        { value: "tile", label: "Tile" },
-        { value: "flooring", label: "Other flooring" },
-        { value: "none", label: "None" },
+        option("tile", "choice.floor.tile"),
+        option("flooring", "choice.floor.flooring"),
+        option("none", "choice.none"),
       ],
     },
     {
       // One choice per wall surface, so the same walls can never be charged
       // for both tile and paint.
       key: "walls",
-      label: "Walls?",
       options: [
-        { value: "tile", label: "Tile (full height)" },
-        { value: "paint", label: "Paint" },
-        { value: "none", label: "Neither" },
+        option("tile", "choice.walls.tile"),
+        option("paint", "choice.walls.paint"),
+        option("none", "choice.neither"),
       ],
     },
-    { key: "paintCeiling", label: "Paint the ceiling?", options: YES_NO },
+    { key: "paintCeiling", options: YES_NO },
   ];
+  SCOPE_QUESTIONS.forEach(function (q) {
+    translated(q, "label", "question." + q.key);
+  });
 
   var DIMENSIONS = [
-    { key: "Bathroom_Width_Ft", label: "Width", max: 50 },
-    { key: "Bathroom_Length_Ft", label: "Length", max: 50 },
-    { key: "Bathroom_Height_Ft", label: "Ceiling height", max: 20 },
+    { key: "Bathroom_Width_Ft", max: 50 },
+    { key: "Bathroom_Length_Ft", max: 50 },
+    { key: "Bathroom_Height_Ft", max: 20 },
   ];
+  DIMENSIONS.forEach(function (d) {
+    translated(d, "label", "dimension." + d.key);
+  });
 
   var MAX_FIXTURE_COUNT = 20;
   var MAX_ELECTRICAL_POINTS = 50;
@@ -176,19 +197,28 @@
     return Math.round((Number(n) || 0) * 100) / 100;
   }
 
-  function money(value) {
+  // US dollars, written the way the page's language writes numbers
+  // ($1,234.50 in English and Spanish, US$ 1.234,50 in Portuguese).
+  // locale: optional, e.g. "pt-BR"; default: the page's language.
+  function money(value, locale) {
     var n = Number(value) || 0;
-    return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return formatUsd(n, 2, locale || I18n.locale());
   }
 
   // Whole dollars when there are no cents ($60), otherwise cents ($1.79).
-  function shortMoney(value) {
+  function shortMoney(value, locale) {
     var n = Number(value) || 0;
-    return n % 1 === 0 ? "$" + n.toLocaleString("en-US") : money(n);
+    return n % 1 === 0 ? formatUsd(n, 0, locale || I18n.locale()) : money(n, locale);
   }
 
-  function formatQty(n) {
-    return (Number(n) || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  function formatUsd(n, digits, locale) {
+    var opts = { minimumFractionDigits: digits, maximumFractionDigits: digits };
+    if (locale === "en-US") return (n < 0 ? "-$" : "$") + Math.abs(n).toLocaleString("en-US", opts);
+    return n.toLocaleString(locale, Object.assign({ style: "currency", currency: "USD" }, opts));
+  }
+
+  function formatQty(n, locale) {
+    return (Number(n) || 0).toLocaleString(locale || I18n.locale(), { maximumFractionDigits: 2 });
   }
 
   // Parses a form value. Returns null for blank, NaN for anything that
@@ -273,23 +303,19 @@
       var answered = q.options.some(function (o) {
         return o.value === scope[q.key];
       });
-      if (!answered) errors[q.key] = "Choose an answer.";
+      if (!answered) errors[q.key] = T("error.chooseAnswer");
     });
 
     var needs = scopeNeeds(scope);
     DIMENSIONS.forEach(function (d) {
       var required = d.key === "Bathroom_Height_Ft" ? needs.height : needs.floorArea;
       var n = parseNumber(values[d.key]);
-      var range = "more than 0 and no more than " + d.max + " ft";
       if (n === null) {
-        if (required) {
-          errors[d.key] =
-            "Enter the " + d.label.toLowerCase() + " in feet (" + range + ") — the work you chose is priced by area.";
-        }
+        if (required) errors[d.key] = T("error.dimension.missing." + d.key, { max: d.max });
         return;
       }
       if (isNaN(n) || n <= 0 || n > d.max) {
-        errors[d.key] = d.label + " must be " + range + ".";
+        errors[d.key] = T("error.dimension.range", { label: d.label, max: d.max });
       }
     });
 
@@ -297,7 +323,7 @@
       var n = parseNumber(values[f.key]);
       if (n === null) return;
       if (isNaN(n) || n < 0 || n > MAX_FIXTURE_COUNT || Math.floor(n) !== n) {
-        errors[f.key] = "Enter a whole number from 0 to " + MAX_FIXTURE_COUNT + ".";
+        errors[f.key] = T("error.wholeNumber", { max: MAX_FIXTURE_COUNT });
       }
     });
 
@@ -307,7 +333,7 @@
         points !== null &&
         (isNaN(points) || points < 0 || points > MAX_ELECTRICAL_POINTS || Math.floor(points) !== points)
       ) {
-        errors.Electrical_Points = "Enter a whole number from 0 to " + MAX_ELECTRICAL_POINTS + ".";
+        errors.Electrical_Points = T("error.wholeNumber", { max: MAX_ELECTRICAL_POINTS });
       }
     }
 
@@ -346,7 +372,7 @@
         unit: unit,
         rate: rate,
         cost: cost,
-        detail: formatQty(qty) + " " + unit + " × " + money(rate),
+        detail: T("line.detail", { qty: formatQty(qty), unit: unit, rate: money(rate) }),
       });
     }
 
@@ -358,59 +384,76 @@
         section: section,
         label: label,
         qty: 1,
-        unit: "flat",
+        unit: T("unit.flat"),
         rate: rate,
         cost: roundCents(rate),
-        detail: "Flat charge",
+        detail: T("line.flatCharge"),
       });
     }
 
     if (scope.demolition === true) {
-      addLine("demolition", "Preparation", "Demolition", a.floorSqFt, "sq ft of floor", prices.Demo_Price_Per_SqFt);
+      addLine(
+        "demolition",
+        T("section.preparation"),
+        T("line.demolition"),
+        a.floorSqFt,
+        T("unit.sqftFloor"),
+        prices.Demo_Price_Per_SqFt,
+      );
     }
 
     FIXTURES.forEach(function (f) {
       var qty = parseNumber(values[f.key]) || 0;
-      addLine(f.key, "Fixtures", f.plural, qty, qty === 1 ? "unit" : "units", fixtureRate(f, prices));
+      addLine(
+        f.key,
+        T("section.fixtures"),
+        f.plural,
+        qty,
+        T(qty === 1 ? "unit.unit" : "unit.units"),
+        fixtureRate(f, prices),
+      );
     });
 
+    var surfaces = T("section.surfaces");
+    var sqft = T("unit.sqft");
     if (scope.floorFinish === "tile") {
-      addLine("floorTile", "Surfaces", "Floor tile", a.floorSqFt, "sq ft", prices.Tile_Price_Per_SqFt);
+      addLine("floorTile", surfaces, T("line.floorTile"), a.floorSqFt, sqft, prices.Tile_Price_Per_SqFt);
     } else if (scope.floorFinish === "flooring") {
-      addLine("flooring", "Surfaces", "Flooring", a.floorSqFt, "sq ft", prices.Floor_Price_Per_SqFt);
+      addLine("flooring", surfaces, T("line.flooring"), a.floorSqFt, sqft, prices.Floor_Price_Per_SqFt);
     }
     if (scope.walls === "tile") {
-      addLine("wallTile", "Surfaces", "Wall tile (full height)", a.wallSqFt, "sq ft", prices.Tile_Price_Per_SqFt);
+      addLine("wallTile", surfaces, T("line.wallTile"), a.wallSqFt, sqft, prices.Tile_Price_Per_SqFt);
     } else if (scope.walls === "paint") {
-      addLine("wallPaint", "Surfaces", "Painting (walls)", a.wallSqFt, "sq ft", prices.Painting_Price_Per_SqFt);
+      addLine("wallPaint", surfaces, T("line.wallPaint"), a.wallSqFt, sqft, prices.Painting_Price_Per_SqFt);
     }
     if (scope.paintCeiling === true) {
-      addLine("ceilingPaint", "Surfaces", "Painting (ceiling)", a.floorSqFt, "sq ft", prices.Painting_Price_Per_SqFt);
+      addLine("ceilingPaint", surfaces, T("line.ceilingPaint"), a.floorSqFt, sqft, prices.Painting_Price_Per_SqFt);
     }
 
     var fixtureCount = plumbingFixtureCount(values);
     if (options.includeTrade) {
+      var plumbing = T("section.plumbing");
       addLine(
         "plumbing",
-        "Plumbing",
-        "Plumbing points",
+        plumbing,
+        T("line.plumbingPoints"),
         fixtureCount,
-        fixtureCount === 1 ? "point" : "points",
+        T(fixtureCount === 1 ? "unit.point" : "unit.points"),
         prices.Plumbing_Price_Per_Point,
       );
       if (values.No_Stack_Surcharge_Included === true) {
-        addFlat("noStack", "Plumbing", "No existing plumbing stack", prices.No_Stack_Surcharge_Price);
+        addFlat("noStack", plumbing, T("line.noStack"), prices.No_Stack_Surcharge_Price);
       }
       if (values.Bad_Valve_Surcharge_Included === true) {
-        addFlat("badValve", "Plumbing", "Bad valve replacement", prices.Bad_Valve_Surcharge_Price);
+        addFlat("badValve", plumbing, T("line.badValve"), prices.Bad_Valve_Surcharge_Price);
       }
       var points = parseNumber(values.Electrical_Points) || 0;
       addLine(
         "electrical",
-        "Electrical",
-        "Electrical points",
+        T("section.electrical"),
+        T("line.electricalPoints"),
         points,
-        points === 1 ? "point" : "points",
+        T(points === 1 ? "unit.point" : "unit.points"),
         prices.Electrical_Price_Per_Point,
       );
     }
@@ -449,23 +492,19 @@
           return o.value === value;
         })[0]
       : null;
-    return opt ? opt.label : "Not answered";
+    return opt ? opt.label : T("choice.notAnswered");
   }
 
   // One line describing the chosen work, e.g. "Demolition: No; new floor:
   // Other flooring; walls: Neither; paint ceiling: No".
   function describeScope(scope) {
     scope = scope || {};
-    return (
-      "Demolition: " +
-      optionLabel("demolition", scope.demolition) +
-      "; new floor: " +
-      optionLabel("floorFinish", scope.floorFinish) +
-      "; walls: " +
-      optionLabel("walls", scope.walls) +
-      "; paint ceiling: " +
-      optionLabel("paintCeiling", scope.paintCeiling)
-    );
+    return T("scope.describe", {
+      demolition: optionLabel("demolition", scope.demolition),
+      floor: optionLabel("floorFinish", scope.floorFinish),
+      walls: optionLabel("walls", scope.walls),
+      ceiling: optionLabel("paintCeiling", scope.paintCeiling),
+    });
   }
 
   // Plain-text list of what an estimate assumed (estimate card and PDFs).
@@ -474,61 +513,41 @@
     var w = formatQty(parseNumber(values.Bathroom_Width_Ft) || 0);
     var l = formatQty(parseNumber(values.Bathroom_Length_Ft) || 0);
     var h = formatQty(parseNumber(values.Bathroom_Height_Ft) || 0);
-    var list = [describeScope(scope) + ". Only this work is priced."];
+    var list = [T("assume.scope", { scope: describeScope(scope) })];
     if (needs.floorArea) {
-      list.push(
-        "Floor area: " +
-          w +
-          " × " +
-          l +
-          " ft = " +
-          formatQty(result.floorSqFt) +
-          " sq ft (the ceiling is taken to be the same size).",
-      );
+      list.push(T("assume.floorArea", { w: w, l: l, area: formatQty(result.floorSqFt) }));
     }
     if (needs.height) {
-      list.push(
-        "Wall area: 2 × " +
-          h +
-          " ft × (" +
-          w +
-          " + " +
-          l +
-          " ft) = " +
-          formatQty(result.wallSqFt) +
-          " sq ft — all four walls, full height, with no deduction for doors, windows, or a tub/shower.",
-      );
+      list.push(T("assume.wallArea", { w: w, l: l, h: h, area: formatQty(result.wallSqFt) }));
     }
-    list.push("Fixtures are priced per item at our current labor rates, which may change.");
+    list.push(T("assume.fixtures"));
     return list;
   }
 
   // Readable, editable summary of a public estimate, used to pre-fill the
   // Contact form's project details.
   function buildEstimateSummary(values, scope, result) {
-    var out = ["My bathroom estimate from your website:"];
+    var out = [T("summary.title")];
     var needs = scopeNeeds(scope);
     if (needs.floorArea) {
-      var dims =
-        formatQty(parseNumber(values.Bathroom_Width_Ft)) +
-        " ft wide × " +
-        formatQty(parseNumber(values.Bathroom_Length_Ft)) +
-        " ft long";
-      if (needs.height) dims += " × " + formatQty(parseNumber(values.Bathroom_Height_Ft)) + " ft high";
-      out.push("- Room: " + dims);
+      var size = {
+        w: formatQty(parseNumber(values.Bathroom_Width_Ft)),
+        l: formatQty(parseNumber(values.Bathroom_Length_Ft)),
+        h: formatQty(parseNumber(values.Bathroom_Height_Ft)),
+      };
+      out.push(T("summary.room", { size: T(needs.height ? "summary.size3" : "summary.size2", size) }));
     }
-    out.push("- Work: " + describeScope(scope));
+    out.push(T("summary.work", { scope: describeScope(scope) }));
     var counts = FIXTURES.filter(function (f) {
       return (parseNumber(values[f.key]) || 0) > 0;
     }).map(function (f) {
       return f.plural + " " + formatQty(parseNumber(values[f.key]));
     });
-    out.push("- Fixtures: " + (counts.length ? counts.join(", ") : "none"));
+    out.push(T("summary.fixtures", { list: counts.length ? counts.join(", ") : T("summary.none") }));
     out.push(
-      "- Estimated labor total: " +
-        money(result.subtotal) +
-        (result.plumbingFixtureCount > 0 ? " (before plumbing)" : "") +
-        " — rough and non-binding; excludes plumbing, electrical, materials, permits and taxes.",
+      T(result.plumbingFixtureCount > 0 ? "summary.totalBeforePlumbing" : "summary.total", {
+        total: money(result.subtotal),
+      }),
     );
     return out.join("\n");
   }

@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="es">
+  <!-- i18n-source: cf66faea8b9d -->
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Términos de uso | Premium Restoration</title>
+    <meta
+      name="description"
+      content="Términos de uso del sitio web de Premium Restoration, incluido cómo funcionan las estimaciones en línea."
+    />
+    <!-- chrome:head -->
+    <meta name="theme-color" content="#15130f" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="../favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("pr_theme");
+          if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="alternate" hreflang="en" href="https://premium-restoration.vercel.app/terms.html" />
+    <link rel="alternate" hreflang="es" href="https://premium-restoration.vercel.app/es/terms.html" />
+    <link rel="alternate" hreflang="pt-BR" href="https://premium-restoration.vercel.app/pt/terms.html" />
+    <link rel="alternate" hreflang="x-default" href="https://premium-restoration.vercel.app/terms.html" />
+    <script>
+      (function () {
+        var here = "es";
+        var pages = { en: "/terms.html", es: "/es/terms.html", pt: "/pt/terms.html" };
+        try {
+          var chosen = /[?&]lang=(en|es|pt)\b/.exec(location.search);
+          if (chosen) {
+            localStorage.setItem("pr_lang", chosen[1]);
+            var rest = location.search.replace(/([?&])lang=[a-z]+&?/, "$1").replace(/[?&]$/, "");
+            history.replaceState(null, "", location.pathname + rest + location.hash);
+            return;
+          }
+          var want = localStorage.getItem("pr_lang");
+          if (!want && here === "en") {
+            var prefs = navigator.languages || [navigator.language || ""];
+            for (var i = 0; i < prefs.length; i++) {
+              var code = String(prefs[i]).slice(0, 2).toLowerCase();
+              if (code === "en" || code === "es" || code === "pt") {
+                want = code;
+                break;
+              }
+            }
+          }
+          if (want && want !== here && pages[want]) location.replace(pages[want] + location.search + location.hash);
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="../css/style.css" />
+    <!-- /chrome:head -->
+  </head>
+  <body>
+    <!-- chrome:header -->
+    <a class="skip-link" href="#main">Saltar al contenido</a>
+    <header class="site-header">
+      <nav class="nav" aria-label="Principal">
+        <a href="index.html" class="nav-brand">Premium Restoration</a>
+        <button class="nav-toggle" type="button" aria-label="Menú" aria-expanded="false" aria-controls="nav-links">
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+            <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <ul class="nav-links" id="nav-links">
+          <li><a href="index.html">Inicio</a></li>
+          <li><a href="index.html#pricing">Cómo cobramos</a></li>
+          <li><a href="about.html">Quiénes somos</a></li>
+          <li><a href="faq.html">Preguntas</a></li>
+          <li><a href="contact.html" class="nav-cta">Pedir cotización</a></li>
+          <li class="nav-lang">
+            <details class="lang-menu">
+              <summary>
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6" />
+                  <path
+                    d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                  />
+                </svg>
+                <span class="visually-hidden">Idioma: </span>ES<span class="visually-hidden"> Español</span>
+              </summary>
+              <ul class="lang-menu-list" aria-label="Idioma">
+                <li><a href="../terms.html?lang=en" hreflang="en" lang="en" data-lang-choice="en">English</a></li>
+                <li>
+                  <a href="../es/terms.html?lang=es" hreflang="es" lang="es" data-lang-choice="es" aria-current="true"
+                    >Español</a
+                  >
+                </li>
+                <li>
+                  <a href="../pt/terms.html?lang=pt" hreflang="pt-BR" lang="pt-BR" data-lang-choice="pt">Português</a>
+                </li>
+              </ul>
+            </details>
+          </li>
+        </ul>
+      </nav>
+    </header>
+    <!-- /chrome:header -->
+
+    <main id="main">
+      <section class="hero hero-page">
+        <div class="hero-inner">
+          <p class="eyebrow center">La letra pequeña</p>
+          <h1>Términos de <em>uso</em></h1>
+          <p>Cómo funcionan este sitio web, nuestras estimaciones en línea y nuestros precios publicados.</p>
+        </div>
+      </section>
+
+      <section class="section legal-content">
+        <p class="legal-updated">Última actualización: 24 de septiembre de 2026</p>
+
+        <h2>Acerca de estos términos</h2>
+        <p>
+          Estos términos se aplican a su uso de este sitio web. El sitio web y el negocio Premium Restoration están a
+          cargo de una sola persona, su propietario<span data-show-if="owner.legalName" hidden
+            >, <span data-fill="owner.legalName"></span></span
+          >.<span data-show-if="owner.contactAddress" hidden>
+            Nuestra dirección de contacto es <span data-fill="owner.contactAddress"></span>.</span
+          >
+          Premium Restoration es actualmente un negocio no registrado: no es una compañía, LLC ni otra entidad
+          registrada, y no tiene un nombre comercial registrado ni una dirección registrada.<!-- There is currently no contractor licence. Add " Contractor License # [CONTRACTOR LICENSE #] ([LICENSE CLASSIFICATION])." here only once a licence is actually issued. -->
+          Estos términos explican cómo funcionan el sitio web, nuestras estimaciones en línea y nuestros precios
+          publicados. No constituyen un contrato para ningún trabajo: los términos de cualquier trabajo que hagamos para
+          usted se establecen en su acuerdo por escrito con nosotros. Nuestro
+          <a href="privacy.html">Aviso de privacidad</a> explica cómo manejamos la información personal. Esta traducción
+          se ofrece para su comodidad. Si hay alguna diferencia con la versión en inglés, prevalece la versión en
+          inglés.
+        </p>
+
+        <h2>Nuestros servicios</h2>
+        <p>
+          Actualmente solo aceptamos trabajos de remodelación de baños. La información de este sitio web es general y no
+          es una promesa de que podamos aceptar un trabajo en particular. Las estimaciones en línea no incluyen trabajos
+          de plomería ni de electricidad. La instalación de inodoros, lavabos, duchas o bañeras también requiere trabajo
+          de plomería, así que si su proyecto los incluye, o requiere cualquier otro trabajo de plomería o de
+          electricidad, el costo será mayor que la estimación en línea. Actualmente no tenemos licencia de contratista.
+          Antes de acordar cualquier trabajo, le diremos quién hará los trabajos de plomería y de electricidad, cómo se
+          cobrarán y si su trabajo requiere algún permiso.
+        </p>
+
+        <h2>Precios y estimaciones en línea</h2>
+        <ul>
+          <li>
+            Nuestros precios de mano de obra publicados incluyen <span data-price="Cabinet_Price">$60</span> por
+            gabinete y <span data-price="Floor_Price_Per_SqFt">$5</span> por pie cuadrado de piso de baño. Los precios
+            pueden cambiar; el precio que se aplica a su trabajo es el que figura en su acuerdo por escrito con
+            nosotros.
+          </li>
+          <li>
+            Las estimaciones del asistente de chat de nuestra página de inicio, incluido cualquier PDF que usted
+            exporte, son automatizadas, aproximadas y no vinculantes. Cubren solo la mano de obra y se basan únicamente
+            en las medidas, cantidades y opciones que usted ingresa, junto con los supuestos indicados con cada
+            estimación. Excluyen los trabajos de plomería y de electricidad (incluida la plomería necesaria para
+            cualquier inodoro, lavabo, ducha o bañera que usted indique), los materiales, los permisos y cualquier
+            impuesto aplicable, todo lo cual aumentará el costo cuando su trabajo lo requiera.
+          </li>
+          <li>
+            Una estimación en línea no es una cotización, una oferta ni un contrato. Su precio real se establece
+            únicamente en un acuerdo por escrito después de que hayamos revisado su proyecto en persona.
+          </li>
+        </ul>
+
+        <h2>El asistente de chat</h2>
+        <p>
+          El chat de nuestra página de inicio es una herramienta automatizada con respuestas predefinidas. No es una
+          persona ni es inteligencia artificial (IA), y nada de lo que usted escribe en él se nos envía. Para hablar con
+          una persona, llámenos o escríbanos por correo electrónico.
+        </p>
+
+        <h2>Garantías</h2>
+        <p>
+          No ofrecemos ninguna garantía a través de este sitio web. Cualquier garantía sobre el trabajo que realicemos
+          se aplica solo si está establecida en su acuerdo por escrito con nosotros.
+        </p>
+
+        <h2>Contenido del sitio web y materiales de terceros</h2>
+        <ul>
+          <li>Le pedimos que no copie el texto ni el diseño de este sitio web sin nuestro permiso.</li>
+          <li>
+            Fuentes tipográficas:
+            <a href="https://fonts.google.com/specimen/Inter" rel="noopener" target="_blank">Inter</a> y
+            <a href="https://fonts.google.com/specimen/Playfair+Display" rel="noopener" target="_blank"
+              >Playfair Display</a
+            >, alojadas en este sitio web bajo la SIL Open Font License 1.1 (textos de las licencias:
+            <a href="../fonts/OFL-Inter.txt">Inter</a>,
+            <a href="../fonts/OFL-PlayfairDisplay.txt">Playfair Display</a>).
+          </li>
+          <li>
+            Exportación a PDF:
+            <a href="https://github.com/parallax/jsPDF" rel="noopener" target="_blank">jsPDF</a> 4.2.1, alojado en este
+            sitio web bajo la MIT License (<a href="../js/vendor/jspdf-LICENSE.txt">texto de la licencia</a>).
+          </li>
+        </ul>
+
+        <h2>Accesibilidad</h2>
+        <p>
+          Queremos que todas las personas puedan usar este sitio web. Si algo en él es difícil de usar o de leer, llame
+          al <a href="tel:+13853568733">(385) 356-8733</a> o escriba a
+          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>, y le ayudaremos a obtener la
+          información que necesita de otra manera.
+        </p>
+
+        <h2>Límites de nuestra responsabilidad</h2>
+        <p>
+          En la medida en que la ley lo permita, este sitio web se ofrece &ldquo;tal cual&rdquo;, y no somos
+          responsables de pérdidas que resulten de confiar en su información general o en las estimaciones en línea.
+          Nada de lo dispuesto en estos términos limita los derechos que usted tenga conforme a la ley de protección al
+          consumidor que no puedan excluirse.
+        </p>
+
+        <!-- Governing law: add back only once the owner has confirmed the state, as
+        <h2>Governing law</h2>
+        <p>These terms are governed by the laws of [GOVERNING STATE].</p>
+        -->
+
+        <h2>Cambios a estos términos</h2>
+        <p>
+          Si cambiamos estos términos, publicaremos la nueva versión en esta página con una nueva fecha de &ldquo;última
+          actualización&rdquo;.
+        </p>
+      </section>
+    </main>
+
+    <!-- chrome:footer -->
+    <footer class="site-footer">
+      <div class="footer-grid">
+        <div class="footer-col">
+          <p class="footer-brand">Premium Restoration</p>
+          <p class="footer-tagline">Servicios de remodelación de baños.</p>
+          <p class="footer-identity">
+            Operado por
+            <span data-show-if="owner.legalName" hidden><span data-fill="owner.legalName"></span>,</span>
+            una persona física<br />
+            (no una empresa registrada)
+            <span data-show-if="owner.contactAddress" hidden><br /><span data-fill="owner.contactAddress"></span></span>
+            <!-- There is currently no contractor licence. Add a licence line here only once a licence is
+             actually issued, as <br />Contractor License # [CONTRACTOR LICENSE #] ([LICENSE CLASSIFICATION]) -->
+          </p>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Explorar</h2>
+          <a href="index.html">Inicio</a>
+          <a href="index.html#pricing">Cómo cobramos</a>
+          <a href="about.html">Quiénes somos</a>
+          <a href="faq.html">Preguntas frecuentes</a>
+          <a href="contact.html">Pedir cotización</a>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Contacto</h2>
+          <a href="tel:+13853568733">(385) 356-8733</a>
+          <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+        </div>
+        <div class="footer-col">
+          <h2 class="footer-heading">Legal</h2>
+          <a href="privacy.html">Aviso de privacidad</a>
+          <a href="terms.html">Términos de uso</a>
+          <a href="privacy.html#your-rights">Ver o borrar mis datos</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">
+          &copy; <span data-year>2026</span> Premium Restoration<span data-show-if="owner.legalName" hidden
+            >, operado por <span data-fill="owner.legalName"></span></span
+          >.
+        </p>
+        <div class="theme-switch" role="group" aria-label="Tema de color">
+          <span class="theme-switch-label" aria-hidden="true">Tema</span>
+          <button type="button" data-theme-choice="system" aria-pressed="true">Sistema</button>
+          <button type="button" data-theme-choice="light" aria-pressed="false">Claro</button>
+          <button type="button" data-theme-choice="dark" aria-pressed="false">Oscuro</button>
+        </div>
+      </div>
+    </footer>
+    <!-- /chrome:footer -->
+
+    <script src="../js/i18n.js"></script>
+
+    <script src="../js/site-config.js"></script>
+    <script src="../js/theme.js"></script>
+    <script src="../js/script.js"></script>
+  </body>
+</html>

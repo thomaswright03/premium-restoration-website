@@ -9,6 +9,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
   var PHONE = "(385) 356-8733";
   var EMAIL = "eduardo.moroni77@gmail.com";
+  var I18n = window.I18n;
+  var T = I18n.t;
+  var CONTACT = { phone: PHONE, email: EMAIL };
   var configReady = window.SiteConfig ? window.SiteConfig.ready : Promise.resolve(null);
   var siteConfig = null;
   configReady.then(function (c) {
@@ -37,6 +40,22 @@ document.addEventListener("DOMContentLoaded", function () {
       if (e.key === "Escape" && links.classList.contains("open")) {
         setMenu(false);
         toggle.focus();
+      }
+    });
+  }
+
+  // Language menu (a <details> in the nav): close it on a click elsewhere or
+  // Escape. The chosen language is saved by the page's head script, from the
+  // ?lang= its links carry.
+  var langMenu = document.querySelector(".lang-menu");
+  if (langMenu) {
+    document.addEventListener("click", function (e) {
+      if (langMenu.open && !langMenu.contains(e.target)) langMenu.open = false;
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && langMenu.open) {
+        langMenu.open = false;
+        langMenu.querySelector("summary").focus();
       }
     });
   }
@@ -170,7 +189,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function appendChatRow(role, text) {
       var parts = botRow();
       parts.row.className = "ai-chat-row " + role;
-      parts.inner.firstChild.textContent = role === "user" ? "YOU" : "PR";
+      parts.inner.firstChild.textContent = role === "user" ? T("chat.you") : "PR";
       var textEl = document.createElement("div");
       textEl.className = "ai-chat-text";
       textEl.textContent = text;
@@ -186,11 +205,11 @@ document.addEventListener("DOMContentLoaded", function () {
       var btn = document.createElement("button");
       btn.type = "button";
       btn.className = "ai-chat-suggestion";
-      btn.textContent = "Get a bathroom price estimate →";
+      btn.textContent = T("chat.estimateButton");
       btn.addEventListener("click", function () {
         parts.row.remove();
         enterFullscreen();
-        sendChatMessage("I'd like a bathroom price estimate");
+        sendChatMessage(T("chat.estimateRequest"));
       });
       parts.inner.appendChild(btn);
       chatMessages.appendChild(parts.row);
@@ -224,7 +243,7 @@ document.addEventListener("DOMContentLoaded", function () {
       progress.hidden = false;
       progressFill.style.width = pct + "%";
       progressBar.setAttribute("aria-valuenow", String(pct));
-      progressLabel.textContent = pct + "% complete";
+      progressLabel.textContent = T("progress.complete", { pct: pct });
       updateToolbar();
     }
 
@@ -249,8 +268,7 @@ document.addEventListener("DOMContentLoaded", function () {
       var groups = [
         {
           id: "scope",
-          intro:
-            "Sure! Let's get you a rough, non-binding bathroom labor estimate. Nothing you enter here is sent to us. First, which work does the job need? Only what you choose is priced.",
+          intro: T("flow.scopeIntro"),
           fields: Pricing.SCOPE_QUESTIONS.map(function (q) {
             return { key: q.key, label: q.label, type: "choice", options: q.options, target: "scope" };
           }),
@@ -259,13 +277,17 @@ document.addEventListener("DOMContentLoaded", function () {
       if (scope && needs.floorArea) {
         groups.push({
           id: "dimensions",
-          intro: needs.height
-            ? "Now the room's size, in feet. The wall work you chose needs the ceiling height too."
-            : "Now the room's floor size, in feet.",
+          intro: T(needs.height ? "flow.dimensionsIntroHeight" : "flow.dimensionsIntro"),
           fields: Pricing.DIMENSIONS.filter(function (d) {
             return d.key !== "Bathroom_Height_Ft" || needs.height;
           }).map(function (d) {
-            return { key: d.key, label: d.label + " (ft)", type: "number", inputmode: "decimal", target: "values" };
+            return {
+              key: d.key,
+              label: T("flow.dimensionLabel", { label: d.label }),
+              type: "number",
+              inputmode: "decimal",
+              target: "values",
+            };
           }),
         });
       }
@@ -290,7 +312,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       groups.push({
         id: "fixtures",
-        intro: "How many of each should we install? Leave blank or enter 0 for any that don't apply.",
+        intro: T("flow.fixturesIntro"),
         fields: Pricing.FIXTURES.filter(function (f) {
           return f.key !== "Door_Quantity" || !entryPointsStepRuns;
         }).map(function (f) {
@@ -323,10 +345,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (window.BathroomRoom3D) window.BathroomRoom3D.hide();
       hideProgress();
       chatForm.hidden = false;
-      appendChatRow(
-        "bot",
-        "No problem, I've stopped the estimate. Ask me anything else, or say “bathroom quote” to start over.",
-      );
+      appendChatRow("bot", T("flow.cancelled"));
       chatInput.focus();
     }
 
@@ -361,6 +380,12 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     var fieldCounter = 0;
+
+    // Spanish and Portuguese speakers often write 7,5 for 7.5.
+    function localNumber(text) {
+      if (I18n.lang() === "en") return text;
+      return /^\s*\d+,\d+\s*$/.test(text) ? text.replace(",", ".") : text;
+    }
 
     function appendGroupForm() {
       var group = quoteState.groups[quoteState.index];
@@ -452,12 +477,13 @@ document.addEventListener("DOMContentLoaded", function () {
           input.addEventListener("input", function () {
             showFieldError(field.key, null);
             if (!window.BathroomRoom3D) return;
-            if (group.id === "dimensions") window.BathroomRoom3D.setDimension(field.key, input.value);
-            else window.BathroomRoom3D.setFixtureCount(field.key, input.value);
+            var typed = localNumber(input.value);
+            if (group.id === "dimensions") window.BathroomRoom3D.setDimension(field.key, typed);
+            else window.BathroomRoom3D.setFixtureCount(field.key, typed);
           });
           fieldEls[field.key] = { wrap: fieldWrap, error: errorEl, focus: input, input: input };
           readers.push(function () {
-            quoteState.values[field.key] = input.value.trim();
+            quoteState.values[field.key] = localNumber(input.value.trim());
           });
         }
         fieldWrap.appendChild(errorEl);
@@ -484,7 +510,7 @@ document.addEventListener("DOMContentLoaded", function () {
       var cancelBtn = document.createElement("button");
       cancelBtn.type = "button";
       cancelBtn.className = "ai-chat-group-cancel";
-      cancelBtn.textContent = "Cancel";
+      cancelBtn.textContent = T("flow.cancel");
       cancelBtn.addEventListener("click", function () {
         disableForm();
         cancelFlow();
@@ -493,7 +519,7 @@ document.addEventListener("DOMContentLoaded", function () {
       continueBtn.type = "submit";
       continueBtn.className = "ai-chat-group-continue";
       var isLast = quoteState.index === quoteState.groups.length - 1 && group.id !== "scope";
-      continueBtn.textContent = isLast ? "Get My Estimate →" : "Continue →";
+      continueBtn.textContent = T(isLast ? "flow.getEstimate" : "flow.continue");
       actionsWrap.appendChild(cancelBtn);
       actionsWrap.appendChild(continueBtn);
       formEl.appendChild(actionsWrap);
@@ -526,16 +552,12 @@ document.addEventListener("DOMContentLoaded", function () {
           group.fields.forEach(function (field) {
             if (!firstBad && dropped[field.key]) {
               firstBad = field.key;
-              showFieldError(
-                field.key,
-                "Not enough room for all of these — reduce the count, make the room bigger, or check what " +
-                  "else needs to be picked first (e.g. a vanity or sink for a mirror to mount above).",
-              );
+              showFieldError(field.key, T("flow.doesNotFit"));
             }
           });
         }
         summaryError.hidden = !firstBad;
-        summaryError.textContent = firstBad ? "Please fix the highlighted answers above." : "";
+        summaryError.textContent = firstBad ? T("flow.fixHighlighted") : "";
         if (firstBad) {
           fieldEls[firstBad].focus.focus();
           return;
@@ -564,14 +586,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
       var introEl = document.createElement("p");
       introEl.className = "ai-chat-group-intro";
-      introEl.textContent =
-        "Which wall(s) carry the plumbing stack? Click them directly in the 3D preview — pick as many as apply. " +
-        "The toilet, sink, tub, and shower will only be placed on the wall(s) you choose.";
+      introEl.textContent = T("walls.intro");
       content.appendChild(introEl);
 
       var statusEl = document.createElement("p");
       statusEl.className = "ai-chat-group-intro";
-      statusEl.textContent = "No walls selected yet.";
+      statusEl.textContent = T("walls.none");
       content.appendChild(statusEl);
 
       var actionsWrap = document.createElement("div");
@@ -579,15 +599,15 @@ document.addEventListener("DOMContentLoaded", function () {
       var cancelBtn = document.createElement("button");
       cancelBtn.type = "button";
       cancelBtn.className = "ai-chat-group-cancel";
-      cancelBtn.textContent = "Cancel";
+      cancelBtn.textContent = T("flow.cancel");
       var skipBtn = document.createElement("button");
       skipBtn.type = "button";
       skipBtn.className = "ai-chat-group-cancel";
-      skipBtn.textContent = "Skip";
+      skipBtn.textContent = T("flow.skip");
       var continueBtn = document.createElement("button");
       continueBtn.type = "button";
       continueBtn.className = "ai-chat-group-continue";
-      continueBtn.textContent = "Continue →";
+      continueBtn.textContent = T("flow.continue");
       continueBtn.disabled = true;
       actionsWrap.appendChild(cancelBtn);
       actionsWrap.appendChild(skipBtn);
@@ -626,9 +646,7 @@ document.addEventListener("DOMContentLoaded", function () {
         selectedIds = ids;
         continueBtn.disabled = ids.length === 0;
         statusEl.textContent =
-          ids.length === 0
-            ? "No walls selected yet."
-            : ids.length + " wall" + (ids.length === 1 ? "" : "s") + " selected.";
+          ids.length === 0 ? T("walls.none") : T(ids.length === 1 ? "walls.one" : "walls.many", { n: ids.length });
       });
     }
 
@@ -644,7 +662,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       var introEl = document.createElement("p");
       introEl.className = "ai-chat-group-intro";
-      introEl.textContent = "How many entry points (doors or openings) does this bathroom have?";
+      introEl.textContent = T("entry.howMany");
       content.appendChild(introEl);
 
       var formEl = document.createElement("form");
@@ -665,15 +683,15 @@ document.addEventListener("DOMContentLoaded", function () {
       var cancelBtn = document.createElement("button");
       cancelBtn.type = "button";
       cancelBtn.className = "ai-chat-group-cancel";
-      cancelBtn.textContent = "Cancel";
+      cancelBtn.textContent = T("flow.cancel");
       var skipBtn = document.createElement("button");
       skipBtn.type = "button";
       skipBtn.className = "ai-chat-group-cancel";
-      skipBtn.textContent = "Skip";
+      skipBtn.textContent = T("flow.skip");
       var continueBtn = document.createElement("button");
       continueBtn.type = "submit";
       continueBtn.className = "ai-chat-group-continue";
-      continueBtn.textContent = "Continue →";
+      continueBtn.textContent = T("flow.continue");
       actionsWrap.appendChild(cancelBtn);
       actionsWrap.appendChild(skipBtn);
       actionsWrap.appendChild(continueBtn);
@@ -738,13 +756,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
         var epIntro = document.createElement("p");
         epIntro.className = "ai-chat-group-intro";
-        epIntro.textContent =
-          (total > 1 ? "Entry point " + (i + 1) + " of " + total + ": " : "") + "click its wall in the 3D preview.";
+        epIntro.textContent = total > 1 ? T("entry.clickWallOf", { i: i + 1, n: total }) : T("entry.clickWall");
         epContent.appendChild(epIntro);
 
         var wallStatus = document.createElement("p");
         wallStatus.className = "ai-chat-group-intro";
-        wallStatus.textContent = "No wall selected yet.";
+        wallStatus.textContent = T("entry.noWall");
         epContent.appendChild(wallStatus);
 
         // Visible from the start (not nested inside detailsWrap, which
@@ -756,7 +773,7 @@ document.addEventListener("DOMContentLoaded", function () {
         var cancelBtn = document.createElement("button");
         cancelBtn.type = "button";
         cancelBtn.className = "ai-chat-group-cancel";
-        cancelBtn.textContent = "Cancel";
+        cancelBtn.textContent = T("flow.cancel");
         cancelBtn.addEventListener("click", function () {
           disableAll(epContent);
           window.BathroomRoom3D.endWallPicking();
@@ -773,18 +790,18 @@ document.addEventListener("DOMContentLoaded", function () {
         var leftBtn = document.createElement("button");
         leftBtn.type = "button";
         leftBtn.className = "ai-chat-group-cancel";
-        leftBtn.textContent = "← Move left";
+        leftBtn.textContent = T("entry.left");
         var rightBtn = document.createElement("button");
         rightBtn.type = "button";
         rightBtn.className = "ai-chat-group-cancel";
-        rightBtn.textContent = "Move right →";
+        rightBtn.textContent = T("entry.right");
         nudgeWrap.appendChild(leftBtn);
         nudgeWrap.appendChild(rightBtn);
         detailsWrap.appendChild(nudgeWrap);
 
         var doorLabel = document.createElement("p");
         doorLabel.className = "ai-chat-field-label";
-        doorLabel.textContent = "Does this entry point have a door?";
+        doorLabel.textContent = T("entry.hasDoor");
         detailsWrap.appendChild(doorLabel);
 
         var doorChoices = document.createElement("div");
@@ -793,8 +810,8 @@ document.addEventListener("DOMContentLoaded", function () {
         var chosenWallId = null;
         var doorButtons = [];
         [
-          { label: "Yes", value: true },
-          { label: "No — open archway", value: false },
+          { label: T("choice.yes"), value: true },
+          { label: T("entry.archway"), value: false },
         ].forEach(function (option) {
           var btn = document.createElement("button");
           btn.type = "button";
@@ -819,7 +836,7 @@ document.addEventListener("DOMContentLoaded", function () {
         var confirmBtn = document.createElement("button");
         confirmBtn.type = "button";
         confirmBtn.className = "ai-chat-group-continue";
-        confirmBtn.textContent = i === total - 1 ? "Confirm entry point" : "Confirm & next →";
+        confirmBtn.textContent = T(i === total - 1 ? "entry.confirm" : "entry.confirmNext");
         confirmBtn.disabled = true;
         detailsWrap.appendChild(confirmBtn);
         var fitError = document.createElement("p");
@@ -847,8 +864,7 @@ document.addEventListener("DOMContentLoaded", function () {
           // dropped later.
           var dropped = window.BathroomRoom3D.checkFit({});
           if (dropped.Door_Quantity) {
-            fitError.textContent =
-              "That spot doesn't fit — try a different wall, or nudge it clear of what's already there.";
+            fitError.textContent = T("entry.doesNotFit");
             fitError.hidden = false;
             return;
           }
@@ -859,7 +875,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         window.BathroomRoom3D.beginWallPicking("single", function (ids, justClicked) {
           chosenWallId = justClicked;
-          wallStatus.textContent = "Wall selected — nudge it into place and confirm below.";
+          wallStatus.textContent = T("entry.wallSelected");
           detailsWrap.hidden = false;
           confirmBtn.disabled = false;
           window.BathroomRoom3D.setEntryPoint(i, { wallId: chosenWallId, hasDoor: hasDoor });
@@ -868,86 +884,53 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // ---------- estimate card ----------
-    var PLUMBING_NOTE =
-      "Plumbing and electrical work is not included. Toilets, sinks, showers, and bathtubs also need plumbing work, " +
-      "so if you listed any, or your job needs other plumbing or electrical work, expect it to add to the cost. " +
-      "We'll tell you how it will be handled and priced before any work is agreed.";
-
     // hasMaterials is true once at least one real product was picked in the
     // product-pick steps that follow fixtures (see startProductPicks()) —
     // false when that never happened (materials estimator off, or no
     // category applied), in which case the total/disclaimer/etc. describe a
     // labor-only estimate exactly as before that feature existed.
     function estimateDisclaimer(hasMaterials) {
-      if (hasMaterials) {
-        return (
-          "This is an automated, non-binding estimate combining labor at our current rates with current Home " +
-          "Depot prices for the exact products you picked, based only on what you entered and the assumptions " +
-          "listed with it. It is not a quote, offer, or contract. It excludes plumbing and electrical " +
-          "installation work (the labor to hook up any toilets, sinks, showers, or bathtubs listed), permits, " +
-          "and any applicable taxes, which will add to the cost where your job needs them. Product prices were " +
-          "current as of when they were last refreshed and may have changed since — confirm before buying. " +
-          "Your actual price is set only in a written agreement after we review your project in person."
-        );
-      }
-      return (
-        "This is an automated, non-binding estimate of labor only, based only on the measurements, counts, and " +
-        "choices you entered and the assumptions listed with it. It is not a quote, offer, or contract. It " +
-        "excludes plumbing and electrical work (including the plumbing any toilets, sinks, showers, or bathtubs " +
-        "need), materials, permits, and any applicable taxes, which will add to the cost where your job needs " +
-        "them. Prices are current as of the date generated and may change. Your actual price is set only in a " +
-        "written agreement after we review your project in person."
-      );
+      return T(hasMaterials ? "card.disclaimerMaterials" : "card.disclaimer");
     }
 
     function totalLabel(fixtureCount, hasMaterials) {
-      var base = hasMaterials ? "Estimated Total (Labor + Materials)" : "Estimated Labor Total";
-      return fixtureCount > 0 ? base + ", before plumbing" : base;
+      var key = hasMaterials ? "card.totalMaterials" : "card.total";
+      return T(fixtureCount > 0 ? key + "BeforePlumbing" : key);
     }
 
     function plumbingTotalNote(fixtureCount) {
-      return (
-        "This is not the full cost of your job: plumbing work for the " +
-        Pricing.formatQty(fixtureCount) +
-        " toilet/sink/shower/bathtub item(s) you listed will be added on top of this total."
-      );
+      return T("card.plumbingTotalNote", { n: Pricing.formatQty(fixtureCount) });
     }
 
     function excludedLines(fixtureCount, hasMaterials) {
       var list = [];
       if (fixtureCount > 0) {
         list.push({
-          label:
-            "Plumbing for the " + Pricing.formatQty(fixtureCount) + " toilet/sink/shower/bathtub item(s) you listed",
-          value: "Extra — not included",
+          label: T("card.excluded.listedPlumbing", { n: Pricing.formatQty(fixtureCount) }),
+          value: T("card.excluded.extra"),
         });
       }
       list.push({
-        label: (fixtureCount > 0 ? "Any other plumbing" : "Plumbing") + " & electrical work",
-        value: "Extra — not included",
+        label: T(fixtureCount > 0 ? "card.excluded.otherTrades" : "card.excluded.trades"),
+        value: T("card.excluded.extra"),
       });
       list.push({
-        label: hasMaterials ? "Permits & any applicable taxes" : "Materials, permits & any applicable taxes",
-        value: "Not included",
+        label: T(hasMaterials ? "card.excluded.permits" : "card.excluded.materialsPermits"),
+        value: T("card.excluded.notIncluded"),
       });
       return list;
     }
 
     function allAssumptions(values, scope, result, hasMaterials) {
       return Pricing.estimateAssumptions(values, scope, result).concat([
-        PLUMBING_NOTE,
-        hasMaterials
-          ? "Materials shown are priced at current Home Depot rates as of when they were last refreshed — " +
-            "confirm before buying. Also not included: permits and any applicable taxes."
-          : "Also not included: materials, permits, and any applicable taxes.",
+        T("card.plumbingNote"),
+        T(hasMaterials ? "card.materialsNote" : "card.alsoNotIncluded"),
       ]);
     }
 
     function businessLine() {
       var name = siteConfig && siteConfig.owner.legalName;
-      return (
-        "Premium Restoration, operated by " + (name ? name + ", " : "") + "an individual (not a registered company)"
-      );
+      return T(name ? "card.businessNamed" : "card.business", { name: name });
     }
 
     function el(tag, className, text) {
@@ -984,17 +967,9 @@ document.addEventListener("DOMContentLoaded", function () {
       card.setAttribute("data-testid", "estimate-card");
 
       var head = el("div", "ai-chat-estimate-header");
-      head.appendChild(el("p", "eyebrow", "Your Estimate"));
-      head.appendChild(el("h3", null, "Bathroom Restoration"));
-      head.appendChild(
-        el(
-          "p",
-          "ai-chat-estimate-lede",
-          hasMaterials
-            ? "Rough, non-binding estimate — labor plus real current prices for the exact products you picked."
-            : "Rough, non-binding labor estimate — details below.",
-        ),
-      );
+      head.appendChild(el("p", "eyebrow", T("card.eyebrow")));
+      head.appendChild(el("h3", null, T("card.title")));
+      head.appendChild(el("p", "ai-chat-estimate-lede", T(hasMaterials ? "card.ledeMaterials" : "card.lede")));
       card.appendChild(head);
 
       var lines = el("div", "ai-chat-estimate-lines");
@@ -1008,7 +983,7 @@ document.addEventListener("DOMContentLoaded", function () {
       });
       if (!result.lines.length) {
         var empty = el("div", "ai-chat-estimate-line");
-        empty.appendChild(el("span", null, "No priced work selected"));
+        empty.appendChild(el("span", null, T("card.noWork")));
         empty.appendChild(el("span", "ai-chat-estimate-amount", Pricing.money(0)));
         lines.appendChild(empty);
       }
@@ -1016,7 +991,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       if (hasMaterials) {
         var laborSubtotalWrap = el("div", "ai-chat-estimate-line muted");
-        laborSubtotalWrap.appendChild(el("span", null, "Labor Subtotal"));
+        laborSubtotalWrap.appendChild(el("span", null, T("card.laborSubtotal")));
         laborSubtotalWrap.appendChild(el("span", null, Pricing.money(result.subtotal)));
         card.appendChild(laborSubtotalWrap);
 
@@ -1046,7 +1021,7 @@ document.addEventListener("DOMContentLoaded", function () {
         card.appendChild(materialLines);
 
         var materialsSubtotalWrap = el("div", "ai-chat-estimate-line muted");
-        materialsSubtotalWrap.appendChild(el("span", null, "Materials Subtotal"));
+        materialsSubtotalWrap.appendChild(el("span", null, T("card.materialsSubtotal")));
         materialsSubtotalWrap.appendChild(el("span", null, Pricing.money(materialsSubtotal)));
         card.appendChild(materialsSubtotalWrap);
       }
@@ -1070,7 +1045,7 @@ document.addEventListener("DOMContentLoaded", function () {
       card.appendChild(el("p", "ai-chat-estimate-disclaimer", estimateDisclaimer(hasMaterials)));
 
       var assumptionsWrap = el("div", "ai-chat-estimate-assumptions");
-      assumptionsWrap.appendChild(el("p", "ai-chat-estimate-assumptions-title", "What this estimate assumes"));
+      assumptionsWrap.appendChild(el("p", "ai-chat-estimate-assumptions-title", T("card.assumptions")));
       var list = el("ul");
       assumptions.forEach(function (a) {
         list.appendChild(el("li", null, a));
@@ -1080,7 +1055,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       if (hasMaterials) {
         var shoppingWrap = el("div", "ai-chat-estimate-assumptions ai-chat-materials-shopping");
-        shoppingWrap.appendChild(el("p", "ai-chat-estimate-assumptions-title", "Where to buy the materials"));
+        shoppingWrap.appendChild(el("p", "ai-chat-estimate-assumptions-title", T("card.whereToBuy")));
         var shopList = document.createElement("ul");
         pickList.forEach(function (p) {
           var item = document.createElement("li");
@@ -1103,7 +1078,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       var actions = el("div", "ai-chat-estimate-actions");
-      var exportBtn = el("button", "ai-chat-estimate-export", "Export as PDF");
+      var exportBtn = el("button", "ai-chat-estimate-export", T("card.exportPdf"));
       exportBtn.type = "button";
       var pdfStatus = el("p", "ai-chat-estimate-pdf-status");
       pdfStatus.setAttribute("role", "status");
@@ -1122,7 +1097,7 @@ document.addEventListener("DOMContentLoaded", function () {
       });
       actions.appendChild(exportBtn);
 
-      var cta = el("a", "ai-chat-estimate-cta", "Contact Us About This →");
+      var cta = el("a", "ai-chat-estimate-cta", T("card.contactCta"));
       cta.href = "contact.html?from=estimate";
       cta.addEventListener("click", function () {
         try {
@@ -1149,12 +1124,12 @@ document.addEventListener("DOMContentLoaded", function () {
       var out = [Pricing.buildEstimateSummary(values, scope, result)];
       if (pickList.length) {
         out.push("");
-        out.push("Materials picked (real current Home Depot prices):");
+        out.push(T("summary.materials"));
         pickList.forEach(function (p) {
           out.push("- " + p.categoryLabel + ": " + p.productName + " (" + p.retailer + ") — " + Pricing.money(p.cost));
         });
-        out.push("- Materials subtotal: " + Pricing.money(materialsSubtotal));
-        out.push("- Labor + materials total: " + Pricing.money(grandTotal));
+        out.push(T("summary.materialsSubtotal", { total: Pricing.money(materialsSubtotal) }));
+        out.push(T("summary.grandTotal", { total: Pricing.money(grandTotal) }));
       }
       return out.join("\n");
     }
@@ -1172,7 +1147,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (button.disabled) return;
       var label = button.textContent;
       button.disabled = true;
-      button.textContent = "Preparing PDF…";
+      button.textContent = T("pdf.preparing");
       status.hidden = true;
       status.textContent = "";
       window.EstimatePdf.load()
@@ -1192,15 +1167,15 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           var totals = hasMaterials
             ? [
-                { label: "Labor Subtotal", value: Pricing.money(result.subtotal) },
-                { label: "Materials Subtotal", value: Pricing.money(materialsSubtotal) },
+                { label: T("card.laborSubtotal"), value: Pricing.money(result.subtotal) },
+                { label: T("card.materialsSubtotal"), value: Pricing.money(materialsSubtotal) },
                 { label: totalLabel(fixtureCount, true), value: Pricing.money(grandTotal), strong: true },
               ]
             : [{ label: totalLabel(fixtureCount, false), value: Pricing.money(grandTotal), strong: true }];
-          var sections = [{ title: "What this estimate assumes", items: assumptions }];
+          var sections = [{ title: T("card.assumptions"), items: assumptions }];
           if (hasMaterials) {
             sections.push({
-              title: "Where to buy the materials",
+              title: T("card.whereToBuy"),
               items: pickList.map(function (p) {
                 return (
                   p.categoryLabel +
@@ -1216,9 +1191,7 @@ document.addEventListener("DOMContentLoaded", function () {
             });
           }
           var doc = window.EstimatePdf.build({
-            title: hasMaterials
-              ? "Bathroom Restoration — Estimate (Labor + Materials)"
-              : "Bathroom Restoration — Labor Estimate",
+            title: T(hasMaterials ? "pdf.titleMaterials" : "pdf.title"),
             lines: lines,
             excluded: excludedLines(fixtureCount, hasMaterials),
             totals: totals,
@@ -1230,7 +1203,7 @@ document.addEventListener("DOMContentLoaded", function () {
               business: businessLine(),
               phone: PHONE,
               email: EMAIL,
-              date: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
+              date: new Date().toLocaleDateString(I18n.locale(), { year: "numeric", month: "long", day: "numeric" }),
             },
           });
           doc.save("premium-restoration-bathroom-estimate.pdf");
@@ -1239,9 +1212,9 @@ document.addEventListener("DOMContentLoaded", function () {
         })
         .catch(function () {
           button.disabled = false;
-          button.textContent = "Retry PDF";
+          button.textContent = T("pdf.retry");
           status.hidden = false;
-          status.textContent = "Sorry, the PDF couldn't be prepared. Check your connection and press Retry PDF.";
+          status.textContent = T("pdf.failed");
           status.classList.add("is-error");
         });
     }
@@ -1355,20 +1328,13 @@ document.addEventListener("DOMContentLoaded", function () {
     function appendMaterialsZipForm() {
       var parts = botRow();
       var content = el("div", "ai-chat-text");
-      content.appendChild(
-        el(
-          "p",
-          "ai-chat-group-intro",
-          "Now let's pick the exact product for each item, at real current prices — starting with your ZIP code. " +
-            "(Prices can vary a little by area.)",
-        ),
-      );
+      content.appendChild(el("p", "ai-chat-group-intro", T("materials.zipIntro")));
 
       var formEl = document.createElement("form");
       formEl.className = "ai-chat-group-form";
 
       var fieldWrap = el("div", "ai-chat-group-field");
-      fieldWrap.appendChild(el("label", "ai-chat-field-label", "ZIP code"));
+      fieldWrap.appendChild(el("label", "ai-chat-field-label", T("materials.zipLabel")));
       var input = document.createElement("input");
       input.type = "text";
       input.inputMode = "numeric";
@@ -1392,9 +1358,9 @@ document.addEventListener("DOMContentLoaded", function () {
       formEl.appendChild(fieldWrap);
 
       var actionsWrap = el("div", "ai-chat-group-actions");
-      var cancelBtn = el("button", "ai-chat-group-cancel", "Cancel");
+      var cancelBtn = el("button", "ai-chat-group-cancel", T("flow.cancel"));
       cancelBtn.type = "button";
-      var continueBtn = el("button", "ai-chat-group-continue", "Continue →");
+      var continueBtn = el("button", "ai-chat-group-continue", T("flow.continue"));
       continueBtn.type = "submit";
       actionsWrap.appendChild(cancelBtn);
       actionsWrap.appendChild(continueBtn);
@@ -1415,7 +1381,7 @@ document.addEventListener("DOMContentLoaded", function () {
         e.preventDefault();
         var zip = input.value.trim();
         if (!/^\d{5}$/.test(zip)) {
-          errorEl.textContent = "Enter a 5-digit ZIP code.";
+          errorEl.textContent = T("materials.zipError");
           errorEl.hidden = false;
           fieldWrap.classList.add("has-error");
           input.focus();
@@ -1443,13 +1409,11 @@ document.addEventListener("DOMContentLoaded", function () {
         el(
           "p",
           "ai-chat-group-intro",
-          "Which " +
-            category.label.toLowerCase() +
-            " would you like? (" +
-            Pricing.formatQty(category.qty) +
-            " " +
-            category.unit +
-            ")",
+          T("materials.which", {
+            label: category.label.toLowerCase(),
+            qty: Pricing.formatQty(category.qty),
+            unit: category.unit,
+          }),
         ),
       );
 
@@ -1486,7 +1450,11 @@ document.addEventListener("DOMContentLoaded", function () {
         var textWrap = el("span", "ai-chat-material-text");
         textWrap.appendChild(el("span", "ai-chat-material-name", opt.name));
         textWrap.appendChild(
-          el("span", "ai-chat-material-price", Pricing.money(opt.best.price) + " at " + opt.best.name),
+          el(
+            "span",
+            "ai-chat-material-price",
+            T("materials.priceAt", { price: Pricing.money(opt.best.price), store: opt.best.name }),
+          ),
         );
         if (opt.best.compareNote) textWrap.appendChild(el("span", "ai-chat-material-note", opt.best.compareNote));
         btn.appendChild(textWrap);
@@ -1523,10 +1491,10 @@ document.addEventListener("DOMContentLoaded", function () {
       formEl.appendChild(errorEl);
 
       var actionsWrap = el("div", "ai-chat-group-actions");
-      var cancelBtn = el("button", "ai-chat-group-cancel", "Cancel");
+      var cancelBtn = el("button", "ai-chat-group-cancel", T("flow.cancel"));
       cancelBtn.type = "button";
       var isLast = index === pickState.categories.length - 1;
-      var continueBtn = el("button", "ai-chat-group-continue", isLast ? "See My Estimate →" : "Continue →");
+      var continueBtn = el("button", "ai-chat-group-continue", T(isLast ? "flow.seeEstimate" : "flow.continue"));
       continueBtn.type = "submit";
       actionsWrap.appendChild(cancelBtn);
       actionsWrap.appendChild(continueBtn);
@@ -1546,7 +1514,7 @@ document.addEventListener("DOMContentLoaded", function () {
       formEl.addEventListener("submit", function (e) {
         e.preventDefault();
         if (!chosen) {
-          errorEl.textContent = "Pick one option to continue.";
+          errorEl.textContent = T("materials.pickOne");
           errorEl.hidden = false;
           return;
         }
@@ -1586,7 +1554,7 @@ document.addEventListener("DOMContentLoaded", function () {
       var typing = botRow();
       typing.row.id = "ai-chat-typing-row";
       var dots = el("div", "ai-chat-typing");
-      dots.setAttribute("aria-label", "Assistant is typing");
+      dots.setAttribute("aria-label", T("chat.typing"));
       dots.appendChild(el("span"));
       dots.appendChild(el("span"));
       dots.appendChild(el("span"));
@@ -1636,7 +1604,7 @@ document.addEventListener("DOMContentLoaded", function () {
       starter.addEventListener("click", function () {
         enterFullscreen();
         if (starterRow) starterRow.remove();
-        sendChatMessage("I'd like a bathroom price estimate");
+        sendChatMessage(T("chat.estimateRequest"));
       });
     }
   }
@@ -1689,17 +1657,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function validate() {
       var errors = {};
-      if (!value("name")) errors.name = "Enter your name.";
+      if (!value("name")) errors.name = T("form.error.name");
       var phone = value("phone");
       var digits = phone.replace(/\D/g, "");
-      if (!phone) errors.phone = "Enter a phone number we can call you on.";
+      if (!phone) errors.phone = T("form.error.phone");
       else if (!/^[0-9+().\-\s]+$/.test(phone) || digits.length < 10 || digits.length > 15) {
-        errors.phone = "Enter a valid phone number, e.g. (385) 356-8733.";
+        errors.phone = T("form.error.phoneInvalid");
       }
       var email = value("email");
-      if (!email) errors.email = "Enter your email address.";
-      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email))
-        errors.email = "Enter a valid email address, e.g. name@example.com.";
+      if (!email) errors.email = T("form.error.email");
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errors.email = T("form.error.emailInvalid");
       ["name", "phone", "email"].forEach(function (id) {
         setError(id, errors[id]);
       });
@@ -1738,46 +1705,58 @@ document.addEventListener("DOMContentLoaded", function () {
       return s;
     }
 
-    function body() {
-      return (
-        "Name: " +
-        value("name") +
-        "\n" +
-        "Phone: " +
-        value("phone") +
-        "\n" +
-        "Email: " +
-        value("email") +
-        "\n" +
-        "Service: " +
-        value("service") +
-        "\n\n" +
-        "Project details:\n" +
-        value("message")
-      );
+    // Status messages mix text and links: "[b:bold text]", "[again:link
+    // text]" and "[phone]" in the translation become the matching node.
+    function rich(key, nodes) {
+      var out = [];
+      T(key, CONTACT)
+        .split(/(\[[a-z]+(?::[^\]]*)?\])/)
+        .forEach(function (part) {
+          var m = /^\[([a-z]+)(?::([^\]]*))?\]$/.exec(part);
+          if (m && nodes[m[1]]) out.push(nodes[m[1]](m[2]));
+          else if (part) out.push(part);
+        });
+      return out;
     }
+
+    function subject() {
+      return T("form.subject", { name: value("name") });
+    }
+
+    function body() {
+      var lines = [
+        T("form.body.name") + ": " + value("name"),
+        T("form.body.phone") + ": " + value("phone"),
+        T("form.body.email") + ": " + value("email"),
+        T("form.body.service") + ": " + value("service"),
+      ];
+      if (I18n.lang() !== "en") lines.push(T("lang.label") + ": " + I18n.name());
+      return lines.join("\n") + "\n\n" + T("form.body.details") + ":\n" + value("message");
+    }
+
+    var phoneLink = function () {
+      return link("tel:+13853568733", PHONE);
+    };
+    var emailLink = function () {
+      return link("mailto:" + EMAIL, EMAIL);
+    };
 
     function sendByEmailApp() {
       var href =
-        "mailto:" +
-        EMAIL +
-        "?subject=" +
-        encodeURIComponent("Bathroom quote request from " + value("name")) +
-        "&body=" +
-        encodeURIComponent(body());
-      var again = link(href, "open it again");
-      again.id = "mailto-link";
-      showStatus("info", [
-        "Your email app should now open with your request filled in. ",
-        strong("Please press Send in your email app"),
-        " — we don't receive anything until you do. If nothing opened, ",
-        again,
-        ", email us at ",
-        link("mailto:" + EMAIL, EMAIL),
-        " or call ",
-        link("tel:+13853568733", PHONE),
-        ".",
-      ]);
+        "mailto:" + EMAIL + "?subject=" + encodeURIComponent(subject()) + "&body=" + encodeURIComponent(body());
+      showStatus(
+        "info",
+        rich("form.status.mailto", {
+          b: strong,
+          again: function (text) {
+            var again = link(href, text);
+            again.id = "mailto-link";
+            return again;
+          },
+          email: emailLink,
+          phone: phoneLink,
+        }),
+      );
       window.location.href = href;
     }
 
@@ -1789,12 +1768,13 @@ document.addEventListener("DOMContentLoaded", function () {
       var original = submit.innerHTML;
       submit.disabled = true;
       submit.setAttribute("aria-busy", "true");
-      submit.textContent = "Sending…";
-      showStatus("info", ["Sending your request…"]);
+      submit.textContent = T("form.sending");
+      showStatus("info", [T("form.status.sending")]);
 
       var data = new FormData(form);
       data.set("service", value("service"));
-      data.set("_subject", "Bathroom quote request from " + value("name"));
+      data.set("_subject", subject());
+      if (I18n.lang() !== "en") data.set("language", I18n.name());
       var controller = "AbortController" in window ? new AbortController() : null;
       var timer = setTimeout(function () {
         if (controller) controller.abort();
@@ -1822,22 +1802,10 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           var note = document.getElementById("estimate-prefill-note");
           if (note) note.hidden = true;
-          showStatus("success", [
-            strong("Request sent."),
-            " Thank you — we've received your request and will get back to you as soon as we can. If it's urgent, call ",
-            link("tel:+13853568733", PHONE),
-            ".",
-          ]);
+          showStatus("success", rich("form.status.sent", { b: strong, phone: phoneLink }));
         })
         .catch(function () {
-          showStatus("error", [
-            strong("Sorry, your request wasn't sent."),
-            " Nothing you entered has been lost — please try again, or call us at ",
-            link("tel:+13853568733", PHONE),
-            " or email ",
-            link("mailto:" + EMAIL, EMAIL),
-            ".",
-          ]);
+          showStatus("error", rich("form.status.failed", { b: strong, phone: phoneLink, email: emailLink }));
         })
         .then(function () {
           clearTimeout(timer);

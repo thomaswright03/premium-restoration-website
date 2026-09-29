@@ -1,0 +1,49 @@
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-col">
+      <p class="footer-brand">Premium Restoration</p>
+      <p class="footer-tagline">Servicios de remodelación de baños.</p>
+      <p class="footer-identity">
+        Operado por
+        <span data-show-if="owner.legalName" hidden><span data-fill="owner.legalName"></span>,</span>
+        una persona física<br />
+        (no una empresa registrada)
+        <span data-show-if="owner.contactAddress" hidden><br /><span data-fill="owner.contactAddress"></span></span>
+        <!-- There is currently no contractor licence. Add a licence line here only once a licence is
+             actually issued, as <br />Contractor License # [CONTRACTOR LICENSE #] ([LICENSE CLASSIFICATION]) -->
+      </p>
+    </div>
+    <div class="footer-col">
+      <h2 class="footer-heading">Explorar</h2>
+      <a href="{{base}}index.html">Inicio</a>
+      <a href="{{base}}index.html#pricing">Cómo cobramos</a>
+      <a href="{{base}}about.html">Quiénes somos</a>
+      <a href="{{base}}faq.html">Preguntas frecuentes</a>
+      <a href="{{base}}contact.html">Pedir cotización</a>
+    </div>
+    <div class="footer-col">
+      <h2 class="footer-heading">Contacto</h2>
+      <a href="tel:+13853568733">(385) 356-8733</a>
+      <a href="mailto:eduardo.moroni77@gmail.com">eduardo.moroni77@gmail.com</a>
+    </div>
+    <div class="footer-col">
+      <h2 class="footer-heading">Legal</h2>
+      <a href="{{base}}privacy.html">Aviso de privacidad</a>
+      <a href="{{base}}terms.html">Términos de uso</a>
+      <a href="{{base}}privacy.html#your-rights">Ver o borrar mis datos</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p class="footer-copy">
+      &copy; <span data-year>2026</span> Premium Restoration<span data-show-if="owner.legalName" hidden
+        >, operado por <span data-fill="owner.legalName"></span></span
+      >.
+    </p>
+    <div class="theme-switch" role="group" aria-label="Tema de color">
+      <span class="theme-switch-label" aria-hidden="true">Tema</span>
+      <button type="button" data-theme-choice="system" aria-pressed="true">Sistema</button>
+      <button type="button" data-theme-choice="light" aria-pressed="false">Claro</button>
+      <button type="button" data-theme-choice="dark" aria-pressed="false">Oscuro</button>
+    </div>
+  </div>
+</footer>
