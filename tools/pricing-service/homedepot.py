@@ -62,6 +62,12 @@ def set_store(driver, zipcode):
     return shown[0].text.split("\n")[0].strip() if shown else None
 
 
+def _same_model(shown, mmn):
+    """Home Depot lists some Kohler models without the "K-" prefix."""
+    strip = lambda m: re.sub(r"^K-", "", str(m).strip().upper())
+    return strip(shown) == strip(mmn)
+
+
 _LD_JSON = re.compile(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', re.S)
 
 
@@ -72,7 +78,7 @@ def _from_product_page(html, mmn):
         except ValueError:
             continue
         if isinstance(data, dict) and data.get("@type") == "Product":
-            if str(data.get("model", "")).upper() != mmn.upper():
+            if not _same_model(data.get("model", ""), mmn):
                 return None
             offer = data.get("offers") or {}
             price = offer.get("price")
@@ -88,7 +94,7 @@ def _from_product_page(html, mmn):
 def _from_search_results(driver, mmn):
     for pod in driver.find_elements(By.CSS_SELECTOR, "[data-testid='product-pod']"):
         model = re.search(r"Model#\s*(\S+)", pod.text)
-        if not model or model.group(1).upper() != mmn.upper():
+        if not model or not _same_model(model.group(1), mmn):
             continue
         price = pod.find_elements(By.CSS_SELECTOR, "[data-testid='price-simple']")
         cents = re.sub(r"[^\d]", "", price[0].text) if price else ""
@@ -104,10 +110,19 @@ def _from_search_results(driver, mmn):
 
 
 def price_of(driver, mmn, timeout=30):
-    """The product's price at the current store. A search with one match
-    lands on the product page; otherwise the matching result card is used.
-    {"found": False} when Home Depot has nothing with that model number."""
-    driver.get(HOME + "s/" + mmn)
+    """The product's price at the current store. Searches for the model
+    number, then without its "K-" prefix (how Home Depot lists some Kohler
+    models). {"found": False} when neither search turns it up."""
+    found = _search(driver, mmn, mmn, timeout)
+    if not found["found"] and mmn.upper().startswith("K-"):
+        found = _search(driver, mmn[2:], mmn, timeout)
+    return found
+
+
+def _search(driver, query, mmn, timeout):
+    """A search with one match lands on the product page; otherwise the
+    matching result card is used."""
+    driver.get(HOME + "s/" + query)
     started = time.time()
     while time.time() - started < timeout:
         time.sleep(1)
