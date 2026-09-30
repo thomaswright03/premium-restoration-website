@@ -824,6 +824,7 @@ var PRODUCT_SLOTS = [
       {
         id: "freestanding",
         url: "models/fixtures/bathtub.glb",
+        mmn: "K-24010-0",
         rimY: 2.08,
         deckZ: 0.235,
         depth: 2.85,
@@ -1692,20 +1693,119 @@ function syncProductSwitcher(s, layoutInput, placedKeys, sel) {
   if (!ui) return;
   PRODUCT_SLOTS.forEach(function (slot) {
     var entry = ui.rows[slot.id];
-    entry.shown = !!placedKeys[slot.fixtureKey] && (!slot.showIf || slot.showIf(sel));
-    var sized = entry.shown && slotIsSized(slot);
-    slot.options.forEach(function (opt) {
-      var el = entry.options[opt.id];
-      var picked = sel[slot.id] === opt;
-      var reason = null;
-      if (opt.available && !opt.available(sel)) reason = T(opt.unavailableReason || "room3d.noFit");
-      else if (sized && !picked && productWouldDrop(layoutInput, slot, opt)) reason = T("room3d.tooBig");
-      el.disabled = !!reason;
-      el.textContent = T("room3d.option." + opt.id) + (reason ? " (" + reason + ")" : "");
+    entry.shown = slotShown(slot, placedKeys, sel);
+    slotOptionStates(slot, sel, layoutInput, entry.shown).forEach(function (o) {
+      var el = entry.options[o.id];
+      el.disabled = !!o.reason;
+      el.textContent = o.label + (o.reason ? " (" + o.reason + ")" : "");
     });
     entry.select.value = sel[slot.id].id;
   });
   applyProductGroup(ui);
+}
+
+function slotShown(slot, placedKeys, sel) {
+  return !!placedKeys[slot.fixtureKey] && (!slot.showIf || slot.showIf(sel));
+}
+
+// Each of a slot's options with its label and, when it can't be picked
+// right now, why: it doesn't go with another pick, or (for a sized slot
+// that's showing) it's too big for the room.
+function slotOptionStates(slot, sel, layoutInput, shown) {
+  var sized = shown && slotIsSized(slot);
+  return slot.options.map(function (opt) {
+    var reason = null;
+    if (opt.available && !opt.available(sel)) reason = T(opt.unavailableReason || "room3d.noFit");
+    else if (sized && sel[slot.id] !== opt && productWouldDrop(layoutInput, slot, opt)) reason = T("room3d.tooBig");
+    return { id: opt.id, label: T("room3d.option." + opt.id), reason: reason };
+  });
+}
+
+// ---------------------------------------------------------------------
+// Product picks for the estimate
+// ---------------------------------------------------------------------
+// The chat's product step (js/script.js) walks the placed fixtures one tab
+// at a time, and prices whatever is showing by Kohler model number.
+
+function mmnFromUrl(url) {
+  var m = /\/(K-[A-Z0-9-]+)\.glb$/.exec(url || "");
+  return m ? m[1] : null;
+}
+
+// The Kohler model numbers an option puts in the room: its model and any
+// extras (a showerhead's arm, a spout's handles, the bowl under a top),
+// or for the walls, the kit (and corner joints) made for the base showing.
+// A stand-in or "none" has none.
+function optionMmns(slot, opt, sel) {
+  var urls;
+  if (slot.id === "showerWalls") {
+    if (!sel.showerBase.url) return [];
+    urls = [opt.kit(sel.showerBase)].concat(opt.corners ? [opt.corners] : []);
+  } else {
+    urls = optionModels(opt).map(function (m) {
+      return m.url;
+    });
+  }
+  var out = urls.map(mmnFromUrl).filter(Boolean);
+  if (opt.mmn) out.unshift(opt.mmn);
+  // The Pinoir sink is the room's own default model file.
+  if (!out.length && !opt.url && /^K-/.test(opt.id)) out.push(opt.id);
+  return out;
+}
+
+// The layout for the room as it stands in state right now (not the last
+// one drawn, which may lag a frame behind a just-entered count).
+function currentLayout() {
+  var dims = Layout.computeRoomDimensions(state.dims);
+  var layoutInput = {
+    widthFt: dims.widthFt,
+    lengthFt: dims.lengthFt,
+    fixtureCounts: state.fixtures,
+    plumbingWallIds: state.plumbingWallIds,
+    entryPoints: state.entryPoints,
+  };
+  layoutInput.footprints = fittedProductFootprints(layoutInput, false);
+  var layout = Layout.computeLayout(layoutInput);
+  var placedKeys = {};
+  layout.placements.forEach(function (p) {
+    placedKeys[p.fixtureKey] = true;
+  });
+  return { layoutInput: layoutInput, layout: layout, placedKeys: placedKeys };
+}
+
+function productGroupDef(groupId) {
+  for (var i = 0; i < PRODUCT_GROUPS.length; i++) if (PRODUCT_GROUPS[i].id === groupId) return PRODUCT_GROUPS[i];
+  return null;
+}
+
+// Frames every placed instance of a tab's fixtures, from in front of them.
+function focusCameraOn(s, group) {
+  var box = new THREE.Box3();
+  var facing = null;
+  s.fixtureGroup.children.forEach(function (inst) {
+    if (group.fixtureKeys.indexOf(inst.userData.fixtureKey) === -1) return;
+    box.expandByObject(inst);
+    if (facing === null) facing = inst.rotation.y;
+  });
+  if (box.isEmpty()) return false;
+  var center = box.getCenter(new THREE.Vector3());
+  var size = box.getSize(new THREE.Vector3());
+  var dir = new THREE.Vector3(Math.sin(facing), 0.55, Math.cos(facing)).normalize();
+  var distance = Math.max(size.x, size.y, size.z) * 1.6 + 3;
+  var dims = Layout.computeRoomDimensions(state.dims);
+  var diag = Math.sqrt(dims.widthFt * dims.widthFt + dims.lengthFt * dims.lengthFt);
+  s.controls.minDistance = Math.min(distance, 2);
+  s.controls.maxDistance = Math.max(distance, clamp(diag * 1.9, 12, 160));
+  s.cameraLerp = {
+    from: s.camera.position.clone(),
+    to: center.clone().addScaledVector(dir, distance),
+    targetFrom: s.controls.target.clone(),
+    targetTo: center,
+    start: performance.now(),
+    durationMs: 700,
+  };
+  needsRender = true;
+  return true;
 }
 
 function productWouldDrop(layoutInput, slot, opt) {
@@ -2707,6 +2807,8 @@ function applyCameraLerp(s) {
   var t = clamp((performance.now() - s.cameraLerp.start) / s.cameraLerp.durationMs, 0, 1);
   var eased = easeOutCubic(t);
   s.camera.position.lerpVectors(s.cameraLerp.from, s.cameraLerp.to, eased);
+  // A focus move (focusCameraOn) turns to look at the fixture as it goes.
+  if (s.cameraLerp.targetTo) s.controls.target.lerpVectors(s.cameraLerp.targetFrom, s.cameraLerp.targetTo, eased);
   if (t >= 1) s.cameraLerp = null;
 }
 
@@ -2820,6 +2922,10 @@ function rebuild() {
 
   rebuildFinishes(s);
   rebuildFixtures(s, dims.widthFt, dims.lengthFt, dims.heightFt);
+  if (s.pendingFocus) {
+    focusCameraOn(s, s.pendingFocus);
+    s.pendingFocus = null;
+  }
   // Follows the room if it resizes while walking in, or if the layout's
   // entry-point placement shifted; a no-op re-pin when nothing moved.
   if (state.cameraMode === "walkin") applyCameraMode(s);
@@ -2969,6 +3075,114 @@ window.BathroomRoom3D = {
 
   getProductPicks: function () {
     return Object.assign({}, state.productPicks);
+  },
+
+  // The switcher's tabs for the fixtures placed right now, in order, each
+  // with its dropdowns: [{ id, label, slots: [{ id, label, value,
+  // options: [{ id, label, reason }] }] }]. reason is set on an option that
+  // can't be picked, saying why.
+  getProductGroups: function () {
+    var cur = currentLayout();
+    var sel = selectedProducts();
+    return PRODUCT_GROUPS.map(function (group) {
+      var slots = PRODUCT_SLOTS.filter(function (slot) {
+        return productGroupOf(slot) === group.id && slotShown(slot, cur.placedKeys, sel);
+      }).map(function (slot) {
+        return {
+          id: slot.id,
+          label: T("room3d.slot." + slot.id),
+          value: sel[slot.id].id,
+          options: slotOptionStates(slot, sel, cur.layoutInput, true),
+        };
+      });
+      return { id: group.id, label: T("room3d.group." + group.id), slots: slots };
+    }).filter(function (g) {
+      return g.slots.length > 0;
+    });
+  },
+
+  // Swaps any stand-in still showing in this tab (the generic toilet, the
+  // glass enclosure, the plain mirror) for its first Kohler product that
+  // fits, so every fixture in it has a real product to price.
+  useRealProducts: function (groupId) {
+    var changed = false;
+    PRODUCT_SLOTS.forEach(function (slot) {
+      if (!slot.body || productGroupOf(slot) !== groupId) return;
+      var sel = selectedProducts();
+      if (optionMmns(slot, sel[slot.id], sel).length) return;
+      var layoutInput = currentLayout().layoutInput;
+      var pick = slot.options.filter(function (opt) {
+        return (
+          optionMmns(slot, opt, sel).length &&
+          (!opt.available || opt.available(sel)) &&
+          !productWouldDrop(layoutInput, slot, opt)
+        );
+      })[0];
+      if (pick) {
+        state.productPicks[slot.id] = pick.id;
+        changed = true;
+      }
+    });
+    if (changed) markDirty();
+  },
+
+  // Turns the camera to frame a tab's fixtures, and shows that tab above
+  // the canvas; null goes back to the whole-room overview. Returns whether
+  // there was anything to frame.
+  focusProductGroup: function (groupId) {
+    var s = threeState;
+    if (!s) return false;
+    if (!groupId) {
+      applyCameraMode(s);
+      return true;
+    }
+    var group = productGroupDef(groupId);
+    if (!group) return false;
+    if (state.cameraMode === "walkin") {
+      state.cameraMode = "orbit";
+      syncCameraControls(s);
+    }
+    if (s.productSwitcher) {
+      s.productSwitcher.group = groupId;
+      applyProductGroup(s.productSwitcher);
+    }
+    // The fixtures may not be drawn yet (counts just entered): frame them
+    // once the next rebuild has placed them.
+    if (dirty) {
+      s.pendingFocus = group;
+      return true;
+    }
+    return focusCameraOn(s, group);
+  },
+
+  // What to price: one item per showing product slot of each placed
+  // fixture, with the Kohler model numbers it puts in the room and how many
+  // of that fixture are placed. [{ groupId, slotId, slotLabel, optionId,
+  // productLabel, mmns: [...], qty }]
+  getProductPricingItems: function () {
+    var cur = currentLayout();
+    var sel = selectedProducts();
+    var items = [];
+    PRODUCT_SLOTS.forEach(function (slot) {
+      if (!slotShown(slot, cur.placedKeys, sel)) return;
+      var opt = sel[slot.id];
+      var mmns = optionMmns(slot, opt, sel);
+      if (!mmns.length) return;
+      var qty = cur.layout.placements.filter(function (p) {
+        return p.fixtureKey === slot.fixtureKey && !(slot.skip && slot.skip(p));
+      }).length;
+      if (!qty) return;
+      items.push({
+        groupId: productGroupOf(slot),
+        slotId: slot.id,
+        slotLabel: T("room3d.slot." + slot.id),
+        optionId: opt.id,
+        productLabel: T("room3d.option." + opt.id),
+        mmns: mmns,
+        qty: qty,
+      });
+    });
+    return items;
   },
 
   setFixtureFinish: function (fixtureKey, colorHex) {

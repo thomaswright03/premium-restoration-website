@@ -240,13 +240,43 @@ test.describe("chat estimate", () => {
 test.describe("the merged fixtures + real-product-pick flow", () => {
   const NOTHING_BUT_FIXTURES = { demolition: "No", floorFinish: "None", walls: "Neither", paintCeiling: "No" };
 
-  test("moves straight from fixtures into product picks with real photos, retints the 3D view, and ends in one combined card", async ({
+  test("walks each placed fixture's Kohler products with the camera on it, prices them live, and ends in one combined card", async ({
     page,
   }) => {
+    // The pricing service (tools/pricing-service/) stood in for here: it
+    // prices every model it's asked for except the paper holder's.
+    await useConfig(page, { productPricing: { endpoint: "https://pricing.example.com/prices" } });
+    let asked = null;
+    await page.route("https://pricing.example.com/prices", async (route) => {
+      const cors = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      };
+      if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
+      asked = route.request().postDataJSON();
+      const results = {};
+      for (const mmn of asked.mmns) {
+        if (mmn !== "K-14377-CP")
+          results[mmn] = { found: true, price: 100, name: mmn, url: "https://www.homedepot.com/p/" + mmn };
+      }
+      return route.fulfill({
+        status: 200,
+        headers: cors,
+        contentType: "application/json",
+        body: JSON.stringify({ zip: asked.zip, store: "21st South", results }),
+      });
+    });
+
     await startEstimate(page);
     await answerScope(page, NOTHING_BUT_FIXTURES);
     await skipRoomInteractionSteps(page);
-    await fillGroup(page, "fixtures", { Toilet_Quantity: 1, Shower_Quantity: 1, Shower_Door_Quantity: 1 });
+    await fillGroup(page, "fixtures", {
+      Toilet_Quantity: 1,
+      Shower_Quantity: 1,
+      Shower_Door_Quantity: 1,
+      Cabinet_Quantity: 1,
+    });
 
     // The old two-step flow (separate button, separate card) is gone.
     await expect(page.getByRole("button", { name: /Pick Your Materials/ })).toHaveCount(0);
@@ -256,31 +286,41 @@ test.describe("the merged fixtures + real-product-pick flow", () => {
     await page.locator('input[autocomplete="postal-code"]').fill("84101");
     await page.locator(".ai-chat-group-continue").last().click();
 
-    await expect(page.locator(".ai-chat-group-intro", { hasText: "Which toilets" })).toBeVisible();
-    const toiletChoice = page.locator(".ai-chat-choice--material").last();
-    await expect(toiletChoice.locator(".ai-chat-material-thumb")).toHaveCount(1);
-    await toiletChoice.click();
+    // One step per fixture, its switcher tab showing above the canvas. The
+    // generic stand-in toilet is swapped for the first Kohler one.
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Next up: Toilet." })).toBeVisible();
+    await expect(page.locator(".ai-chat-room-3d-products .ai-chat-room-3d-style-btn.selected")).toHaveText("Toilet");
+    await expect(page.locator("#ai-chat-product-pick-toilet")).toHaveValue("K-31648-0");
+    await page.locator("#ai-chat-product-pick-paperHolder").selectOption("K-14377-CP");
+    await expect(page.locator("#ai-chat-room-3d-product-paperHolder")).toHaveValue("K-14377-CP");
     await page.locator(".ai-chat-group-continue").last().click();
 
-    await expect(page.locator(".ai-chat-group-intro", { hasText: "Which showers" })).toBeVisible();
-    await page.locator(".ai-chat-choice--material").last().click();
+    // The glass enclosure is swapped for a Kohler base that fits, which
+    // brings its wall kit and a door made for it.
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Next up: Shower." })).toBeVisible();
+    await expect(page.locator("#ai-chat-product-pick-showerBase")).not.toHaveValue("glass-enclosure");
+    await expect(page.locator("#ai-chat-product-pick-showerWalls")).toBeVisible();
+    await expect(page.locator("#ai-chat-product-pick-showerDoor")).not.toHaveValue("standard-door");
     await page.locator(".ai-chat-group-continue").last().click();
 
-    // Every real catalog option here is "Matte Black" — picking one proves
-    // the 3D proxy's best-effort finish retint (guessFinishColor() in
-    // js/materials-pricing.js) actually fires against real product names,
-    // not just in isolation.
-    await expect(page.locator(".ai-chat-group-intro", { hasText: "Which shower doors" })).toBeVisible();
-    const doorChoice = page.locator(".ai-chat-choice--material").last();
-    await expect(doorChoice).toContainText(/Matte Black/i);
-    await doorChoice.click();
+    // Anything without a Kohler product keeps the catalog picker.
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Which cabinets" })).toBeVisible();
+    const cabinetChoice = page.locator(".ai-chat-choice--material").last();
+    await expect(cabinetChoice.locator(".ai-chat-material-thumb")).toHaveCount(1);
+    await cabinetChoice.click();
     await page.locator(".ai-chat-group-continue").last().click();
 
     const card = page.getByTestId("estimate-card");
     await expect(card).toBeVisible();
+    expect(asked.zip).toBe("84101");
+    expect(asked.mmns).toEqual(expect.arrayContaining(["K-31648-0", "K-14377-CP", "K-T73117-4-CP"]));
     await expect(card).toContainText("Labor Subtotal");
     await expect(card).toContainText("Materials Subtotal");
-    await expect(card).toContainText(/Matte Black/i);
+    await expect(card).toContainText("Cimarron two-piece elongated (K-31648-0)");
+    await expect(card).toContainText("Home Depot, 21st South store");
+    await expect(card).toContainText(
+      "No live Home Depot price was found for these, so they aren't in the total: Paper holder: Purist pivoting holder.",
+    );
     await expect(card.locator(".ai-chat-material-thumb").first()).toBeVisible();
     await expect(card.locator(".ai-chat-estimate-total-label")).toHaveText(
       "Estimated Total (Labor + Materials), before plumbing",
@@ -298,6 +338,23 @@ test.describe("the merged fixtures + real-product-pick flow", () => {
     expect(pdf).toContain("Estimated Total \\(Labor + Materials\\), before plumbing");
   });
 
+  test("with no pricing service, the Kohler picks are named as not priced and the estimate still finishes", async ({
+    page,
+  }) => {
+    await startEstimate(page);
+    await answerScope(page, NOTHING_BUT_FIXTURES);
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Toilet_Quantity: 1 });
+    await page.locator('input[autocomplete="postal-code"]').fill("84101");
+    await page.locator(".ai-chat-group-continue").last().click();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Next up: Toilet." })).toBeVisible();
+    await page.locator(".ai-chat-group-continue", { hasText: "See My Estimate" }).last().click();
+    const card = page.getByTestId("estimate-card");
+    await expect(card).toBeVisible();
+    await expect(card).toContainText("so they aren't in the total: Toilet: Cimarron two-piece elongated.");
+    await expect(card.locator(".ai-chat-estimate-total-label")).toHaveText("Estimated Labor Total, before plumbing");
+  });
+
   test("a ZIP typed with a stray leading space is not truncated below 5 real digits", async ({ page }) => {
     // Regression: maxlength=5 counted a leading space as one of the 5
     // slots, so typing " 84101" real-character-by-character (as a browser
@@ -313,7 +370,7 @@ test.describe("the merged fixtures + real-product-pick flow", () => {
     await zipInput.pressSequentially(" 84101");
     await expect(zipInput).toHaveValue(" 84101");
     await page.locator(".ai-chat-group-continue").last().click();
-    await expect(page.locator(".ai-chat-group-intro", { hasText: "Which toilets" })).toBeVisible();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Next up: Toilet." })).toBeVisible();
   });
 
   test("a scope needing no real products (no fixtures, no tile/paint) still ends in a plain labor-only card", async ({

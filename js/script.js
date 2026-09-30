@@ -261,7 +261,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // rendering — the ZIP + per-category real-product-pick steps that now
     // follow fixtures automatically, no separate button/gate. See
     // startProductPicks()/advanceProductPick() below.
-    var pickState = null; // { values, scope, laborResult, categories, categoryIndex, zip, picks, mainSteps, totalSteps }
+    var pickState = null; // { values, scope, laborResult, groups, groupIndex, categories, categoryIndex, zip, picks, mainSteps, totalSteps }
 
     function buildGroups(scope) {
       var needs = Pricing.scopeNeeds(scope || {});
@@ -945,7 +945,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // grand total, and the usual disclaimers/actions. hasMaterials controls
     // which copy/labels are used throughout (see totalLabel()/
     // excludedLines()/allAssumptions()/estimateDisclaimer() above).
-    function appendCombinedCard(values, scope, result, categories, picks) {
+    function appendCombinedCard(values, scope, result, categories, picks, notes) {
       var fixtureCount = result.plumbingFixtureCount;
       var pickList = categories
         .map(function (c) {
@@ -1025,6 +1025,9 @@ document.addEventListener("DOMContentLoaded", function () {
         materialsSubtotalWrap.appendChild(el("span", null, Pricing.money(materialsSubtotal)));
         card.appendChild(materialsSubtotalWrap);
       }
+      (notes || []).forEach(function (note) {
+        card.appendChild(el("p", "ai-chat-estimate-total-note", note));
+      });
 
       var excluded = el("div", "ai-chat-estimate-excluded");
       excludedLines(fixtureCount, hasMaterials).forEach(function (x) {
@@ -1282,7 +1285,17 @@ document.addEventListener("DOMContentLoaded", function () {
         materialsEstimatorEnabled() && window.MaterialsPricing
           ? window.MaterialsPricing.categoriesFromLines(result.lines)
           : [];
-      if (!categories.length) {
+      // With the 3D room up, the fixtures it has Kohler products for are
+      // picked there instead (one step per fixture, the camera zoomed in on
+      // it), and priced live at Home Depot for the customer's ZIP once
+      // they're done. Everything else keeps the catalog picker.
+      var groups = kohlerPicksEnabled() ? window.BathroomRoom3D.getProductGroups() : [];
+      if (groups.length) {
+        categories = categories.filter(function (c) {
+          return KOHLER_PRICED_KEYS.indexOf(c.key) === -1;
+        });
+      }
+      if (!categories.length && !groups.length) {
         finishEstimate(values, scope, result, [], {});
         return;
       }
@@ -1290,27 +1303,42 @@ document.addEventListener("DOMContentLoaded", function () {
         values: values,
         scope: scope,
         laborResult: result,
+        groups: groups.map(function (g) {
+          return g.id;
+        }),
+        groupIndex: -1,
         categories: categories,
         categoryIndex: -1,
         zip: "",
         picks: {},
         mainSteps: mainSteps,
-        totalSteps: mainSteps + 1 + categories.length, // +1 for the ZIP step
+        totalSteps: mainSteps + 1 + groups.length + categories.length, // +1 for the ZIP step
       };
       setProgress(Math.round((mainSteps / pickState.totalSteps) * 100));
       appendMaterialsZipForm();
     }
 
     function advanceProductPick() {
+      if (pickState.groupIndex + 1 < pickState.groups.length) {
+        pickState.groupIndex++;
+        setProgress(Math.round(((pickState.mainSteps + 1 + pickState.groupIndex) / pickState.totalSteps) * 100));
+        appendKohlerGroupForm(pickState.groups[pickState.groupIndex]);
+        return;
+      }
       pickState.categoryIndex++;
       if (pickState.categoryIndex < pickState.categories.length) {
-        var stepIndex = pickState.mainSteps + 1 + pickState.categoryIndex;
+        var stepIndex = pickState.mainSteps + 1 + pickState.groups.length + pickState.categoryIndex;
         setProgress(Math.round((stepIndex / pickState.totalSteps) * 100));
         appendMaterialCategoryForm(pickState.categoryIndex);
         return;
       }
       var state = pickState;
       pickState = null;
+      if (state.groups.length) {
+        if (window.BathroomRoom3D) window.BathroomRoom3D.focusProductGroup(null);
+        priceKohlerPicks(state);
+        return;
+      }
       finishEstimate(state.values, state.scope, state.laborResult, state.categories, state.picks);
     }
 
@@ -1318,11 +1346,224 @@ document.addEventListener("DOMContentLoaded", function () {
     // picks happened — renders the combined card and restores the chat
     // input, matching what advance() used to do directly before product
     // picks were folded into this same continuous flow.
-    function finishEstimate(values, scope, result, categories, picks) {
+    function finishEstimate(values, scope, result, categories, picks, notes) {
       setProgress(100);
       chatForm.hidden = false;
-      appendCombinedCard(values, scope, result, categories, picks);
+      appendCombinedCard(values, scope, result, categories, picks, notes);
       setTimeout(hideProgress, 1200);
+    }
+
+    // Catalog categories the 3D room's Kohler products stand in for. The
+    // vanity's cabinet isn't a Kohler product: only its bowl or top and
+    // faucet are priced, and the card says the cabinet isn't.
+    var KOHLER_PRICED_KEYS = [
+      "Toilet_Quantity",
+      "Sink_Quantity",
+      "Bathtub_Quantity",
+      "Shower_Quantity",
+      "Shower_Door_Quantity",
+      "Vanity_Quantity",
+      "Mirror_Quantity",
+      "Mirror_Huge_Quantity",
+      "Shower_Shelf_Quantity",
+    ];
+
+    function kohlerPicksEnabled() {
+      return !!(
+        materialsEstimatorEnabled() &&
+        room3dInteractive() &&
+        typeof window.BathroomRoom3D.getProductGroups === "function"
+      );
+    }
+
+    function productPricingEndpoint() {
+      return (siteConfig && siteConfig.productPricing && siteConfig.productPricing.endpoint) || "";
+    }
+
+    // One step per placed fixture: the camera zooms in on it and each of
+    // its parts gets a dropdown, the same choices as the switcher above the
+    // canvas (and kept in sync with it). A stand-in still showing (the
+    // generic toilet, the glass enclosure) is swapped for a Kohler product
+    // first, so there's something real to price.
+    function appendKohlerGroupForm(groupId) {
+      var room = window.BathroomRoom3D;
+      room.useRealProducts(groupId);
+      room.focusProductGroup(groupId);
+      var group = currentGroup();
+
+      var parts = botRow();
+      var content = el("div", "ai-chat-text");
+      content.appendChild(el("p", "ai-chat-group-intro", T("products.which", { fixture: group.label })));
+
+      var formEl = document.createElement("form");
+      formEl.className = "ai-chat-group-form";
+      var fieldsWrap = el("div", "ai-chat-product-fields");
+      formEl.appendChild(fieldsWrap);
+
+      function currentGroup() {
+        return (
+          room.getProductGroups().filter(function (g) {
+            return g.id === groupId;
+          })[0] || { id: groupId, label: "", slots: [] }
+        );
+      }
+
+      // Redrawn after every pick: one pick can change what another slot
+      // offers (a 36 in. base only takes pivot doors).
+      function renderFields() {
+        fieldsWrap.textContent = "";
+        currentGroup().slots.forEach(function (slot) {
+          var fieldWrap = el("div", "ai-chat-group-field");
+          var id = "ai-chat-product-pick-" + slot.id;
+          var label = el("label", "ai-chat-field-label", slot.label);
+          label.htmlFor = id;
+          fieldWrap.appendChild(label);
+          var select = document.createElement("select");
+          select.id = id;
+          select.className = "ai-chat-product-select";
+          slot.options.forEach(function (opt) {
+            var o = document.createElement("option");
+            o.value = opt.id;
+            o.textContent = opt.label + (opt.reason ? " (" + opt.reason + ")" : "");
+            o.disabled = !!opt.reason;
+            select.appendChild(o);
+          });
+          select.value = slot.value;
+          select.addEventListener("change", function () {
+            room.setProductPick(slot.id, select.value);
+            renderFields();
+            var again = document.getElementById(id);
+            if (again) again.focus({ preventScroll: true });
+          });
+          fieldWrap.appendChild(select);
+          fieldsWrap.appendChild(fieldWrap);
+        });
+      }
+      renderFields();
+
+      var actionsWrap = el("div", "ai-chat-group-actions");
+      var cancelBtn = el("button", "ai-chat-group-cancel", T("flow.cancel"));
+      cancelBtn.type = "button";
+      var isLast =
+        pickState.groupIndex === pickState.groups.length - 1 &&
+        pickState.categoryIndex + 1 >= pickState.categories.length;
+      var continueBtn = el("button", "ai-chat-group-continue", T(isLast ? "flow.seeEstimate" : "flow.continue"));
+      continueBtn.type = "submit";
+      actionsWrap.appendChild(cancelBtn);
+      actionsWrap.appendChild(continueBtn);
+      formEl.appendChild(actionsWrap);
+
+      function disableForm() {
+        Array.prototype.forEach.call(formEl.querySelectorAll("select, button"), function (elx) {
+          elx.disabled = true;
+        });
+      }
+
+      cancelBtn.addEventListener("click", function () {
+        disableForm();
+        cancelFlow();
+      });
+
+      formEl.addEventListener("submit", function (e) {
+        e.preventDefault();
+        disableForm();
+        advanceProductPick();
+      });
+
+      content.appendChild(formEl);
+      parts.inner.appendChild(content);
+      chatMessages.appendChild(parts.row);
+      scrollToEnd();
+      var first = formEl.querySelector("select");
+      if (first) first.focus({ preventScroll: true });
+    }
+
+    // Asks the pricing service (site-config.json productPricing.endpoint,
+    // see tools/pricing-service/) for each model's current price at the
+    // Home Depot store nearest the ZIP. Resolves to { store, results:
+    // { MMN: { price, name, url } } }, or null when there's no service or
+    // it didn't answer — the card then says those products aren't priced.
+    function fetchProductPrices(zip, mmns) {
+      var endpoint = productPricingEndpoint();
+      if (!endpoint || !window.fetch) return Promise.resolve(null);
+      var controller = window.AbortController ? new AbortController() : null;
+      var timer = controller
+        ? setTimeout(function () {
+            controller.abort();
+          }, 150000)
+        : null;
+      return fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zip: zip, mmns: mmns }),
+        signal: controller ? controller.signal : undefined,
+      })
+        .then(function (res) {
+          return res.ok ? res.json() : null;
+        })
+        .catch(function () {
+          return null;
+        })
+        .then(function (data) {
+          if (timer) clearTimeout(timer);
+          return data && data.results ? data : null;
+        });
+    }
+
+    // Prices everything the Kohler steps put in the room, then shows the
+    // card: a line per product with its live price (times how many of that
+    // fixture there are), and a note naming anything without one.
+    function priceKohlerPicks(state) {
+      var items = window.BathroomRoom3D.getProductPricingItems();
+      var mmns = [];
+      items.forEach(function (item) {
+        item.mmns.forEach(function (m) {
+          if (mmns.indexOf(m) === -1) mmns.push(m);
+        });
+      });
+      var waiting = botRow();
+      waiting.inner.appendChild(el("div", "ai-chat-text", T("products.checking", { zip: state.zip })));
+      chatMessages.appendChild(waiting.row);
+      scrollToEnd();
+
+      fetchProductPrices(state.zip, mmns).then(function (data) {
+        waiting.row.remove();
+        var results = (data && data.results) || {};
+        var retailer = data && data.store ? T("products.retailer", { store: data.store }) : "Home Depot";
+        var categories = state.categories.slice();
+        var unpriced = [];
+        items.forEach(function (item) {
+          var prices = item.mmns.map(function (m) {
+            return results[m] && typeof results[m].price === "number" ? results[m] : null;
+          });
+          var label = item.slotLabel + ": " + item.productLabel;
+          if (prices.indexOf(null) !== -1) {
+            unpriced.push(label);
+            return;
+          }
+          var each = prices.reduce(function (sum, r) {
+            return sum + r.price;
+          }, 0);
+          var key = "kohler:" + item.slotId;
+          categories.push({ key: key, label: item.slotLabel, qty: item.qty, unit: "" });
+          state.picks[key] = {
+            categoryLabel: item.slotLabel,
+            productName: item.productLabel + " (" + item.mmns.join(" + ") + ")",
+            imageUrl: null,
+            retailer: retailer,
+            url: prices[0].url || null,
+            quantityLabel: Pricing.formatQty(item.qty) + " " + T(item.qty === 1 ? "unit.unit" : "unit.units"),
+            cost: Pricing.roundCents(each * item.qty),
+          };
+        });
+        var notes = [];
+        if (unpriced.length) notes.push(T("products.unpriced", { items: unpriced.join("; ") }));
+        var hasVanity = items.some(function (item) {
+          return item.groupId === "vanity";
+        });
+        if (hasVanity) notes.push(T("products.vanityCabinet"));
+        finishEstimate(state.values, state.scope, state.laborResult, categories, state.picks, notes);
+      });
     }
 
     function appendMaterialsZipForm() {

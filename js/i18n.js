@@ -648,6 +648,27 @@
       "Elija el producto para: {label} ({qty} {unit})",
       "Escolha o produto para: {label} ({qty} {unit})",
     ],
+    "products.which": [
+      "Next up: {fixture}. Pick its products below; the 3D view zooms in and shows each one as you pick it.",
+      "Sigue: {fixture}. Elija sus productos abajo; la vista 3D se acerca y muestra cada uno a medida que lo elige.",
+      "Próximo: {fixture}. Escolha os produtos abaixo; a visualização 3D se aproxima e mostra cada um conforme você escolhe.",
+    ],
+    "products.checking": [
+      "Checking live Home Depot prices near {zip}. This can take up to a minute.",
+      "Consultando los precios actuales de Home Depot cerca de {zip}. Puede tardar hasta un minuto.",
+      "Consultando os preços atuais da Home Depot perto de {zip}. Pode levar até um minuto.",
+    ],
+    "products.retailer": ["Home Depot, {store} store", "Home Depot, tienda {store}", "Home Depot, loja {store}"],
+    "products.unpriced": [
+      "No live Home Depot price was found for these, so they aren't in the total: {items}.",
+      "No se encontró un precio actual de Home Depot para estos productos, así que no están en el total: {items}.",
+      "Não encontramos um preço atual da Home Depot para estes produtos, então eles não estão no total: {items}.",
+    ],
+    "products.vanityCabinet": [
+      "The vanity cabinet itself isn't a Kohler product, so it isn't priced here; only its bowl or top and faucet are.",
+      "El mueble del lavabo no es un producto Kohler, así que no tiene precio aquí; solo el lavabo o la cubierta y la llave.",
+      "O gabinete em si não é um produto Kohler, então não tem preço aqui; só a cuba ou o tampo e a torneira.",
+    ],
     "materials.priceAt": ["{price} at {store}", "{price} en {store}", "{price} na {store}"],
     "materials.pickOne": [
       "Pick one option to continue.",

@@ -869,6 +869,24 @@ body.ai-chat-locked {
   font-size: var(--fs-sm);
 }
 
+/* The chat's per-fixture product step (js/script.js appendKohlerGroupForm):
+   one labelled dropdown per part, two across once there's room. */
+.ai-chat-product-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-3);
+}
+
+.ai-chat-product-select {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+}
+
 /* Walk-in POV toggle + (when more than one entry point exists) the entry
    switcher row beneath it — built and shown/hidden entirely by
    js/bathroom-room-3d.js once at least one entry point is placed. */

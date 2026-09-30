@@ -183,10 +183,9 @@ test.describe("accessibility", () => {
       await page.locator('input[autocomplete="postal-code"]').fill("84101");
       await page.locator(".ai-chat-group-continue").last().click();
 
-      await expect(page.locator(".ai-chat-group-intro", { hasText: "Which toilets" })).toBeVisible();
+      await expect(page.locator(".ai-chat-group-intro", { hasText: "Next up: Toilet." })).toBeVisible();
       results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
       expect(results.violations.flatMap((v) => v.nodes.map((n) => n.target + " " + n.failureSummary))).toEqual([]);
-      await page.locator(".ai-chat-choice--material").last().click();
       await page.locator(".ai-chat-group-continue").last().click();
 
       await expect(page.getByTestId("estimate-card")).toBeVisible();
