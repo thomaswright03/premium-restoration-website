@@ -203,6 +203,16 @@ test("computeLayout: a toilet and a tub or shower share one plumbing wall when i
   }
 });
 
+test("computeLayout: a vanity only goes on a plumbing wall", () => {
+  var result = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    fixtureCounts: { Vanity_Quantity: 1 },
+    plumbingWallIds: ["E"],
+  });
+  assert.equal(result.placements[0].wallId, "E");
+});
+
 test("computeLayout: a shower door sits at the open edge of a resized shower", () => {
   var base = { widthFt: 10, lengthFt: 8, fixtureCounts: { Shower_Quantity: 1, Shower_Door_Quantity: 1 } };
   var door = (layout) => layout.placements.filter((p) => p.fixtureKey === "Shower_Door_Quantity")[0];
@@ -321,7 +331,7 @@ test("demolition has no fixture-layout or finish-color entry point, same convent
 test("PLUMBING_FIXTURE_KEYS exposes exactly the fixtures that need to be on a plumbing wall", () => {
   assert.deepEqual(
     L.PLUMBING_FIXTURE_KEYS.slice().sort(),
-    ["Bathtub_Quantity", "Shower_Quantity", "Sink_Quantity", "Toilet_Quantity"].sort(),
+    ["Bathtub_Quantity", "Shower_Quantity", "Sink_Quantity", "Toilet_Quantity", "Vanity_Quantity"].sort(),
   );
 });
 

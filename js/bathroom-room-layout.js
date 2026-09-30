@@ -105,7 +105,15 @@
   // Fixtures that need to be on a wall carrying the plumbing stack. Kept
   // local (not read from js/bathroom-pricing.js's needsPlumbing flags) so
   // this module keeps its existing no-cross-file-dependency convention.
-  var PLUMBING_FIXTURE_KEYS = ["Toilet_Quantity", "Sink_Quantity", "Bathtub_Quantity", "Shower_Quantity"];
+  // A vanity carries a sink, so it needs the stack as much as a pedestal
+  // sink does.
+  var PLUMBING_FIXTURE_KEYS = [
+    "Toilet_Quantity",
+    "Sink_Quantity",
+    "Vanity_Quantity",
+    "Bathtub_Quantity",
+    "Shower_Quantity",
+  ];
 
   // Fixed priority order for the floor-standing wall scan. Each type scans
   // from its OWN fixed wall index (priorityIndex % 4), not a shared cursor

@@ -451,9 +451,9 @@
       "Corrija as respostas destacadas acima.",
     ],
     "walls.intro": [
-      "Which wall(s) carry the plumbing stack? Click them directly in the 3D preview — pick as many as apply. The toilet, sink, tub, and shower will only be placed on the wall(s) you choose.",
-      "¿Qué pared o paredes tienen la bajante de plomería? Haga clic en ellas directamente en la vista 3D; elija todas las que correspondan. El inodoro, el lavabo, la bañera y la ducha solo se colocarán en las paredes que elija.",
-      "Qual parede ou quais paredes têm a prumada hidráulica? Clique nelas direto na visualização 3D; escolha todas as que se aplicam. O vaso, a pia, a banheira e o chuveiro só serão colocados nas paredes que você escolher.",
+      "Which wall(s) carry the plumbing stack? Click them directly in the 3D preview — pick as many as apply. The toilet, sink, vanity, tub, and shower will only be placed on the wall(s) you choose.",
+      "¿Qué pared o paredes tienen la bajante de plomería? Haga clic en ellas directamente en la vista 3D; elija todas las que correspondan. El inodoro, el lavabo, el mueble de baño, la bañera y la ducha solo se colocarán en las paredes que elija.",
+      "Qual parede ou quais paredes têm a prumada hidráulica? Clique nelas direto na visualização 3D; escolha todas as que se aplicam. O vaso, a pia, o gabinete, a banheira e o chuveiro só serão colocados nas paredes que você escolher.",
     ],
     "walls.none": ["No walls selected yet.", "Todavía no hay paredes elegidas.", "Nenhuma parede escolhida ainda."],
     "walls.one": ["1 wall selected.", "1 pared elegida.", "1 parede escolhida."],
