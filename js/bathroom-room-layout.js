@@ -281,8 +281,20 @@
     };
   }
 
+  // Rectangles that only touch don't overlap. EPS absorbs floating-point
+  // error: a fixture packed right after another starts at a sum like
+  // 1.25 + 1.25 + 2.6 - 2.6, which can land a hair before the first one's
+  // edge (2.4999999999999996 vs 2.5) and would otherwise count as a
+  // collision, dropping a fixture from a wall with plenty of room.
+  var OVERLAP_EPS_FT = 1e-6;
+
   function rectsOverlap(a, b) {
-    return a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ;
+    return (
+      a.minX < b.maxX - OVERLAP_EPS_FT &&
+      a.maxX > b.minX + OVERLAP_EPS_FT &&
+      a.minZ < b.maxZ - OVERLAP_EPS_FT &&
+      a.maxZ > b.minZ + OVERLAP_EPS_FT
+    );
   }
 
   function placeAt(wall, alongOffset, footprint) {

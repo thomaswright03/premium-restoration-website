@@ -186,6 +186,23 @@ test("computeLayout: shower door pairs with the shower of the same index, extra 
   assert.equal(doors[0].z, shower.z);
 });
 
+test("computeLayout: a toilet and a tub or shower share one plumbing wall when it's long enough", () => {
+  // Packed side by side, the second fixture's envelope starts exactly where
+  // the toilet's ends; floating-point error used to read that as overlap.
+  for (const other of ["Bathtub_Quantity", "Shower_Quantity"]) {
+    for (const widthFt of [8, 10, 12]) {
+      var result = L.computeLayout({
+        widthFt,
+        lengthFt: 10,
+        fixtureCounts: { Toilet_Quantity: 1, [other]: 1 },
+        plumbingWallIds: ["N"],
+      });
+      assert.deepEqual(result.droppedCounts, {}, other + " in a " + widthFt + " ft room");
+      assert.ok(result.placements.every((p) => p.wallId === "N"));
+    }
+  }
+});
+
 test("computeLayout: a shower door sits at the open edge of a resized shower", () => {
   var base = { widthFt: 10, lengthFt: 8, fixtureCounts: { Shower_Quantity: 1, Shower_Door_Quantity: 1 } };
   var door = (layout) => layout.placements.filter((p) => p.fixtureKey === "Shower_Door_Quantity")[0];
