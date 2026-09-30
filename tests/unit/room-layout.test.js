@@ -203,6 +203,38 @@ test("computeLayout: a toilet and a tub or shower share one plumbing wall when i
   }
 });
 
+test("computeLayout: a fixture dragged to a spot stays there, and one that no longer fits goes back to automatic", () => {
+  var base = { widthFt: 12, lengthFt: 10, fixtureCounts: { Toilet_Quantity: 1, Vanity_Quantity: 1 } };
+  var moved = L.computeLayout(
+    Object.assign({}, base, { fixturePositions: { Vanity_Quantity: { 0: { wallId: "S", offsetFt: 6 } } } }),
+  );
+  var vanity = moved.placements.filter((p) => p.fixtureKey === "Vanity_Quantity")[0];
+  assert.equal(vanity.wallId, "S");
+  assert.equal(vanity.offsetFt, 6);
+  assert.equal(vanity.moved, true);
+  // On top of the toilet, itself dragged there: ignored, placed
+  // automatically instead.
+  var clash = L.computeLayout(
+    Object.assign({}, base, {
+      fixturePositions: {
+        Toilet_Quantity: { 0: { wallId: "N", offsetFt: 1.25 } },
+        Vanity_Quantity: { 0: { wallId: "N", offsetFt: 1.5 } },
+      },
+    }),
+  );
+  var auto = clash.placements.filter((p) => p.fixtureKey === "Vanity_Quantity")[0];
+  assert.ok(auto && !auto.moved);
+  assert.deepEqual(clash.droppedCounts, {});
+  // Not on a plumbing wall: ignored too.
+  var dry = L.computeLayout(
+    Object.assign({}, base, {
+      plumbingWallIds: ["N"],
+      fixturePositions: { Vanity_Quantity: { 0: { wallId: "S", offsetFt: 6 } } },
+    }),
+  );
+  assert.equal(dry.placements.filter((p) => p.fixtureKey === "Vanity_Quantity")[0].wallId, "N");
+});
+
 test("computeLayout: a vanity only goes on a plumbing wall", () => {
   var result = L.computeLayout({
     widthFt: 10,

@@ -470,6 +470,48 @@
       });
     }
 
+    // Fixtures the customer dragged to a spot in the 3D preview
+    // (input.fixturePositions: { fixtureKey: { index: { wallId, offsetFt } } }),
+    // reserved next — before the automatic scan, like entry points — and
+    // held to the same plumbing-wall, fit and clearance rules. A position
+    // that no longer works (the room shrank, the wall lost its plumbing)
+    // is ignored and that fixture is placed automatically instead.
+    var fixturePositions =
+      input.fixturePositions && typeof input.fixturePositions === "object" ? input.fixturePositions : {};
+    var reserved = {}; // fixtureKey -> { index: placement }
+    FLOOR_PRIORITY.forEach(function (fixtureKey) {
+      if (fixtureKey === "Door_Quantity") return;
+      var positions = fixturePositions[fixtureKey];
+      if (!positions || typeof positions !== "object") return;
+      var footprint = footprintFor(fixtureKey);
+      var halfWidth = expandedHalfWidth(footprint, fixtureKey);
+      var depthExtent = footprint.depth + clearanceFt(fixtureKey).front;
+      var parsedCount = parseNumber(fixtureCounts[fixtureKey]);
+      var count = clamp(Math.floor(parsedCount === null ? 0 : parsedCount), 0, MAX_FIXTURE_COUNT);
+      var isPlumbing = plumbingWallIds && plumbingWallIds.length && PLUMBING_FIXTURE_KEYS.indexOf(fixtureKey) !== -1;
+      reserved[fixtureKey] = {};
+      for (var i = 0; i < count; i++) {
+        var pos = positions[i];
+        if (!pos || typeof pos.offsetFt !== "number" || !isFinite(pos.offsetFt)) continue;
+        var wall = wallByIdOrder([pos.wallId])[0];
+        if (!wall || wall.span < 2 * halfWidth || depthExtent > wall.roomDepth) continue;
+        if (isPlumbing && plumbingWallIds.indexOf(wall.id) === -1) continue;
+        var alongOffset = clamp(pos.offsetFt, halfWidth, wall.span - halfWidth);
+        var rect = clearanceRect(wall, alongOffset, halfWidth, depthExtent);
+        var conflict = placedRects.some(function (r) {
+          return rectsOverlap(rect, r);
+        });
+        if (conflict) continue;
+        var placement = placeAt(wall, alongOffset, footprint);
+        placement.fixtureKey = fixtureKey;
+        placement.index = i;
+        placement.offsetFt = alongOffset;
+        placement.moved = true;
+        placedRects.push(rect);
+        reserved[fixtureKey][i] = placement;
+      }
+    });
+
     FLOOR_PRIORITY.forEach(function (fixtureKey, priorityIdx) {
       // Handled above instead, when the customer picked explicit points.
       if (fixtureKey === "Door_Quantity" && explicitEntryPoints) return;
@@ -483,6 +525,12 @@
       placedByType[fixtureKey] = [];
       var isPlumbing = plumbingWallIds && plumbingWallIds.length && PLUMBING_FIXTURE_KEYS.indexOf(fixtureKey) !== -1;
       for (var i = 0; i < count; i++) {
+        var moved = reserved[fixtureKey] && reserved[fixtureKey][i];
+        if (moved) {
+          placements.push(moved);
+          placedByType[fixtureKey].push(moved);
+          continue;
+        }
         var candidateWalls = scanOrderFor(priorityIdx, i);
         if (footprint.preferWall) {
           var preferred = wallByIdOrder([footprint.preferWall])[0];
@@ -518,6 +566,7 @@
         var placement = placeAt(chosen, chosenOffset, footprint);
         placement.fixtureKey = fixtureKey;
         placement.index = i;
+        placement.offsetFt = chosenOffset;
         chosen.used = chosenOffset + halfWidth;
         placedRects.push(chosenRect);
         placements.push(placement);

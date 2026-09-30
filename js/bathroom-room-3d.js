@@ -787,7 +787,22 @@ var PRODUCT_SLOTS = [
     id: "paperHolder",
     fixtureKey: "Toilet_Quantity",
     // Beside the toilet at the usual 26 in., clear of the tank.
-    options: accessoryOptions(PAPER_HOLDERS, "chrome", onWall(1.15, 2.15)),
+    // Beside the toilet so it never pokes into the fixture next door (see
+    // paperHolderSpot): on the wall behind it where there's room, otherwise
+    // turned to face the toilet on the side wall of a corner, or on the
+    // side of a shower, vanity or cabinet next to it.
+    options: accessoryOptions(PAPER_HOLDERS, "chrome", function (sel, opt, size, ctx) {
+      var spot = ctx.paperHolder;
+      return spot.facing ? [spot.x, 2.15 - size.y / 2, 1.3] : [spot.x, 2.15 - size.y / 2, 0];
+    }).map(function (opt) {
+      if (opt.url) {
+        opt.pickSpot = true;
+        opt.rotationFor = function (ctx) {
+          return [0, ctx.paperHolder.facing ? -ctx.paperHolder.side * (Math.PI / 2) : 0, 0];
+        };
+      }
+      return opt;
+    }),
   },
   {
     id: "towelBar",
@@ -1552,10 +1567,12 @@ function addProductParts(s, instance, placement, sel, bodyReady, ctx) {
     var opt = sel[slot.id];
     var models = optionModels(opt);
     if (!models.length || !productModelsReady(s, models) || !bodyReady) return;
+    if (opt.pickSpot) ctx.paperHolder = paperHolderSpot(ctx, placement, s.productModels[opt.url].userData.size);
     models.forEach(function (m) {
       var model = s.productModels[m.url];
       var part = model.clone(true);
-      if (m.rotation) part.rotation.set(m.rotation[0], m.rotation[1], m.rotation[2]);
+      var rotation = m.rotationFor ? m.rotationFor(ctx) : m.rotation;
+      if (rotation) part.rotation.set(rotation[0], rotation[1], rotation[2]);
       var p = m.place(sel, opt, model.userData.size, ctx);
       part.position.set(p[0], p[1], p[2]);
       if (m.anchor === "topCenter") {
@@ -1763,6 +1780,7 @@ function currentLayout() {
     fixtureCounts: state.fixtures,
     plumbingWallIds: state.plumbingWallIds,
     entryPoints: state.entryPoints,
+    fixturePositions: state.fixturePositions,
   };
   layoutInput.footprints = fittedProductFootprints(layoutInput, false);
   var layout = Layout.computeLayout(layoutInput);
@@ -1963,6 +1981,9 @@ var state = {
   surfacePicks: {},
   // PRODUCT_SLOTS id -> picked option id (the 3D switcher's buttons).
   productPicks: defaultProductPicks(),
+  // Where the customer dragged fixtures to: { fixtureKey: { index:
+  // { wallId, offsetFt } } }, see Layout.computeLayout's fixturePositions.
+  fixturePositions: {},
 };
 // Transient wall-click picking session, entirely separate from `state`
 // (the room's own data) — null when no picking UI is active.
@@ -2099,6 +2120,109 @@ function handleWallPick(wallId) {
   if (picking.onPick) picking.onPick(picking.selected.slice(), wallId);
 }
 
+// ---------------------------------------------------------------------
+// Dragging fixtures
+// ---------------------------------------------------------------------
+// Floor fixtures the customer can drag to a new spot. Entry doors have
+// their own wall-click step; mirrors, shelves and shower doors ride along
+// with whatever they're attached to.
+var DRAGGABLE_FIXTURES = [
+  "Toilet_Quantity",
+  "Bathtub_Quantity",
+  "Shower_Quantity",
+  "Vanity_Quantity",
+  "Sink_Quantity",
+  "Cabinet_Quantity",
+];
+
+// Where a fixture being dragged would go with the pointer over floor point
+// (x, z): against the nearest wall, at that point along it. fits: the
+// layout keeps it there (plumbing walls, fit and clearances all hold)
+// without moving or dropping anything else.
+function dragTarget(drag, x, z) {
+  var dims = Layout.computeRoomDimensions(state.dims);
+  var w = dims.widthFt;
+  var l = dims.lengthFt;
+  x = clamp(x, 0, w);
+  z = clamp(z, 0, l);
+  var walls = [
+    { id: "N", dist: z, offsetFt: x },
+    { id: "E", dist: w - x, offsetFt: z },
+    { id: "S", dist: l - z, offsetFt: w - x },
+    { id: "W", dist: x, offsetFt: l - z },
+  ];
+  var wall = walls.reduce(function (a, b) {
+    return b.dist < a.dist ? b : a;
+  });
+  wall.offsetFt = Math.round(wall.offsetFt * 100) / 100; // to the nearest 1/8 in. or so
+  var base = currentLayout();
+  var positions = Object.assign({}, state.fixturePositions);
+  positions[drag.fixtureKey] = Object.assign({}, positions[drag.fixtureKey]);
+  positions[drag.fixtureKey][drag.index] = { wallId: wall.id, offsetFt: wall.offsetFt };
+  var trial = Layout.computeLayout(Object.assign({}, base.layoutInput, { fixturePositions: positions }));
+  var moved = null;
+  var othersStay = trial.placements.every(function (p) {
+    if (p.fixtureKey === drag.fixtureKey && p.index === drag.index) {
+      moved = p;
+      return true;
+    }
+    return base.layout.placements.some(function (q) {
+      return (
+        q.fixtureKey === p.fixtureKey && q.index === p.index && Math.abs(q.x - p.x) < 1e-6 && Math.abs(q.z - p.z) < 1e-6
+      );
+    });
+  });
+  var fits =
+    !!moved &&
+    moved.moved === true &&
+    moved.wallId === wall.id &&
+    othersStay &&
+    trial.placements.length === base.layout.placements.length;
+  if (fits)
+    return {
+      fits: true,
+      wallId: wall.id,
+      offsetFt: moved.offsetFt,
+      x: moved.x,
+      z: moved.z,
+      rotationY: moved.rotationY,
+    };
+  // Doesn't fit: still follow the pointer along that wall, marked red.
+  var n = WALL_INWARD_NORMAL[wall.id];
+  return {
+    fits: false,
+    wallId: wall.id,
+    offsetFt: wall.offsetFt,
+    x: wall.id === "E" ? w : wall.id === "W" ? 0 : x,
+    z: wall.id === "N" ? 0 : wall.id === "S" ? l : z,
+    rotationY: Math.atan2(n.x, n.z),
+  };
+}
+
+// Moves the dragged fixture to its would-be spot, with a green (fits) or
+// red (doesn't) outline around it.
+function showDragTarget(s, drag) {
+  var t = drag.target;
+  if (!t) return;
+  drag.instance.position.x = t.x;
+  drag.instance.position.z = t.z;
+  drag.instance.rotation.y = t.rotationY;
+  if (!s.dragOutline) {
+    s.dragOutline = new THREE.Box3Helper(new THREE.Box3(), 0x2e8b57);
+    s.scene.add(s.dragOutline);
+  }
+  drag.instance.updateMatrixWorld(true);
+  s.dragOutline.box.setFromObject(drag.instance);
+  s.dragOutline.material.color.set(t.fits ? 0x2e8b57 : 0xc0392b);
+  s.dragOutline.visible = true;
+  needsRender = true;
+}
+
+function clearDragTarget(s) {
+  if (s && s.dragOutline) s.dragOutline.visible = false;
+  needsRender = true;
+}
+
 function ensureScene() {
   if (threeState !== null) return threeState;
   try {
@@ -2173,6 +2297,10 @@ function ensureScene() {
     var toiletStyleSwitch = buildToiletStyleSwitch(panel, wrap);
     var productSwitcher = buildProductSwitcher(panel, wrap);
     var cameraControls = buildCameraModeControls(panel, wrap);
+    var dragHint = document.createElement("p");
+    dragHint.className = "ai-chat-room-3d-hint";
+    dragHint.textContent = T("room3d.dragHint");
+    panel.insertBefore(dragHint, wrap);
 
     // Persistent (not recreated per rebuildShell call, unlike wall geometry
     // itself) so highlight state survives a dimension change without
@@ -2222,6 +2350,84 @@ function ensureScene() {
       var hit = raycastWall(e.clientX, e.clientY);
       if (hit) handleWallPick(hit.userData.wallId);
     });
+
+    // Dragging a floor fixture moves it: along its wall, or onto whichever
+    // wall the pointer is nearest. Listened for on the canvas's wrapper in
+    // the capture phase, so a press on a fixture never reaches
+    // OrbitControls (the room stays put while the fixture moves); a press
+    // anywhere else still orbits as before.
+    var drag = null;
+    var floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+    function pointerRay(clientX, clientY) {
+      var rect = renderer.domElement.getBoundingClientRect();
+      if (!rect.width || !rect.height) return false;
+      raycaster.setFromCamera(
+        new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1),
+        camera,
+      );
+      return true;
+    }
+
+    function fixtureUnderPointer(clientX, clientY) {
+      if (!threeState || !pointerRay(clientX, clientY)) return null;
+      var hits = raycaster.intersectObjects(threeState.fixtureGroup.children, true);
+      for (var i = 0; i < hits.length; i++) {
+        var o = hits[i].object;
+        while (o && o.parent !== threeState.fixtureGroup) o = o.parent;
+        if (o && o.visible && DRAGGABLE_FIXTURES.indexOf(o.userData.fixtureKey) !== -1) return o;
+      }
+      return null;
+    }
+
+    wrap.addEventListener(
+      "pointerdown",
+      function (e) {
+        if (picking || state.cameraMode !== "orbit" || e.button !== 0) return;
+        var instance = fixtureUnderPointer(e.clientX, e.clientY);
+        if (!instance) return;
+        e.stopPropagation();
+        e.preventDefault();
+        drag = {
+          instance: instance,
+          fixtureKey: instance.userData.fixtureKey,
+          index: instance.userData.placementIndex,
+          pointerId: e.pointerId,
+          target: null,
+        };
+        renderer.domElement.setPointerCapture(e.pointerId);
+        wrap.classList.add("is-dragging");
+      },
+      true,
+    );
+    renderer.domElement.addEventListener("pointermove", function (e) {
+      if (!drag) {
+        if (!picking && state.cameraMode === "orbit") {
+          wrap.classList.toggle("can-drag", !!fixtureUnderPointer(e.clientX, e.clientY));
+        }
+        return;
+      }
+      var hit = new THREE.Vector3();
+      if (!pointerRay(e.clientX, e.clientY) || !raycaster.ray.intersectPlane(floorPlane, hit)) return;
+      drag.target = dragTarget(drag, hit.x, hit.z);
+      showDragTarget(threeState, drag);
+    });
+    function endDrag(e) {
+      if (!drag || e.pointerId !== drag.pointerId) return;
+      var done = drag;
+      drag = null;
+      wrap.classList.remove("is-dragging");
+      if (done.target && done.target.fits) {
+        var positions = Object.assign({}, state.fixturePositions);
+        positions[done.fixtureKey] = Object.assign({}, positions[done.fixtureKey]);
+        positions[done.fixtureKey][done.index] = { wallId: done.target.wallId, offsetFt: done.target.offsetFt };
+        state.fixturePositions = positions;
+      }
+      clearDragTarget(threeState);
+      markDirty(); // redraws it where it now is, or back where it was
+    }
+    renderer.domElement.addEventListener("pointerup", endDrag);
+    renderer.domElement.addEventListener("pointercancel", endDrag);
 
     var resizeObserver = null;
     if (typeof ResizeObserver !== "undefined") {
@@ -2728,6 +2934,51 @@ function setShadowFlags(object3d) {
   });
 }
 
+// Fixtures with a flat, tall enough side to hang a paper holder on.
+var SIDE_MOUNTS = ["Shower_Quantity", "Vanity_Quantity", "Cabinet_Quantity"];
+
+// Where a paper holder of this size goes beside toilet placement p:
+// { side, x, facing }. On the wall behind, a little past the tank, when
+// that side has room for it; otherwise turned to face the toilet (facing)
+// on a corner's side wall or a tall neighbor's side, at x; failing all of
+// that, the roomier side.
+function paperHolderSpot(ctx, p, size) {
+  var rooms = [1, -1].map(function (side) {
+    return { side: side, room: ctx.sideRoom(p, side, 2.3) };
+  });
+  var behind = rooms.filter(function (r) {
+    return r.room.dist >= 1.15 + size.x / 2;
+  })[0];
+  if (behind) return { side: behind.side, x: behind.side * 1.15, facing: false };
+  var beside = rooms.filter(function (r) {
+    return r.room.what === "wall" || SIDE_MOUNTS.indexOf(r.room.what) !== -1;
+  })[0];
+  if (beside) return { side: beside.side, x: beside.side * beside.room.dist, facing: true };
+  var roomier = rooms[0].room.dist >= rooms[1].room.dist ? rooms[0] : rooms[1];
+  return { side: roomier.side, x: roomier.side * 1.15, facing: false };
+}
+
+// A box in a placed fixture's own frame (x along its wall, z out into the
+// room), as the room-space axis-aligned box it covers.
+function fixtureFrameBox(p, minX, maxX, minZ, maxZ) {
+  var c = Math.cos(p.rotationY);
+  var sn = Math.sin(p.rotationY);
+  var xs = [];
+  var zs = [];
+  [minX, maxX].forEach(function (lx) {
+    [minZ, maxZ].forEach(function (lz) {
+      xs.push(p.x + lx * c + lz * sn);
+      zs.push(p.z - lx * sn + lz * c);
+    });
+  });
+  return {
+    minX: Math.min.apply(null, xs),
+    maxX: Math.max.apply(null, xs),
+    minZ: Math.min.apply(null, zs),
+    maxZ: Math.max.apply(null, zs),
+  };
+}
+
 function rebuildFixtures(s, widthFt, lengthFt, heightFt) {
   while (s.fixtureGroup.children.length) {
     var old = s.fixtureGroup.children[0];
@@ -2740,6 +2991,7 @@ function rebuildFixtures(s, widthFt, lengthFt, heightFt) {
     fixtureCounts: state.fixtures,
     plumbingWallIds: state.plumbingWallIds,
     entryPoints: state.entryPoints,
+    fixturePositions: state.fixturePositions,
   };
   layoutInput.footprints = fittedProductFootprints(layoutInput, true);
   var layout = Layout.computeLayout(layoutInput);
@@ -2749,7 +3001,40 @@ function rebuildFixtures(s, widthFt, lengthFt, heightFt) {
   var toiletCount = 0;
   var placedKeys = {};
   var sel = selectedProducts();
-  var ctx = { heightFt: heightFt };
+  var ctx = {
+    heightFt: heightFt,
+    // How much room a fixture has on one side (side: +1 = along its wall's
+    // direction, -1 = back toward the wall's start), within `depth` ft of
+    // the wall: { dist: from its centerline to the nearest thing, what:
+    // "wall" (the room's corner) or the fixtureKey in the way }.
+    sideRoom: function (p, side, depth) {
+      var span = p.wallId === "N" || p.wallId === "S" ? widthFt : lengthFt;
+      var room = { dist: side > 0 ? span - p.offsetFt : p.offsetFt, what: "wall" };
+      var c = Math.cos(p.rotationY);
+      var sn = Math.sin(p.rotationY);
+      layout.placements.forEach(function (q) {
+        if (q === p) return;
+        var fp =
+          (layoutInput.footprints && layoutInput.footprints[q.fixtureKey]) || Layout.FIXTURE_LAYOUT[q.fixtureKey];
+        if (!fp || (fp.mount !== "floor" && q.fixtureKey !== "Shower_Door_Quantity")) return;
+        var z0 = q.depthOffset || 0;
+        var box = fixtureFrameBox(q, -fp.wallSpan / 2, fp.wallSpan / 2, z0, z0 + (fp.depth || 0.1));
+        // That box's corners in p's own frame.
+        var lx = [];
+        var lz = [];
+        [box.minX, box.maxX].forEach(function (wx) {
+          [box.minZ, box.maxZ].forEach(function (wz) {
+            lx.push((wx - p.x) * c - (wz - p.z) * sn);
+            lz.push((wx - p.x) * sn + (wz - p.z) * c);
+          });
+        });
+        if (Math.max.apply(null, lz) <= 0 || Math.min.apply(null, lz) >= depth) return;
+        var near = side > 0 ? Math.min.apply(null, lx) : -Math.max.apply(null, lx);
+        if (near > 0 && near < room.dist) room = { dist: near, what: q.fixtureKey };
+      });
+      return room;
+    },
+  };
   layout.placements.forEach(function (p) {
     placedKeys[p.fixtureKey] = true;
     ensureFixtureModel(s, p.fixtureKey);
@@ -2782,6 +3067,7 @@ function rebuildFixtures(s, widthFt, lengthFt, heightFt) {
     // setFixtureFinish() looks instances up by this to retint in place
     // without a full rebuild — see updateFixtureFinishInstances().
     instance.userData.fixtureKey = p.fixtureKey;
+    instance.userData.placementIndex = p.index;
     var finish = state.fixtureFinishes[p.fixtureKey];
     if (finish != null) applyFixtureFinish(instance, p.fixtureKey, s.mat, finish);
     setShadowFlags(instance);
@@ -2999,6 +3285,7 @@ window.BathroomRoom3D = {
       fixtureFinishes: {},
       surfacePicks: {},
       productPicks: defaultProductPicks(),
+      fixturePositions: {},
     };
     picking = null;
     hoveredWallId = null;
@@ -3051,6 +3338,7 @@ window.BathroomRoom3D = {
       fixtureCounts: fixtureCounts,
       plumbingWallIds: state.plumbingWallIds,
       entryPoints: state.entryPoints,
+      fixturePositions: state.fixturePositions,
     };
     layoutInput.footprints = fittedProductFootprints(layoutInput, false);
     var result = Layout.computeLayout(layoutInput);
@@ -3075,6 +3363,32 @@ window.BathroomRoom3D = {
 
   getProductPicks: function () {
     return Object.assign({}, state.productPicks);
+  },
+
+  // Where the customer has dragged fixtures to (see state.fixturePositions).
+  getFixturePositions: function () {
+    return JSON.parse(JSON.stringify(state.fixturePositions));
+  },
+
+  // The page coordinates of a placed fixture's center, or of a floor point
+  // (feet) when given one — where a pointer would press to drag it (the
+  // browser tests drive dragging through this).
+  screenPoint: function (fixtureKey, floorX, floorZ) {
+    var s = threeState;
+    if (!s) return null;
+    var p;
+    if (fixtureKey) {
+      var inst = s.fixtureGroup.children.filter(function (c) {
+        return c.userData.fixtureKey === fixtureKey;
+      })[0];
+      if (!inst) return null;
+      p = new THREE.Box3().setFromObject(inst).getCenter(new THREE.Vector3());
+    } else {
+      p = new THREE.Vector3(floorX, 0, floorZ);
+    }
+    p.project(s.camera);
+    var rect = s.renderer.domElement.getBoundingClientRect();
+    return { x: rect.left + ((p.x + 1) / 2) * rect.width, y: rect.top + ((1 - p.y) / 2) * rect.height };
   },
 
   // The switcher's tabs for the fixtures placed right now, in order, each

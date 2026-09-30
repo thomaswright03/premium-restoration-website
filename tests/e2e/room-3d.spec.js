@@ -110,6 +110,44 @@ test.describe("3D bathroom room preview", () => {
     );
   });
 
+  test("dragging a fixture moves it to another wall, and a spot where it won't fit is refused", async ({ page }) => {
+    test.setTimeout(90000);
+    await disableMaterials(page);
+    await startEstimate(page);
+    await answerScope(page, NEEDS_WALLS);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 12, Bathroom_Length_Ft: 10, Bathroom_Height_Ft: 8 });
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Toilet_Quantity: 1, Vanity_Quantity: 1 });
+    await expect(page.locator(".ai-chat-room-3d-hint")).toContainText("Drag a toilet");
+
+    async function dragTo(fixtureKey, x, z) {
+      // Let the camera settle first, so the points stay where they were.
+      await page.waitForTimeout(1500);
+      const from = await page.evaluate((k) => window.BathroomRoom3D.screenPoint(k), fixtureKey);
+      const to = await page.evaluate(([fx, fz]) => window.BathroomRoom3D.screenPoint(null, fx, fz), [x, z]);
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, { steps: 5 });
+      await page.mouse.move(to.x, to.y, { steps: 5 });
+      await page.mouse.up();
+    }
+
+    // To the middle of the south wall.
+    await dragTo("Vanity_Quantity", 6, 9.6);
+    await expect
+      .poll(() => page.evaluate(() => window.BathroomRoom3D.getFixturePositions()))
+      .toEqual({ Vanity_Quantity: { 0: { wallId: "S", offsetFt: 6 } } });
+
+    // Onto the toilet: refused, the vanity stays on the south wall.
+    const toilet = await page.evaluate(() => window.BathroomRoom3D.screenPoint("Toilet_Quantity"));
+    expect(toilet).not.toBeNull();
+    await dragTo("Vanity_Quantity", 1.3, 0.4);
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => window.BathroomRoom3D.getFixturePositions())).toEqual({
+      Vanity_Quantity: { 0: { wallId: "S", offsetFt: 6 } },
+    });
+  });
+
   test("off when bathroomVisualizer.enabled is false", async ({ page }) => {
     await useConfig(page, { bathroomVisualizer: { enabled: false } });
     await startEstimate(page);

@@ -731,6 +731,11 @@
     "room3d.walkIn": ["Walk in", "Entrar", "Entrar"],
     "room3d.overview": ["Overview", "Vista general", "Visão geral"],
     "room3d.entry": ["Entry {n}", "Entrada {n}", "Entrada {n}"],
+    "room3d.dragHint": [
+      "Drag a toilet, tub, shower, vanity, sink or cabinet to move it. The outline turns red where it won't fit.",
+      "Arrastre un inodoro, bañera, ducha, mueble de baño, lavabo o gabinete para moverlo. El contorno se pone rojo donde no cabe.",
+      "Arraste um vaso, banheira, box, gabinete, pia ou armário para movê-lo. O contorno fica vermelho onde ele não cabe.",
+    ],
     "room3d.tooBig": ["Too big for this room", "Demasiado grande para este baño", "Grande demais para este banheiro"],
     "room3d.toilet.A": ["Skirted two-piece", "Dos piezas con faldón", "Duas peças com saia"],
     "room3d.toilet.B": ["One-piece seamless", "Una pieza, sin uniones", "Peça única, sem emendas"],
