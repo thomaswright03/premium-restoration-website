@@ -1,4 +1,4 @@
-// Premium Restoration — public site behaviour: navigation, FAQ, the chat
+// Eddys Remodeling — public site behaviour: navigation, FAQ, the chat
 // assistant and its bathroom price estimate, and the Get a Quote form.
 //
 // Settings (price estimator on/off, lead-form endpoint, owner details) come
@@ -180,7 +180,7 @@ document.addEventListener("DOMContentLoaded", function () {
       var avatar = document.createElement("div");
       avatar.className = "ai-chat-avatar";
       avatar.setAttribute("aria-hidden", "true");
-      avatar.textContent = "PR";
+      avatar.textContent = "ER";
       inner.appendChild(avatar);
       row.appendChild(inner);
       return { row: row, inner: inner };
@@ -189,7 +189,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function appendChatRow(role, text) {
       var parts = botRow();
       parts.row.className = "ai-chat-row " + role;
-      parts.inner.firstChild.textContent = role === "user" ? T("chat.you") : "PR";
+      parts.inner.firstChild.textContent = role === "user" ? T("chat.you") : "ER";
       var textEl = document.createElement("div");
       textEl.className = "ai-chat-text";
       textEl.textContent = text;
@@ -1206,7 +1206,7 @@ document.addEventListener("DOMContentLoaded", function () {
               date: new Date().toLocaleDateString(I18n.locale(), { year: "numeric", month: "long", day: "numeric" }),
             },
           });
-          doc.save("premium-restoration-bathroom-estimate.pdf");
+          doc.save("eddys-remodeling-bathroom-estimate.pdf");
           button.disabled = false;
           button.textContent = label;
         })

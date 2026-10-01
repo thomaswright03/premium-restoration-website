@@ -1,6 +1,6 @@
-# Premium Restoration — Website
+# Eddys Remodeling — Website
 
-The website for Premium Restoration, a bathroom-restoration business. Plain HTML/CSS/JS: **no build step and no framework**, so it is easy to hand off, edit and deploy. It is hosted on Vercel as a static site.
+The website for Eddys Remodeling, a bathroom-restoration business. Plain HTML/CSS/JS: **no build step and no framework**, so it is easy to hand off, edit and deploy. It is hosted on Vercel as a static site.
 
 It has three parts:
 
@@ -190,7 +190,7 @@ There is no licence number, so no licence line appears anywhere. Only if a licen
 
 ## Business identity
 
-Premium Restoration is currently an **unregistered business run by one individual**: no LLC or other entity, no registered business name and no registered address. The Privacy Notice, Terms, every footer and the PDF say this. The owner's name and address come from `site-config.json` (`owner.legalName`, `owner.contactAddress`) and are shown only once filled in. If the business is registered later, update the "unregistered" wording on `privacy.html`, `terms.html`, `scripts/partials/footer.html` and the PDF footers at once.
+Eddys Remodeling is currently an **unregistered business run by one individual**: no LLC or other entity, no registered business name and no registered address. The Privacy Notice, Terms, every footer and the PDF say this. The owner's name and address come from `site-config.json` (`owner.legalName`, `owner.contactAddress`) and are shown only once filled in. If the business is registered later, update the "unregistered" wording on `privacy.html`, `terms.html`, `scripts/partials/footer.html` and the PDF footers at once.
 
 ## Contact / lead form
 

@@ -1,4 +1,4 @@
-// Premium Restoration — scripted chat replies (no AI, no backend).
+// Eddys Remodeling — scripted chat replies (no AI, no backend).
 //
 // Pure function: reply(message, { estimatorEnabled, lang }) returns
 //   { text, action }  where action is one of

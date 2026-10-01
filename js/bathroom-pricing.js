@@ -1,4 +1,4 @@
-// Premium Restoration — shared bathroom pricing model.
+// Eddys Remodeling — shared bathroom pricing model.
 //
 // The single source of truth for bathroom labor prices AND for the
 // calculation itself. Both the admin quoting tool (js/admin.js) and the

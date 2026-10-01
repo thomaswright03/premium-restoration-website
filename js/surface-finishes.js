@@ -1,4 +1,4 @@
-// Premium Restoration — real-product surface finishes for the 3D preview.
+// Eddys Remodeling — real-product surface finishes for the 3D preview.
 //
 // When a customer picks an actual floor tile, wall tile, flooring or paint
 // in the chat's materials step, the 3D room should show THAT product, not a

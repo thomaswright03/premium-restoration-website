@@ -1,4 +1,4 @@
-// Premium Restoration — materials picker data layer.
+// Eddys Remodeling — materials picker data layer.
 //
 // CATALOG (between the catalog:generated markers below) holds real Home
 // Depot prices, generated — not hand-written — by a two-step offline
