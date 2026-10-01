@@ -744,7 +744,7 @@
             { title: "What this estimate assumes", items: Pricing.estimateAssumptions(values, scope, result) },
           ],
           footer: {
-            business: "Eddys Remodeling, operated by an individual (not a registered company)",
+            business: "Eddys Remodeling, a Utah limited liability company",
             phone: PHONE,
             email: EMAIL,
             date: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),

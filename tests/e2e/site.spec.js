@@ -46,18 +46,21 @@ test.describe("every public page", () => {
     await page.goto("/privacy.html");
     await expect(page.locator("html")).toHaveAttribute("data-config", "loaded");
     const text = await page.locator("body").innerText();
-    expect(text).toContain("its owner, Test Owner Name (“we”, “us”)");
+    expect(text).toContain("Eddys Remodeling (Test Owner Name) is a Utah limited liability company");
     expect(text).toContain("Our contact address is 1 Example Street.");
     expect(text).toContain("we will respond within 30 days");
-    expect(text).toContain("Operated by Test Owner Name, an individual");
+    expect(text).toContain("A Utah limited liability company");
 
     await page.unroute("**/site-config.json");
     await page.goto("/privacy.html");
     await expect(page.locator("html")).toHaveAttribute("data-config", "loaded");
     const plain = await page.locator("body").innerText();
-    expect(plain).toContain("run by one individual, its owner (“we”, “us”)");
+    expect(plain).toContain(
+      "Eddys Remodeling is a Utah limited liability company that runs this website and the business (“we”, “us”)",
+    );
     expect(plain).toContain("confirming details of your enquiry). If we have to keep");
-    expect(plain).toContain("Operated by an individual");
+    expect(plain).not.toContain("an individual");
+    expect(plain).not.toContain("Test Owner Name");
   });
 
   test("published prices in page text match DEFAULT_PRICES", async ({ page }) => {
