@@ -81,7 +81,10 @@ function applyFixtureFinish(instance, fixtureKey, mat, colorHex) {
   instance.traverse(function (child) {
     // Real product models (see FIXTURE_MODELS) mark their own finish
     // surface with userData.finishBase instead of sharing `mat`'s material.
-    var base = child.isMesh && (child.userData.finishBase || (child.material === sharedMaterial && sharedMaterial));
+    // It's a `mat` key, not the material itself: clone() deep-copies
+    // userData through JSON, which would turn a material into a plain object.
+    var base =
+      child.isMesh && (mat[child.userData.finishBase] || (child.material === sharedMaterial && sharedMaterial));
     if (base) {
       if (!tinted) {
         tinted = base.clone();
@@ -125,7 +128,7 @@ function updateFixtureFinishInstances(s, fixtureKey, colorHex) {
     instance.traverse(function (child) {
       if (child.isMesh && child.material && child.material.userData && child.material.userData.isFinishClone) {
         child.material.dispose();
-        child.material = child.userData.finishBase || sharedMaterial;
+        child.material = s.mat[child.userData.finishBase] || sharedMaterial;
       }
     });
     if (colorHex != null) applyFixtureFinish(instance, fixtureKey, s.mat, colorHex);
@@ -597,7 +600,7 @@ function ensureFixtureModel(s, fixtureKey) {
       template.traverse(function (child) {
         if (child.isMesh) {
           child.material = s.mat.porcelainGloss;
-          child.userData.finishBase = s.mat.porcelainGloss;
+          child.userData.finishBase = "porcelainGloss";
         }
       });
       if (fixtureKey === "Toilet_Quantity") {
@@ -884,13 +887,14 @@ function ensureProductModel(s, opt) {
     siteUrl(opt.url),
     function (gltf) {
       var model = gltf.scene;
-      var material = s.mat[opt.material || "porcelainGloss"];
+      var materialKey = opt.material || "porcelainGloss";
+      var material = s.mat[materialKey];
       model.traverse(function (child) {
         if (child.isMesh) {
           child.material = material;
           // Porcelain bodies stay retintable by setFixtureFinish(); chrome
           // and steel trim keep their finish.
-          if (!opt.material) child.userData.finishBase = material;
+          if (!opt.material) child.userData.finishBase = materialKey;
         }
       });
       model.userData.size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
