@@ -615,3 +615,94 @@ test("computeLayout ignores malformed footprint overrides, keeping the default s
     },
   );
 });
+
+const FULL_BATH = { Toilet_Quantity: 1, Bathtub_Quantity: 1, Vanity_Quantity: 1 };
+
+test("computeLayout: a standard 5x8 ft full bath (tub, toilet, vanity, door) fits whichever way round the room is typed", () => {
+  [
+    [5, 8],
+    [8, 5],
+    [5, 9],
+  ].forEach(([widthFt, lengthFt]) => {
+    const r = L.computeLayout({
+      widthFt,
+      lengthFt,
+      fixtureCounts: Object.assign({ Door_Quantity: 1, Mirror_Quantity: 1 }, FULL_BATH),
+    });
+    assert.deepEqual(r.droppedCounts, {}, `${widthFt}x${lengthFt}`);
+  });
+});
+
+test("computeLayout: in a 5x8 ft room the full bath still fits with the door picked on a long wall", () => {
+  ["E", "W"].forEach((wallId) => {
+    const r = L.computeLayout({
+      widthFt: 5,
+      lengthFt: 8,
+      fixtureCounts: FULL_BATH,
+      entryPoints: [{ wallId, offsetFt: 5.25, hasDoor: true }],
+    });
+    assert.deepEqual(r.droppedCounts, {}, wallId);
+  });
+});
+
+test("computeLayout: a 60 in. tub fills a 5 ft alcove wall exactly", () => {
+  const r = L.computeLayout({ widthFt: 5, lengthFt: 6, fixtureCounts: { Bathtub_Quantity: 1 } });
+  assert.deepEqual(r.droppedCounts, {});
+});
+
+test("computeLayout: clear floor spaces may overlap, but nothing stands in front of a toilet", () => {
+  // 4 ft deep: a vanity facing the toilet from the opposite wall would sit
+  // inside the toilet's 21 in. clear space, so only one of them fits.
+  const facing = L.computeLayout({
+    widthFt: 2.5,
+    lengthFt: 5,
+    fixtureCounts: { Toilet_Quantity: 1, Vanity_Quantity: 1 },
+  });
+  assert.equal(Object.keys(facing.droppedCounts).length, 1);
+  // Side by side on one wall, their clear spaces share the same floor.
+  const sideBySide = L.computeLayout({
+    widthFt: 5,
+    lengthFt: 4.7,
+    fixtureCounts: { Toilet_Quantity: 1, Vanity_Quantity: 1 },
+  });
+  assert.deepEqual(sideBySide.droppedCounts, {});
+});
+
+test("computeLayout: a tub keeps at least a 30 in. stretch of clear floor along its front", () => {
+  // Cabinets fill every spot they can around a 5x6 ft room with a tub, but
+  // never the whole 21 in. deep strip in front of the tub.
+  const widthFt = 5;
+  const lengthFt = 6;
+  const r = L.computeLayout({ widthFt, lengthFt, fixtureCounts: { Bathtub_Quantity: 1, Cabinet_Quantity: 6 } });
+  const tub = r.placements.find((p) => p.fixtureKey === "Bathtub_Quantity");
+  assert.ok(tub);
+  const tubDepth = L.FIXTURE_LAYOUT.Bathtub_Quantity.depth;
+  const front = L.CLEARANCE_IN.Bathtub_Quantity.front / 12;
+  const alongX = tub.wallId === "N" || tub.wallId === "S";
+  const fromWall = (p) => ({ N: p.z, S: lengthFt - p.z, W: p.x, E: widthFt - p.x })[tub.wallId];
+  const cab = L.FIXTURE_LAYOUT.Cabinet_Quantity;
+  // Along-wall stretches the cabinets' bodies cover inside the strip.
+  const covered = r.placements
+    .filter((p) => p.fixtureKey === "Cabinet_Quantity")
+    .map((p) => {
+      const sameAxis = p.wallId === tub.wallId || p.wallId === { N: "S", S: "N", E: "W", W: "E" }[tub.wallId];
+      const half = sameAxis ? cab.wallSpan / 2 : cab.depth / 2;
+      const center = alongX ? p.x : p.z;
+      const near = sameAxis ? fromWall(p) - (p.wallId === tub.wallId ? 0 : cab.depth) : fromWall(p) - cab.wallSpan / 2;
+      const far = near + (sameAxis ? cab.depth : cab.wallSpan);
+      const inStrip = far > tubDepth && near < tubDepth + front;
+      return inStrip ? [center - half, center + half] : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a[0] - b[0]);
+  const tubCenter = alongX ? tub.x : tub.z;
+  const tubHalf = L.FIXTURE_LAYOUT.Bathtub_Quantity.wallSpan / 2;
+  let cursor = tubCenter - tubHalf;
+  let widest = 0;
+  covered.forEach(([a, b]) => {
+    widest = Math.max(widest, a - cursor);
+    cursor = Math.max(cursor, b);
+  });
+  widest = Math.max(widest, tubCenter + tubHalf - cursor);
+  assert.ok(widest >= 2.5 - 1e-6, `widest clear stretch ${widest} ft`);
+});
