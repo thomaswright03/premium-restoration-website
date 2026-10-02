@@ -1649,7 +1649,11 @@ document.addEventListener("DOMContentLoaded", function () {
         });
         if (hasVanity) notes.push(T("products.vanityCabinet"));
         var hasValveTrim = priceable.some(function (item) {
-          return item.slotId === "showerValve" || item.slotId === "tubValve";
+          return (
+            item.slotId === "showerValve" ||
+            item.slotId === "tubValve" ||
+            (item.slotId === "tubFaucet" && item.needsValve)
+          );
         });
         if (hasValveTrim) notes.push(T("products.valveNotIncluded"));
         finishEstimate(state.values, state.scope, state.laborResult, categories, state.picks, notes);

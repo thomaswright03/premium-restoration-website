@@ -783,6 +783,26 @@
     "room3d.group.door": ["Door", "Puerta", "Porta"],
     "room3d.tooLong": ["Too long for this shower", "Demasiado larga para esta ducha", "Comprida demais para este box"],
     "room3d.noFit": ["Not made for this base", "No es para esta base", "Não é para esta base"],
+    "room3d.needsDeck": [
+      "Needs a drop-in tub's deck",
+      "Necesita la cubierta de una bañera empotrada",
+      "Precisa do deck de uma banheira embutida",
+    ],
+    "room3d.needsFreestanding": [
+      "For freestanding tubs only",
+      "Solo para bañeras independientes",
+      "Só para banheiras de chão",
+    ],
+    "room3d.faucetHasHandles": [
+      "The tub faucet has its own handles",
+      "La llave de la bañera ya tiene sus manijas",
+      "A torneira da banheira já tem seus registros",
+    ],
+    "room3d.wrongHoles": [
+      "Doesn't fit this sink's faucet holes",
+      "No coincide con los orificios de este lavabo",
+      "Não serve nos furos desta pia",
+    ],
     "room3d.option.freestanding": [
       "Stargaze 60 in. freestanding",
       "Stargaze 60 pulg. independiente",

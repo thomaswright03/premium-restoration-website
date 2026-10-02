@@ -350,6 +350,34 @@ test.describe("3D room preview: wall-click plumbing walls, entry points, walk-in
   });
 });
 
+test.describe("sink faucets match the sink's holes", () => {
+  test("a single-hole vanity top only offers single-hole faucets, and a widespread pick moves to one", async ({
+    page,
+  }) => {
+    test.setTimeout(90000);
+    await disableMaterials(page);
+    await startEstimate(page);
+    await answerScope(page, NEEDS_WALLS);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 10, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 });
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Vanity_Quantity: 1 });
+
+    const sink = page.locator("#ai-chat-room-3d-product-vanitySink");
+    const faucet = page.locator("#ai-chat-room-3d-product-vanityFaucet");
+    await faucet.selectOption("K-14410-4-CP");
+    await expect(faucet).toHaveValue("K-14410-4-CP");
+    await sink.selectOption("K-3048-1-0");
+    // The widespread faucet can't go on a one-hole top: the room shows a
+    // single-hole one instead, and the dropdown says why.
+    await expect(faucet).toHaveValue("K-14402-4A-CP");
+    const widespread = faucet.locator('option[value="K-14410-4-CP"]');
+    await expect(widespread).toBeDisabled();
+    await expect(widespread).toContainText("Doesn't fit this sink's faucet holes");
+    const centerset = faucet.locator('option[value="K-35951-4-CP"]');
+    await expect(centerset).toBeDisabled();
+  });
+});
+
 test.describe("going back a step", () => {
   test("a room too small for its fixtures can be made bigger with Back, keeping every answer", async ({ page }) => {
     await disableMaterials(page);

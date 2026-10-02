@@ -675,34 +675,54 @@ var SHOWER_ARM_TOP_FT = 6.75;
 
 // Deck-mounted sink faucets, shared by the vanity and the pedestal/wall
 // sink rows (each row gets its own copies, since place() differs).
+// mount: the faucet holes it needs — "single" (one hole), "centerset" (three
+// holes 4 in. apart) or "widespread" (three holes 8 in. apart).
 var SINK_FAUCETS = [
-  { id: "K-14410-4-CP", url: "models/products/kohler/K-14410-4-CP.glb", deckLine: 0.17 },
-  { id: "K-77974-9-CP", url: "models/products/kohler/K-77974-9-CP.glb", deckLine: 0.11 },
-  { id: "K-14402-4A-CP", url: "models/products/kohler/K-14402-4A-CP.glb", deckLine: 0.12 },
-  { id: "K-73167-4-CP", url: "models/products/kohler/K-73167-4-CP.glb", deckLine: 0.03 },
-  { id: "K-77958-4A-CP", url: "models/products/kohler/K-77958-4A-CP.glb", deckLine: 0.26 },
-  { id: "K-35951-4-CP", url: "models/products/kohler/K-35951-4-CP.glb", deckLine: 0.11 },
-  { id: "K-27388-4-CP", url: "models/products/kohler/K-27388-4-CP.glb", deckLine: 0.09 },
+  { id: "K-14410-4-CP", url: "models/products/kohler/K-14410-4-CP.glb", deckLine: 0.17, mount: "widespread" },
+  { id: "K-77974-9-CP", url: "models/products/kohler/K-77974-9-CP.glb", deckLine: 0.11, mount: "widespread" },
+  { id: "K-14402-4A-CP", url: "models/products/kohler/K-14402-4A-CP.glb", deckLine: 0.12, mount: "single" },
+  { id: "K-73167-4-CP", url: "models/products/kohler/K-73167-4-CP.glb", deckLine: 0.03, mount: "single" },
+  { id: "K-77958-4A-CP", url: "models/products/kohler/K-77958-4A-CP.glb", deckLine: 0.26, mount: "single" },
+  { id: "K-35951-4-CP", url: "models/products/kohler/K-35951-4-CP.glb", deckLine: 0.11, mount: "centerset" },
+  { id: "K-27388-4-CP", url: "models/products/kohler/K-27388-4-CP.glb", deckLine: 0.09, mount: "centerset" },
   // Components spouts go in with the Components handles either side.
   {
     id: "K-77969-CP",
     url: "models/products/kohler/K-77969-CP.glb",
     deckLine: 0.08,
+    mount: "widespread",
     handles: { url: "models/products/kohler/K-77974-9-CP.glb", deckLine: 0.11 },
   },
   {
     id: "K-77967-CP",
     url: "models/products/kohler/K-77967-CP.glb",
     deckLine: 0.1,
+    mount: "widespread",
     handles: { url: "models/products/kohler/K-77974-9-CP.glb", deckLine: 0.11 },
   },
 ];
 
+// Which faucets each sink's drilling takes (a sink's `holes`; a bowl with
+// none, like an undermount, takes any faucet, since that goes in the
+// countertop). A single-handle faucet also fits a 4 in. centerset sink with
+// its deck plate.
+var FAUCET_FITS = {
+  single: ["single"],
+  centerset: ["centerset", "single"],
+  widespread: ["widespread"],
+};
+
 // deck(sel) -> { y, line }: the deck height and faucet-hole line (from the
 // wall) of whatever the faucets in this row sit on.
-function sinkFaucetOptions(deck) {
+// bowl(sel): the sink option the faucets in this row go on.
+function sinkFaucetOptions(deck, bowl) {
   return SINK_FAUCETS.map(function (f) {
     var opt = { id: f.id, url: f.url, material: "chrome", deckLine: f.deckLine };
+    opt.available = function (sel) {
+      var holes = bowl(sel).holes;
+      return !holes || FAUCET_FITS[holes].indexOf(f.mount) !== -1;
+    };
+    opt.unavailableReason = "room3d.wrongHoles";
     opt.place = function (sel) {
       var d = deck(sel);
       return [0, d.y, d.line - f.deckLine];
@@ -763,6 +783,10 @@ function grabBarOptions(place, fits) {
     }
     return opt;
   });
+}
+
+function isFreestandingTub(sel) {
+  return !sel.tub.dropIn;
 }
 
 function kohlerUrl(id) {
@@ -920,11 +944,17 @@ var PRODUCT_SLOTS = [
           return [0, sel.tub.rimY + 0.2, 0];
         },
       },
+      // Needs a deck to stand on: only the drop-in tubs have one.
       {
         id: "K-73081-4-CP",
         url: kohlerUrl("K-73081-4-CP"),
         material: "chrome",
         deckLine: 0.105,
+        ownHandles: true,
+        available: function (sel) {
+          return !!sel.tub.dropIn;
+        },
+        unavailableReason: "room3d.needsDeck",
         place: function (sel, opt) {
           return [0, sel.tub.rimY, sel.tub.deckZ - opt.deckLine];
         },
@@ -932,20 +962,49 @@ var PRODUCT_SLOTS = [
       // Floor-mount fillers stand on the room side of the tub, turned so
       // the spout reaches back over it. base: the riser's center in the
       // model (x, z), before that half turn.
-      { id: "K-T97328-4-CP", url: kohlerUrl("K-T97328-4-CP"), material: "chrome", base: [0.06, 0.2] },
-      { id: "K-T73087-4-CP", url: kohlerUrl("K-T73087-4-CP"), material: "chrome", base: [0.04, 0.22] },
+      // Only for a freestanding tub (a drop-in's deck is in the way). These
+      // are trims with their own handle; the valve in the floor is extra.
+      {
+        id: "K-T97328-4-CP",
+        url: kohlerUrl("K-T97328-4-CP"),
+        material: "chrome",
+        base: [0.06, 0.2],
+        ownHandles: true,
+        needsValve: true,
+        available: isFreestandingTub,
+        unavailableReason: "room3d.needsFreestanding",
+      },
+      {
+        id: "K-T73087-4-CP",
+        url: kohlerUrl("K-T73087-4-CP"),
+        material: "chrome",
+        base: [0.04, 0.22],
+        ownHandles: true,
+        needsValve: true,
+        available: isFreestandingTub,
+        unavailableReason: "room3d.needsFreestanding",
+      },
     ],
   },
   {
     id: "tubValve",
     fixtureKey: "Bathtub_Quantity",
     // Above the spout (and any grab bar), centered on the tub. A trim by
-    // default, since the spout needs one; "none" goes last.
+    // default, since the wall spout needs one; "none" goes last, and is all
+    // that's left when the tub faucet has its own handles.
     options: noneLast(
       accessoryOptions(["K-T14501-4-CP", "K-TS14423-4-CP", "K-TS73115-4-CP"], "chrome", function (sel, opt, size) {
         return [0, sel.tub.rimY + 1.4 - size.y / 2, 0];
       }),
-    ),
+    ).map(function (opt) {
+      if (opt.url) {
+        opt.available = function (sel) {
+          return !sel.tubFaucet.ownHandles;
+        };
+        opt.unavailableReason = "room3d.faucetHasHandles";
+      }
+      return opt;
+    }),
   },
   {
     id: "tubGrabBar",
@@ -1005,15 +1064,16 @@ var PRODUCT_SLOTS = [
       },
       // Vanity tops with the bowl cast in: they ARE the countertop, and the
       // cabinet under them is stretched to their size.
-      { id: "K-3048-1-0", top: { width: 2.134, depth: 1.853, height: 0.544 }, faucetLine: 0.2 },
-      { id: "K-3049-1-0", top: { width: 2.636, depth: 1.853, height: 0.506 }, faucetLine: 0.25 },
-      { id: "K-3051-1-0", top: { width: 3.134, depth: 1.859, height: 0.541 }, faucetLine: 0.25 },
-      { id: "K-3052-1-0", top: { width: 3.633, depth: 1.853, height: 0.544 }, faucetLine: 0.2 },
-      { id: "K-3053-1-0", top: { width: 4.132, depth: 1.859, height: 0.555 }, faucetLine: 0.25 },
+      { id: "K-3048-1-0", holes: "single", top: { width: 2.134, depth: 1.853, height: 0.544 }, faucetLine: 0.2 },
+      { id: "K-3049-1-0", holes: "single", top: { width: 2.636, depth: 1.853, height: 0.506 }, faucetLine: 0.25 },
+      { id: "K-3051-1-0", holes: "single", top: { width: 3.134, depth: 1.859, height: 0.541 }, faucetLine: 0.25 },
+      { id: "K-3052-1-0", holes: "single", top: { width: 3.633, depth: 1.853, height: 0.544 }, faucetLine: 0.2 },
+      { id: "K-3053-1-0", holes: "single", top: { width: 4.132, depth: 1.859, height: 0.555 }, faucetLine: 0.25 },
       // A stone top cut for an undermount bowl: shown with the Caxton bowl
       // (K-2210-G-0) under its round cutout.
       {
         id: "K-14031-BU-96",
+        holes: "single",
         material: "countertop",
         top: { width: 2.583, depth: 1.822, height: 0.063, slab: true },
         faucetLine: 0.2,
@@ -1032,9 +1092,14 @@ var PRODUCT_SLOTS = [
   {
     id: "vanityFaucet",
     fixtureKey: "Vanity_Quantity",
-    options: sinkFaucetOptions(function (sel) {
-      return { y: sel.vanitySink.deckY, line: sel.vanitySink.faucetLine };
-    }),
+    options: sinkFaucetOptions(
+      function (sel) {
+        return { y: sel.vanitySink.deckY, line: sel.vanitySink.faucetLine };
+      },
+      function (sel) {
+        return sel.vanitySink;
+      },
+    ),
   },
   {
     id: "sink",
@@ -1045,18 +1110,23 @@ var PRODUCT_SLOTS = [
     options: [
       // The wall-hung sink the room already shows (models/fixtures/sink.glb
       // is this Pinoir).
-      { id: "K-2035-4-0", url: null, deckY: 2.8, faucetLine: 0.24 },
-      { id: "K-2032-0", url: kohlerUrl("K-2032-0"), lift: 2.18, deckY: 2.81, faucetLine: 0.38 },
-      { id: "K-2362-8-0", url: kohlerUrl("K-2362-8-0"), deckY: 2.86, faucetLine: 0.22 },
-      { id: "K-5265-4-0", url: kohlerUrl("K-5265-4-0"), deckY: 2.94, faucetLine: 0.22 },
+      { id: "K-2035-4-0", url: null, holes: "centerset", deckY: 2.8, faucetLine: 0.24 },
+      { id: "K-2032-0", url: kohlerUrl("K-2032-0"), holes: "centerset", lift: 2.18, deckY: 2.81, faucetLine: 0.38 },
+      { id: "K-2362-8-0", url: kohlerUrl("K-2362-8-0"), holes: "widespread", deckY: 2.86, faucetLine: 0.22 },
+      { id: "K-5265-4-0", url: kohlerUrl("K-5265-4-0"), holes: "centerset", deckY: 2.94, faucetLine: 0.22 },
     ],
   },
   {
     id: "sinkFaucet",
     fixtureKey: "Sink_Quantity",
-    options: sinkFaucetOptions(function (sel) {
-      return { y: sel.sink.deckY, line: sel.sink.faucetLine };
-    }),
+    options: sinkFaucetOptions(
+      function (sel) {
+        return { y: sel.sink.deckY, line: sel.sink.faucetLine };
+      },
+      function (sel) {
+        return sel.sink;
+      },
+    ),
   },
   {
     id: "showerBase",
@@ -3537,6 +3607,7 @@ window.BathroomRoom3D = {
         productLabel: T("room3d.option." + opt.id),
         mmns: mmns,
         qty: qty,
+        needsValve: !!opt.needsValve,
       });
     });
     return items;
