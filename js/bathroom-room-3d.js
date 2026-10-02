@@ -631,6 +631,10 @@ function ensureFixtureModel(s, fixtureKey) {
     },
     undefined,
     function (err) {
+      var retry = function () {
+        s.modelRequests[fixtureKey] = false;
+      };
+      if (!modelLoadFailed(s, fixtureKey, retry)) return;
       console.warn("3D preview: couldn't load " + FIXTURE_MODELS[fixtureKey] + ", keeping the stand-in.", err);
     },
   );
@@ -1473,8 +1477,35 @@ var productModelLoader = null;
 // actually placed — and cached for the life of the scene, so flipping back
 // to an option is instant. s.productModels[url] is the loaded template
 // (with its bounding-box size in userData.size), or false while in flight.
+// A model that fails is tried twice more, after MODEL_RETRY_MS. If it still
+// fails it's marked null (the stand-in shows, and the room says so), and
+// the next change to the room after MODEL_RETRY_AFTER_FAIL_MS tries again.
+var MODEL_RETRY_MS = [1500, 4000];
+var MODEL_RETRY_AFTER_FAIL_MS = 15000;
+
+function modelLoadFailed(s, key, retry) {
+  var tries = (s.modelTries[key] || 0) + 1;
+  s.modelTries[key] = tries;
+  if (tries <= MODEL_RETRY_MS.length) {
+    setTimeout(
+      function () {
+        retry();
+        markDirty();
+      },
+      MODEL_RETRY_MS[tries - 1],
+    );
+    return false;
+  }
+  s.modelTries[key] = 0;
+  s.modelFailedAt[key] = Date.now();
+  return true;
+}
+
 function ensureProductModel(s, opt) {
-  if (opt.url in s.productModels) return;
+  var entry = s.productModels[opt.url];
+  if (entry !== undefined) {
+    if (entry !== null || Date.now() - s.modelFailedAt[opt.url] < MODEL_RETRY_AFTER_FAIL_MS) return;
+  }
   s.productModels[opt.url] = false;
   if (!productModelLoader) productModelLoader = new GLTFLoader();
   productModelLoader.load(
@@ -1497,7 +1528,13 @@ function ensureProductModel(s, opt) {
     },
     undefined,
     function (err) {
-      console.warn("3D preview: couldn't load " + opt.url + ", leaving it out.", err);
+      var retry = function () {
+        delete s.productModels[opt.url];
+      };
+      if (!modelLoadFailed(s, opt.url, retry)) return;
+      console.warn("3D preview: couldn't load " + opt.url + ", showing the stand-in.", err);
+      s.productModels[opt.url] = null;
+      markDirty();
     },
   );
 }
@@ -2397,6 +2434,12 @@ function ensureScene() {
     tightNote.setAttribute("role", "status");
     tightNote.hidden = true;
     wrap.parentNode.insertBefore(tightNote, wrap.nextSibling);
+    // Products whose 3D model couldn't load (see ensureProductModel()).
+    var modelNote = document.createElement("p");
+    modelNote.className = "ai-chat-room-3d-model-note";
+    modelNote.setAttribute("role", "status");
+    modelNote.hidden = true;
+    tightNote.parentNode.insertBefore(modelNote, tightNote.nextSibling);
 
     // Persistent (not recreated per rebuildShell call, unlike wall geometry
     // itself) so highlight state survives a dimension change without
@@ -2554,7 +2597,9 @@ function ensureScene() {
       toiletTemplates: toiletTemplates,
       realModels: {}, // fixtureKey -> true once its real model replaced the stand-in
       modelRequests: {}, // fixtureKey -> true once its model fetch has started
-      productModels: {}, // PRODUCT_SLOTS option url -> loaded template, or false while loading
+      productModels: {}, // PRODUCT_SLOTS option url -> loaded template, false while loading, null if it failed
+      modelTries: {}, // model url or fixtureKey -> failed tries in a row
+      modelFailedAt: {}, // model url -> when it last gave up
       vanityTemplates: {}, // vanity sink option id -> buildUndermountVanity() template
       tubTemplates: {}, // drop-in tub option id -> tub model + buildTubDeck()
       bodyTemplates: {}, // productBodyTemplate() cache for the other product bodies
@@ -2570,6 +2615,7 @@ function ensureScene() {
       dirLight: dir,
       toiletStyleSwitch: toiletStyleSwitch,
       tightNote: tightNote,
+      modelNote: modelNote,
       cameraControls: cameraControls,
       applySize: applySize,
       cameraLerp: null, // { from, to, target, start } while animating, else null
@@ -3195,6 +3241,24 @@ function rebuildFixtures(s, widthFt, lengthFt, heightFt) {
     s.toiletStyleSwitch.hidden = toiletCount === 0 || !!s.realModels.Toilet_Quantity || !!sel.toilet.url;
   syncProductSwitcher(s, layoutInput, placedKeys, sel);
   syncCameraControls(s);
+  showModelNote(s, placedKeys, sel);
+}
+
+// Names the picked products showing as a stand-in because their model
+// couldn't load. They're still what the estimate prices.
+function showModelNote(s, placedKeys, sel) {
+  if (!s.modelNote) return;
+  var names = [];
+  PRODUCT_SLOTS.forEach(function (slot) {
+    if (!slotShown(slot, placedKeys, sel)) return;
+    var opt = sel[slot.id];
+    var failed = optionModels(opt).some(function (m) {
+      return s.productModels[m.url] === null;
+    });
+    if (failed) names.push(T("room3d.option." + opt.id));
+  });
+  s.modelNote.hidden = !names.length;
+  s.modelNote.textContent = names.length ? T("room3d.modelFailed", { list: names.join(", ") }) : "";
 }
 
 function startCameraLerp(s, newTarget, newDistance) {

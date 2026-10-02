@@ -507,3 +507,37 @@ test("without WebGL the 3D panel stays hidden, the chat says why, and the estima
   await fillGroup(page, "fixtures", { Toilet_Quantity: 1, Vanity_Quantity: 1 });
   await expect(page.getByTestId("estimate-card")).toBeVisible();
 });
+
+test.describe("a 3D model that fails to load", () => {
+  async function toiletRoom(page) {
+    await disableMaterials(page);
+    await startEstimate(page);
+    await answerScope(page, NEEDS_WALLS);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 6, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 });
+    await skipRoomInteractionSteps(page);
+    await page.locator('form[data-group="fixtures"]').last().locator('input[name="Toilet_Quantity"]').fill("1");
+  }
+
+  test("is tried again, and shows once it loads", async ({ page }) => {
+    let calls = 0;
+    await page.route("**/models/products/kohler/K-3981-0.glb", (route) => {
+      calls++;
+      return calls === 1 ? route.abort() : route.continue();
+    });
+    await toiletRoom(page);
+    await page.evaluate(() => window.BathroomRoom3D.setProductPick("toilet", "K-3981-0"));
+    await expect.poll(() => calls, { timeout: 10000 }).toBe(2);
+    await page.waitForTimeout(500);
+    await expect(page.locator(".ai-chat-room-3d-model-note")).toBeHidden();
+  });
+
+  test("says which product is showing as a stand-in when it keeps failing", async ({ page }) => {
+    await page.route("**/models/products/kohler/K-3981-0.glb", (route) => route.abort());
+    await toiletRoom(page);
+    await page.evaluate(() => window.BathroomRoom3D.setProductPick("toilet", "K-3981-0"));
+    await expect(page.locator(".ai-chat-room-3d-model-note")).toContainText(
+      "Couldn't load the 3D model for Tresham one-piece compact",
+      { timeout: 15000 },
+    );
+  });
+});

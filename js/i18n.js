@@ -801,6 +801,11 @@
       "La vista previa 3D no funciona en este navegador, así que está oculta. Su estimación funciona igual sin ella.",
       "A prévia em 3D não funciona neste navegador, então ela está oculta. A sua estimativa funciona do mesmo jeito sem ela.",
     ],
+    "room3d.modelFailed": [
+      "Couldn't load the 3D model for {list}, so a stand-in is showing. It's still in your estimate. Change anything in the room to try again.",
+      "No se pudo cargar el modelo 3D de {list}, así que se muestra uno genérico. Sigue incluido en su estimación. Cambie cualquier cosa en el baño para intentarlo de nuevo.",
+      "Não foi possível carregar o modelo 3D de {list}, então um genérico está aparecendo. Ele continua na sua estimativa. Mude qualquer coisa no banheiro para tentar de novo.",
+    ],
     "room3d.tight": ["Fits, but tight: {list}.", "Cabe, pero justo: {list}.", "Cabe, mas fica apertado: {list}."],
     "room3d.tightSide": [
       "{fixture}, {n} in. beside it (18 in. recommended)",

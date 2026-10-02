@@ -790,7 +790,8 @@ body.ai-chat-locked {
 }
 
 /* "Fits, but tight" under the 3D room (js/bathroom-room-3d.js). */
-.ai-chat-room-3d-tight {
+.ai-chat-room-3d-tight,
+.ai-chat-room-3d-model-note {
   margin: 0;
   font-size: var(--fs-sm);
   color: var(--color-ink);
