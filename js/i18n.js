@@ -589,14 +589,14 @@
     "card.exportPdf": ["Export as PDF", "Descargar en PDF", "Baixar em PDF"],
     "card.contactCta": ["Contact Us About This →", "Contáctenos sobre esto →", "Fale conosco sobre isto →"],
     "card.business": [
-      "Eddys Remodeling, operated by an individual (not a registered company)",
-      "Eddys Remodeling, operado por una persona física (no una empresa registrada)",
-      "Eddys Remodeling, operado por uma pessoa física (não é uma empresa registrada)",
+      "Eddys Remodeling, a Utah limited liability company",
+      "Eddys Remodeling, compañía de responsabilidad limitada (LLC) de Utah",
+      "Eddys Remodeling, sociedade de responsabilidade limitada (LLC) de Utah",
     ],
     "card.businessNamed": [
-      "Eddys Remodeling, operated by {name}, an individual (not a registered company)",
-      "Eddys Remodeling, operado por {name}, una persona física (no una empresa registrada)",
-      "Eddys Remodeling, operado por {name}, uma pessoa física (não é uma empresa registrada)",
+      "Eddys Remodeling ({name}), a Utah limited liability company",
+      "Eddys Remodeling ({name}), compañía de responsabilidad limitada (LLC) de Utah",
+      "Eddys Remodeling ({name}), sociedade de responsabilidade limitada (LLC) de Utah",
     ],
     "summary.materials": [
       "Materials picked (real current Home Depot prices):",
