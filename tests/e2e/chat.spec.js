@@ -338,9 +338,29 @@ test.describe("the merged fixtures + real-product-pick flow", () => {
     expect(pdf).toContain("Estimated Total \\(Labor + Materials\\), before plumbing");
   });
 
-  test("with no pricing service, the Kohler picks are named as not priced and the estimate still finishes", async ({
+  test("with no pricing service, the fixtures fall back to the catalog picker and are priced", async ({ page }) => {
+    await startEstimate(page);
+    await answerScope(page, NOTHING_BUT_FIXTURES);
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Toilet_Quantity: 1 });
+    await page.locator('input[autocomplete="postal-code"]').fill("84101");
+    await page.locator(".ai-chat-group-continue").last().click();
+    // No Kohler step: it could only end in "not priced" without the service.
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Which toilets" })).toBeVisible();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Next up: Toilet." })).toHaveCount(0);
+    await page.locator(".ai-chat-choice--material:enabled").first().click();
+    await page.locator(".ai-chat-group-continue").last().click();
+    const card = page.getByTestId("estimate-card");
+    await expect(card).toBeVisible();
+    await expect(card).toContainText("Materials Subtotal");
+    await expect(card).not.toContainText("so they aren't in the total");
+  });
+
+  test("when the pricing service doesn't answer, the Kohler picks are named as not priced and the estimate still finishes", async ({
     page,
   }) => {
+    await useConfig(page, { productPricing: { endpoint: "https://pricing.example.com/prices" } });
+    await page.route("https://pricing.example.com/prices", (route) => route.abort());
     await startEstimate(page);
     await answerScope(page, NOTHING_BUT_FIXTURES);
     await skipRoomInteractionSteps(page);
@@ -370,7 +390,7 @@ test.describe("the merged fixtures + real-product-pick flow", () => {
     await zipInput.pressSequentially(" 84101");
     await expect(zipInput).toHaveValue(" 84101");
     await page.locator(".ai-chat-group-continue").last().click();
-    await expect(page.locator(".ai-chat-group-intro", { hasText: "Next up: Toilet." })).toBeVisible();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Which toilets" })).toBeVisible();
   });
 
   test("a scope needing no real products (no fixtures, no tile/paint) still ends in a plain labor-only card", async ({

@@ -1368,9 +1368,13 @@ document.addEventListener("DOMContentLoaded", function () {
       "Shower_Shelf_Quantity",
     ];
 
+    // Without a pricing service the Kohler picks could only ever come back
+    // "not priced", so the catalog picker (real scraped prices) prices those
+    // fixtures instead, the same as with the 3D room off.
     function kohlerPicksEnabled() {
       return !!(
         materialsEstimatorEnabled() &&
+        productPricingEndpoint() &&
         room3dInteractive() &&
         typeof window.BathroomRoom3D.getProductGroups === "function"
       );
