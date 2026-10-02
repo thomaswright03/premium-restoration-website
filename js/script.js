@@ -1876,6 +1876,14 @@ document.addEventListener("DOMContentLoaded", function () {
           );
         });
         if (hasValveTrim) notes.push(T("products.valveNotIncluded"));
+        var wired = items
+          .filter(function (item) {
+            return item.needsWiring;
+          })
+          .map(function (item) {
+            return item.productLabel;
+          });
+        if (wired.length) notes.push(T("products.wiringNotIncluded", { items: wired.join(", ") }));
         finishEstimate(state.values, state.scope, state.laborResult, categories, state.picks, notes);
         if (run === flowRun) offerRepriceOnChange(state, pricedSignature);
       });

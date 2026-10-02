@@ -808,6 +808,11 @@ var isNarrowShower = function (sel) {
   return !sel.showerBase.wide;
 };
 
+// For accessories a room has one of, whatever the number of toilets.
+function firstOnly(placement) {
+  return placement.index > 0;
+}
+
 var PRODUCT_SLOTS = [
   {
     id: "toilet",
@@ -848,17 +853,22 @@ var PRODUCT_SLOTS = [
   {
     id: "towelBar",
     fixtureKey: "Toilet_Quantity",
+    // One per room, over the first toilet.
+    skip: firstOnly,
     // Over the toilet, about 55 in. up.
     options: accessoryOptions(TOWEL_BARS, "chrome", onWall(0, 4.6)),
   },
   {
     id: "exhaustFan",
     fixtureKey: "Toilet_Quantity",
+    // One per room, over the first toilet.
+    skip: firstOnly,
     options: [
       { id: "none", url: null },
       {
         id: "K-34454-NA",
         url: kohlerUrl("K-34454-NA"),
+        needsWiring: true,
         material: "porcelain",
         // Converted grille-forward; tipped up so the grille faces the
         // floor, flush with the ceiling over the toilet.
@@ -1318,7 +1328,7 @@ var PRODUCT_SLOTS = [
       { id: "standard-mirror", url: null },
       { id: "K-31365-BLL", url: kohlerUrl("K-31365-BLL"), material: "chrome" },
       { id: "K-31369-BLL", url: kohlerUrl("K-31369-BLL"), material: "chrome" },
-      { id: "K-99573-TL-NA", url: kohlerUrl("K-99573-TL-NA"), material: "chrome" },
+      { id: "K-99573-TL-NA", url: kohlerUrl("K-99573-TL-NA"), material: "chrome", needsWiring: true },
     ],
   },
   {
@@ -3783,6 +3793,7 @@ window.BathroomRoom3D = {
         mmns: mmns,
         qty: qty,
         needsValve: !!opt.needsValve,
+        needsWiring: !!opt.needsWiring,
       });
     });
     return items;

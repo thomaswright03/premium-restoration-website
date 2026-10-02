@@ -293,6 +293,7 @@ test.describe("the merged fixtures + real-product-pick flow", () => {
     await expect(page.locator("#ai-chat-product-pick-toilet")).toHaveValue("K-31648-0");
     await page.locator("#ai-chat-product-pick-paperHolder").selectOption("K-14377-CP");
     await expect(page.locator("#ai-chat-room-3d-product-paperHolder")).toHaveValue("K-14377-CP");
+    await page.locator("#ai-chat-product-pick-exhaustFan").selectOption("K-34454-NA");
     await page.locator(".ai-chat-group-continue").last().click();
 
     // The glass enclosure is swapped for a Kohler base that fits, which
@@ -340,6 +341,7 @@ test.describe("the merged fixtures + real-product-pick flow", () => {
     await expect(card).toContainText("the valve inside the wall is extra");
     expect(pdf).toContain("the valve inside the wall is extra");
     expect(pdf).toContain("Paper holder: Purist pivoting holder");
+    await expect(card).toContainText("the wiring by an electrician isn't in this estimate");
 
     // And to the quote form with "Contact Us About This".
     await card.getByRole("link", { name: /Contact Us About This/i }).click();

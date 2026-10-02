@@ -541,3 +541,28 @@ test.describe("a 3D model that fails to load", () => {
     );
   });
 });
+
+test("a room with two toilets prices one towel bar and one exhaust fan, but two paper holders", async ({ page }) => {
+  await disableMaterials(page);
+  await startEstimate(page);
+  await answerScope(page, NEEDS_WALLS);
+  await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 10, Bathroom_Length_Ft: 10, Bathroom_Height_Ft: 8 });
+  await skipRoomInteractionSteps(page);
+  await page.locator('form[data-group="fixtures"]').last().locator('input[name="Toilet_Quantity"]').fill("2");
+  await page.evaluate(() => {
+    window.BathroomRoom3D.setProductPick("exhaustFan", "K-34454-NA");
+    window.BathroomRoom3D.setProductPick("towelBar", "K-14436-CP");
+    window.BathroomRoom3D.setProductPick("paperHolder", "K-14377-CP");
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Object.fromEntries(window.BathroomRoom3D.getProductPricingItems().map((item) => [item.slotId, item.qty])),
+      ),
+    )
+    .toMatchObject({ toilet: 2, paperHolder: 2, towelBar: 1, exhaustFan: 1 });
+  const fan = await page.evaluate(() =>
+    window.BathroomRoom3D.getProductPricingItems().find((item) => item.slotId === "exhaustFan"),
+  );
+  expect(fan.needsWiring).toBe(true);
+});
