@@ -268,8 +268,12 @@ function buildMaterials(isDark) {
   // Stone/quartz vanity top — only used once a real undermount bowl
   // swaps the vanity to buildUndermountVanity().
   var countertop = new THREE.MeshStandardMaterial({ color: isDark ? 0xd9d5cc : 0xeeebe5, roughness: 0.35 });
+  // Mirror glass: a smooth, fully metallic surface, so it reflects the
+  // room's environment light instead of showing the wall through it.
+  var mirrorGlass = new THREE.MeshStandardMaterial({ color: 0xdfe5e8, roughness: 0.04, metalness: 1 });
   return {
     countertop: countertop,
+    mirrorGlass: mirrorGlass,
     stainless: stainless,
     porcelain: porcelain,
     cabinetWood: cabinetWood,
@@ -540,15 +544,21 @@ function buildCabinet(geo, mat) {
   return g;
 }
 
+// Hung like the Kohler mirrors: bottom edge at MIRROR_BOTTOM_FT (clear of a
+// vanity top and faucet), on the wall's face rather than sunk into it. The
+// group's origin is the layout's mountHeight, so the parts are offset from it.
 function buildMirror(geo, mat, huge) {
   var g = new THREE.Group();
   var glassGeo = huge ? geo.mirrorHugeGlass : geo.mirrorGlass;
   var edgeGeo = huge ? geo.mirrorHugeFrameEdge : geo.mirrorFrameEdge;
   var width = huge ? 3.35 : 1.85;
   var height = huge ? 3.85 : 2.35;
-  var glass = new THREE.Mesh(glassGeo, mat.glass);
-  glass.position.set(0, 0, -0.03);
+  var mountY = Layout.FIXTURE_LAYOUT[huge ? "Mirror_Huge_Quantity" : "Mirror_Quantity"].mountHeight;
+  var centerY = MIRROR_BOTTOM_FT + height / 2 - mountY;
+  var glass = new THREE.Mesh(glassGeo, mat.mirrorGlass);
+  glass.position.set(0, centerY, 0.02);
   var frame = frameStrips(edgeGeo, mat.brass, width, height);
+  frame.position.set(0, centerY, 0.03);
   g.add(glass, frame);
   return g;
 }

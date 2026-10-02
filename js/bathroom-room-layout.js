@@ -802,13 +802,18 @@
     // this file gets, rather than stacked exactly on top of the last
     // anchor's attachment where it would render fully overlapping/
     // z-fighting and checkFit() would still wrongly report it as fitting.
+    // Anchors already holding something, across types: a mirror and a large
+    // mirror never share one vanity (they'd sit in exactly the same spot).
+    var usedAnchors = {};
     WALL_MOUNT_PRIORITY.forEach(function (fixtureKey) {
       var footprint = FIXTURE_LAYOUT[fixtureKey];
       var parsedCount = parseNumber(fixtureCounts[fixtureKey]);
       var count = clamp(Math.floor(parsedCount === null ? 0 : parsedCount), 0, MAX_FIXTURE_COUNT);
       var anchorPool = [];
       for (var a = 0; a < footprint.anchors.length; a++) {
-        var pool = placedByType[footprint.anchors[a]] || [];
+        var pool = (placedByType[footprint.anchors[a]] || []).filter(function (p) {
+          return !usedAnchors[p.fixtureKey + ":" + p.index];
+        });
         if (pool.length) {
           anchorPool = pool;
           break;
@@ -820,6 +825,7 @@
           continue;
         }
         var anchor = anchorPool[i2];
+        usedAnchors[anchor.fixtureKey + ":" + anchor.index] = true;
         placements.push({
           fixtureKey: fixtureKey,
           index: i2,

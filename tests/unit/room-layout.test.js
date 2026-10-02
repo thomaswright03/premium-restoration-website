@@ -706,3 +706,21 @@ test("computeLayout: a tub keeps at least a 30 in. stretch of clear floor along 
   widest = Math.max(widest, tubCenter + tubHalf - cursor);
   assert.ok(widest >= 2.5 - 1e-6, `widest clear stretch ${widest} ft`);
 });
+
+test("computeLayout: a mirror and a large mirror never hang on the same vanity", () => {
+  const one = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    fixtureCounts: { Vanity_Quantity: 1, Mirror_Quantity: 1, Mirror_Huge_Quantity: 1 },
+  });
+  assert.equal(one.droppedCounts.Mirror_Huge_Quantity, 1);
+  // With a pedestal sink as well, the large mirror goes over the sink.
+  const two = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    fixtureCounts: { Vanity_Quantity: 1, Sink_Quantity: 1, Mirror_Quantity: 1, Mirror_Huge_Quantity: 1 },
+  });
+  assert.deepEqual(two.droppedCounts, {});
+  const huge = two.placements.find((p) => p.fixtureKey === "Mirror_Huge_Quantity");
+  assert.equal(huge.attachedTo.fixtureKey, "Sink_Quantity");
+});
