@@ -1,5 +1,5 @@
 {
-  "source": "Studio Kohler .obj downloads (Restor step 3), filtered to products sold at Home Depot (step 2). Converted with: node tools/models/obj-to-glb.mjs <MMN>.obj <file> <convertArgs>. slot: the 3D room's product switcher row it appears in (PRODUCT_SLOTS in js/bathroom-room-3d.js).",
+  "source": "Studio Kohler .obj downloads (Restor step 3), filtered to products sold at Home Depot (step 2), plus the missing-products download (download_results_missing.json). Converted with: node tools/models/obj-to-glb.mjs <MMN>.obj <file> <convertArgs>. slot: the 3D room's product switcher row it appears in (PRODUCT_SLOTS in js/bathroom-room-3d.js).",
   "products": [
     {
       "mmn": "K-14426-CP",
@@ -53,7 +53,7 @@
       "file": "models/products/kohler/K-14410-4-CP.glb",
       "homeDepotUrl": "https://www.homedepot.com/p/KOHLER-Purist-8-in-Widespread-2-Handle-Low-Arc-Bathroom-Faucet-in-Polished-Chrome-with-Low-Lever-Handles-K-14410-4-CP/100066218",
       "convertArgs": ["--cluster", "0.12"],
-      "slot": "vanityFaucet"
+      "slot": "vanityFaucet, sinkFaucet"
     },
     {
       "mmn": "K-77974-9-CP",
@@ -62,7 +62,7 @@
       "file": "models/products/kohler/K-77974-9-CP.glb",
       "homeDepotUrl": "https://www.homedepot.com/p/KOHLER-Components-Bathroom-Sink-Handles-with-Industrial-Design-in-Polished-Chrome-K-77974-9-CP/307627783",
       "convertArgs": ["--cluster", "0.12"],
-      "slot": "vanityFaucet"
+      "slot": "vanityFaucet, sinkFaucet"
     },
     {
       "mmn": "K-2608-SU-NA",
@@ -108,6 +108,755 @@
       "homeDepotUrl": "https://www.homedepot.com/p/KOHLER-Components-1-Handle-Thermostatic-Valve-Trim-with-Industrial-Handle-in-Polished-Chrome-Valve-Not-Included-K-T78027-9-CP/307649169",
       "convertArgs": ["--cluster", "0.12"],
       "slot": "showerValve"
+    },
+    {
+      "mmn": "K-31648-0",
+      "name": "KOHLER Cimarron The Complete Solution two-piece elongated toilet, 1.28 gpf",
+      "category": "toilets",
+      "file": "models/products/kohler/K-31648-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/toilets/31648?sku=K-31648-0",
+      "convertArgs": ["--cluster", "0.5"],
+      "slot": "toilet"
+    },
+    {
+      "mmn": "K-31626-DRY-0",
+      "name": "KOHLER Cimarron The Complete Solution two-piece elongated toilet, 1.28 gpf",
+      "category": "toilets",
+      "file": "models/products/kohler/K-31626-DRY-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/toilets/31626-dry?sku=K-31626-DRY-0",
+      "convertArgs": ["--cluster", "0.5"],
+      "slot": "toilet"
+    },
+    {
+      "mmn": "K-3619-0",
+      "name": "KOHLER Cimarron One-piece elongated toilet with concealed trapway, 1.28 gpf",
+      "category": "toilets",
+      "file": "models/products/kohler/K-3619-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/toilets/3619?sku=K-3619-0",
+      "convertArgs": ["--cluster", "0.5"],
+      "slot": "toilet"
+    },
+    {
+      "mmn": "K-3981-0",
+      "name": "KOHLER Tresham One-piece compact elongated toilet with skirted trapway, 1.28 gpf",
+      "category": "toilets",
+      "file": "models/products/kohler/K-3981-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/toilets/3981?sku=K-3981-0",
+      "convertArgs": ["--cluster", "0.5"],
+      "slot": "toilet"
+    },
+    {
+      "mmn": "K-3940-0",
+      "name": "KOHLER Kathryn One-piece compact elongated toilet with concealed trapway, 1.28 gpf",
+      "category": "toilets",
+      "file": "models/products/kohler/K-3940-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/toilets/3940?sku=K-3940-0",
+      "convertArgs": ["--cluster", "0.5"],
+      "slot": "toilet"
+    },
+    {
+      "mmn": "K-31641-0",
+      "name": "KOHLER Cimarron Two-piece round-front toilet, 1.28 gpf",
+      "category": "toilets",
+      "file": "models/products/kohler/K-31641-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/toilets/31641?sku=K-31641-0",
+      "convertArgs": ["--cluster", "0.5"],
+      "slot": "toilet"
+    },
+    {
+      "mmn": "K-8332-0",
+      "name": "KOHLER Memoirs 60\" x 34\" freestanding bath",
+      "category": "bathing",
+      "file": "models/products/kohler/K-8332-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathing/8332?sku=K-8332-0",
+      "convertArgs": ["--cluster", "0.5"],
+      "slot": "tub"
+    },
+    {
+      "mmn": "K-24010-0",
+      "name": "KOHLER Stargaze 60\" x 34\" freestanding bath with straight shroud",
+      "category": "bathing",
+      "file": "models/fixtures/bathtub.glb",
+      "note": "Same model as the room's default freestanding tub, so that file is used.",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathing/24010?sku=K-24010-0",
+      "slot": "tub"
+    },
+    {
+      "mmn": "K-R23217-RA-0",
+      "name": "KOHLER Elmbrook 60\" x 30-1/4\" alcove bath, right drain",
+      "category": "bathing",
+      "file": "models/products/kohler/K-R23217-RA-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathing/r23217-ra?sku=K-R23217-RA-0",
+      "convertArgs": ["--front", "+y"],
+      "slot": "tub"
+    },
+    {
+      "mmn": "K-R23217-LA-0",
+      "name": "KOHLER Elmbrook 60\" x 30-1/4\" alcove bath, left drain",
+      "category": "bathing",
+      "file": "models/products/kohler/K-R23217-LA-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathing/r23217-la?sku=K-R23217-LA-0",
+      "convertArgs": ["--front", "+y"],
+      "slot": "tub"
+    },
+    {
+      "mmn": "K-1946-RA-0",
+      "name": "KOHLER Archer 60\" x 30\" alcove bath right drain",
+      "category": "bathing",
+      "file": "models/products/kohler/K-1946-RA-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathing/1946-ra?sku=K-1946-RA-0",
+      "convertArgs": ["--up", "y", "--front", "-z"],
+      "slot": "tub"
+    },
+    {
+      "mmn": "K-T97328-4-CP",
+      "name": "KOHLER Purist Floor-mount bath filler trim with handshower",
+      "category": "bath_faucets",
+      "file": "models/products/kohler/K-T97328-4-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/faucets/bath-faucets/t97328-4?sku=K-T97328-4-CP",
+      "convertArgs": ["--up", "y", "--front", "+z", "--cluster", "0.22"],
+      "slot": "tubFaucet"
+    },
+    {
+      "mmn": "K-T73087-4-CP",
+      "name": "KOHLER Composed Floor-mount bath filler trim with handshower",
+      "category": "bath_faucets",
+      "file": "models/products/kohler/K-T73087-4-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/faucets/bath-faucets/t73087-4?sku=K-T73087-4-CP",
+      "convertArgs": ["--cluster", "0.22"],
+      "slot": "tubFaucet"
+    },
+    {
+      "mmn": "K-T14501-4-CP",
+      "name": "KOHLER Purist Rite-Temp valve trim with push-button diverter and lever handle",
+      "category": "valves_trims",
+      "file": "models/products/kohler/K-T14501-4-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/valves-trims/t14501-4?sku=K-T14501-4-CP",
+      "convertArgs": ["--cluster", "0.12"],
+      "slot": "tubValve"
+    },
+    {
+      "mmn": "K-TS14423-4-CP",
+      "name": "KOHLER Purist Rite-Temp valve trim with lever handle",
+      "category": "valves_trims",
+      "file": "models/products/kohler/K-TS14423-4-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/valves-trims/ts14423-4?sku=K-TS14423-4-CP",
+      "convertArgs": ["--front", "+y", "--cluster", "0.12"],
+      "slot": "tubValve"
+    },
+    {
+      "mmn": "K-TS73115-4-CP",
+      "name": "KOHLER Composed Rite-Temp valve trim with lever handle",
+      "category": "valves_trims",
+      "file": "models/products/kohler/K-TS73115-4-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/valves-trims/ts73115-4?sku=K-TS73115-4-CP",
+      "convertArgs": ["--front", "+y", "--cluster", "0.12"],
+      "slot": "tubValve"
+    },
+    {
+      "mmn": "K-14402-4A-CP",
+      "name": "KOHLER Purist Single-handle bathroom sink faucet with Straight Lever handle, 1.2 gpm",
+      "category": "bathroom_sink_faucets",
+      "file": "models/products/kohler/K-14402-4A-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/faucets/bathroom-sink-faucets/14402-4a?sku=K-14402-4A-CP",
+      "convertArgs": ["--up", "y", "--front", "+z", "--cluster", "0.12"],
+      "slot": "vanityFaucet, sinkFaucet"
+    },
+    {
+      "mmn": "K-73167-4-CP",
+      "name": "KOHLER Composed Single-handle bathroom sink faucet with Lever handle, 1.2 gpm",
+      "category": "bathroom_sink_faucets",
+      "file": "models/products/kohler/K-73167-4-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/faucets/bathroom-sink-faucets/73167-4?sku=K-73167-4-CP",
+      "convertArgs": ["--up", "y", "--front", "-z", "--cluster", "0.12"],
+      "slot": "vanityFaucet, sinkFaucet"
+    },
+    {
+      "mmn": "K-77958-4A-CP",
+      "name": "KOHLER Components Single-handle bathroom sink faucet, 1.2 gpm",
+      "category": "bathroom_sink_faucets",
+      "file": "models/products/kohler/K-77958-4A-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/faucets/bathroom-sink-faucets/77958-4a?sku=K-77958-4A-CP",
+      "convertArgs": ["--up", "y", "--front", "-z", "--cluster", "0.12"],
+      "slot": "vanityFaucet, sinkFaucet"
+    },
+    {
+      "mmn": "K-35951-4-CP",
+      "name": "KOHLER Buckley Centerset bathroom sink faucet, 1.2 gpm",
+      "category": "bathroom_sink_faucets",
+      "file": "models/products/kohler/K-35951-4-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/faucets/bathroom-sink-faucets/35951-4?sku=K-35951-4-CP",
+      "convertArgs": ["--cluster", "0.12"],
+      "slot": "vanityFaucet, sinkFaucet"
+    },
+    {
+      "mmn": "K-27388-4-CP",
+      "name": "KOHLER Simplice Centerset bathroom sink faucet, 1.2 gpm",
+      "category": "bathroom_sink_faucets",
+      "file": "models/products/kohler/K-27388-4-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/faucets/bathroom-sink-faucets/27388-4?sku=K-27388-4-CP",
+      "convertArgs": ["--cluster", "0.12"],
+      "slot": "vanityFaucet, sinkFaucet"
+    },
+    {
+      "mmn": "K-77969-CP",
+      "name": "KOHLER Components Bathroom sink faucet spout with Row design, 1.2 gpm",
+      "category": "bathroom_sink_faucets",
+      "file": "models/products/kohler/K-77969-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/faucets/bathroom-sink-faucets/77969?sku=K-77969-CP",
+      "convertArgs": ["--up", "-z", "--front", "-y", "--cluster", "0.12"],
+      "slot": "vanityFaucet, sinkFaucet"
+    },
+    {
+      "mmn": "K-77967-CP",
+      "name": "KOHLER Components Bathroom sink faucet spout with Tube design, 1.2 gpm",
+      "category": "bathroom_sink_faucets",
+      "file": "models/products/kohler/K-77967-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/faucets/bathroom-sink-faucets/77967?sku=K-77967-CP",
+      "convertArgs": ["--cluster", "0.12"],
+      "slot": "vanityFaucet, sinkFaucet"
+    },
+    {
+      "mmn": "K-8459-0",
+      "name": "KOHLER Rely 60\" x 32\" alcove shower base, left drain",
+      "category": "shower_bases",
+      "file": "models/products/kohler/K-8459-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/shower-bases/8459?sku=K-8459-0",
+      "convertArgs": ["--up", "y", "--front", "+z"],
+      "slot": "showerBase"
+    },
+    {
+      "mmn": "K-8458-0",
+      "name": "KOHLER Rely 60\" x 32\" alcove shower base, right drain",
+      "category": "shower_bases",
+      "file": "models/products/kohler/K-8458-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/shower-bases/8458?sku=K-8458-0",
+      "convertArgs": ["--up", "y", "--front", "+z"],
+      "slot": "showerBase"
+    },
+    {
+      "mmn": "K-9163-0",
+      "name": "KOHLER Bellwether 60\" x 32\" alcove shower base, left drain",
+      "category": "shower_bases",
+      "file": "models/products/kohler/K-9163-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/shower-bases/9163?sku=K-9163-0",
+      "convertArgs": ["--up", "y", "--front", "+z", "--cluster", "0.5"],
+      "slot": "showerBase"
+    },
+    {
+      "mmn": "K-9396-0",
+      "name": "KOHLER Archer 36\" x 36\" alcove shower base, center drain",
+      "category": "shower_bases",
+      "file": "models/products/kohler/K-9396-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/shower-bases/9396?sku=K-9396-0",
+      "convertArgs": [],
+      "slot": "showerBase"
+    },
+    {
+      "mmn": "K-8644-0",
+      "name": "KOHLER Rely 36\" x 34\" alcove shower base, center drain",
+      "category": "shower_bases",
+      "file": "models/products/kohler/K-8644-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/shower-bases/8644?sku=K-8644-0",
+      "convertArgs": [],
+      "slot": "showerBase"
+    },
+    {
+      "mmn": "K-965-AK-CP",
+      "name": "KOHLER Purist Single-function showerhead, 2.5 gpm",
+      "category": "showerheads",
+      "file": "models/products/kohler/K-965-AK-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/showerheads/965-ak?sku=K-965-AK-CP",
+      "convertArgs": ["--up", "-z", "--front", "+y", "--cluster", "0.12"],
+      "slot": "showerHead"
+    },
+    {
+      "mmn": "K-933-CP",
+      "name": "KOHLER Purist Shower arm and flange",
+      "category": "showerheads",
+      "file": "models/products/kohler/K-933-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/shower-fittings/933?sku=K-933-CP",
+      "convertArgs": ["--cluster", "0.12"],
+      "slot": "showerHead"
+    },
+    {
+      "mmn": "K-24805-CP",
+      "name": "KOHLER Parallel Single-function showerhead, 2.5 gpm",
+      "category": "showerheads",
+      "file": "models/products/kohler/K-24805-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/showerheads/24805?sku=K-24805-CP",
+      "convertArgs": ["--up", "-x", "--front", "-y", "--cluster", "0.12"],
+      "slot": "showerHead"
+    },
+    {
+      "mmn": "K-27051-CP",
+      "name": "KOHLER Occasion 8\" single-function rainhead, 2.5 gpm",
+      "category": "showerheads",
+      "file": "models/products/kohler/K-27051-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/showerheads/27051?sku=K-27051-CP",
+      "convertArgs": ["--cluster", "0.12"],
+      "slot": "showerHead"
+    },
+    {
+      "mmn": "K-22166-CP",
+      "name": "KOHLER Purist Four-function handshower, 2.5 gpm",
+      "category": "showerheads",
+      "file": "models/products/kohler/K-22166-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/handshowers/22166?sku=K-22166-CP",
+      "convertArgs": ["--cluster", "0.12"],
+      "slot": "showerHead"
+    },
+    {
+      "mmn": "K-26322-CP",
+      "name": "KOHLER Statement 15-1/2\" wall-mount single-function rainhead arm and flange",
+      "category": "showerheads",
+      "file": "models/products/kohler/K-26322-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/shower-fittings/26322?sku=K-26322-CP",
+      "convertArgs": ["--cluster", "0.08"],
+      "slot": "showerHead"
+    },
+    {
+      "mmn": "K-R706851-8L-BL",
+      "name": "KOHLER Elmbrook 54-5/8\"-59-5/8\" W x 73-9/16\" H sliding shower door with 5/16\"-thick Crystal Clear glass",
+      "category": "shower_doors",
+      "file": "models/products/kohler/K-R706851-8L-BL.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/shower-doors/r706851-8l?sku=K-R706851-8L-BL",
+      "convertArgs": ["--cluster", "0.25"],
+      "slot": "showerDoor"
+    },
+    {
+      "mmn": "K-707615-8L-BL",
+      "name": "KOHLER Elate 56-1/4\"-59-5/8\" W x 75-1/2\" H sliding shower door with 5/16\"-thick Crystal Clear glass",
+      "category": "shower_doors",
+      "file": "models/products/kohler/K-707615-8L-BL.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/shower-doors/707615-8l?sku=K-707615-8L-BL",
+      "convertArgs": ["--cluster", "0.25"],
+      "slot": "showerDoor"
+    },
+    {
+      "mmn": "K-706015-L-BL",
+      "name": "KOHLER Levity 56-5/8\"-59-5/8\" W x 74\" H bypass shower door with 1/4\"-thick Crystal Clear glass",
+      "category": "shower_doors",
+      "file": "models/products/kohler/K-706015-L-BL.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/shower-doors/706015-l?sku=K-706015-L-BL",
+      "convertArgs": ["--cluster", "0.25"],
+      "slot": "showerDoor"
+    },
+    {
+      "mmn": "K-27582-10L-BL",
+      "name": "KOHLER Composed 29-5/8\"-30-3/8\" W x 71-5/8\" H pivot shower door with 3/8\"-thick Crystal Clear glass",
+      "category": "shower_doors",
+      "file": "models/products/kohler/K-27582-10L-BL.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/shower-doors/27582-10l?sku=K-27582-10L-BL",
+      "convertArgs": ["--cluster", "0.25"],
+      "slot": "showerDoor"
+    },
+    {
+      "mmn": "K-27583-10L-BL",
+      "name": "KOHLER Components 29-5/8\"-30-3/8\" W x 71-5/8\" H pivot shower door with 3/8\"-thick Crystal Clear glass",
+      "category": "shower_doors",
+      "file": "models/products/kohler/K-27583-10L-BL.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/shower-doors/27583-10l?sku=K-27583-10L-BL",
+      "convertArgs": ["--cluster", "0.25"],
+      "slot": "showerDoor"
+    },
+    {
+      "mmn": "K-14436-CP",
+      "name": "KOHLER Purist 24\" towel bar",
+      "category": "accessories",
+      "file": "models/products/kohler/K-14436-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-accessories/14436?sku=K-14436-CP",
+      "convertArgs": ["--up", "y", "--front", "+x", "--cluster", "0.1"],
+      "slot": "towelBar"
+    },
+    {
+      "mmn": "K-14435-CP",
+      "name": "KOHLER Purist 18\" towel bar",
+      "category": "accessories",
+      "file": "models/products/kohler/K-14435-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-accessories/14435?sku=K-14435-CP",
+      "convertArgs": ["--up", "y", "--front", "+z", "--cluster", "0.1"],
+      "slot": "towelBar"
+    },
+    {
+      "mmn": "K-14441-CP",
+      "name": "KOHLER Purist Towel ring",
+      "category": "accessories",
+      "file": "models/products/kohler/K-14441-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-accessories/14441?sku=K-14441-CP",
+      "convertArgs": ["--cluster", "0.1"],
+      "slot": "towelBar"
+    },
+    {
+      "mmn": "K-78373-CP",
+      "name": "KOHLER Components 24\" towel bar",
+      "category": "accessories",
+      "file": "models/products/kohler/K-78373-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-accessories/78373?sku=K-78373-CP",
+      "convertArgs": ["--cluster", "0.1"],
+      "slot": "towelBar"
+    },
+    {
+      "mmn": "K-13504-CP",
+      "name": "KOHLER Kelston Pivoting toilet paper holder",
+      "category": "accessories",
+      "file": "models/products/kohler/K-13504-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/toilet-paper-holders/13504?sku=K-13504-CP",
+      "convertArgs": ["--up", "y", "--front", "+z", "--cluster", "0.08"],
+      "slot": "paperHolder"
+    },
+    {
+      "mmn": "K-73147-CP",
+      "name": "KOHLER Composed Pivoting toilet paper holder",
+      "category": "accessories",
+      "file": "models/products/kohler/K-73147-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/toilet-paper-holders/73147?sku=K-73147-CP",
+      "convertArgs": ["--cluster", "0.08"],
+      "slot": "paperHolder"
+    },
+    {
+      "mmn": "K-78382-CP",
+      "name": "KOHLER Components Pivoting toilet paper holder",
+      "category": "accessories",
+      "file": "models/products/kohler/K-78382-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/toilet-paper-holders/78382?sku=K-78382-CP",
+      "convertArgs": ["--cluster", "0.08"],
+      "slot": "paperHolder"
+    },
+    {
+      "mmn": "K-14377-CP",
+      "name": "KOHLER Purist Pivoting toilet paper holder",
+      "category": "accessories",
+      "file": "models/products/kohler/K-14377-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/toilet-paper-holders/14377?sku=K-14377-CP",
+      "convertArgs": ["--up", "y", "--front", "+z", "--cluster", "0.08"],
+      "slot": "paperHolder"
+    },
+    {
+      "mmn": "K-10542-CP",
+      "name": "KOHLER Traditional 24\" grab bar",
+      "category": "accessories",
+      "file": "models/products/kohler/K-10542-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/grab-bars/10542?sku=K-10542-CP",
+      "convertArgs": ["--cluster", "0.1"],
+      "slot": "tubGrabBar, showerGrabBar"
+    },
+    {
+      "mmn": "K-10544-CP",
+      "name": "KOHLER Traditional 36\" grab bar",
+      "category": "accessories",
+      "file": "models/products/kohler/K-10544-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/grab-bars/10544?sku=K-10544-CP",
+      "convertArgs": ["--cluster", "0.1"],
+      "slot": "tubGrabBar, showerGrabBar"
+    },
+    {
+      "mmn": "K-11895-BS",
+      "name": "KOHLER Purist 36\" grab bar",
+      "category": "accessories",
+      "file": "models/products/kohler/K-11895-BS.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/grab-bars/11895?sku=K-11895-BS",
+      "convertArgs": ["--up", "z", "--front", "-x", "--cluster", "0.1"],
+      "slot": "tubGrabBar, showerGrabBar"
+    },
+    {
+      "mmn": "K-25161-CP",
+      "name": "KOHLER Components 36\" grab bar",
+      "category": "accessories",
+      "file": "models/products/kohler/K-25161-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/grab-bars/25161?sku=K-25161-CP",
+      "convertArgs": ["--cluster", "0.1"],
+      "slot": "tubGrabBar, showerGrabBar"
+    },
+    {
+      "mmn": "K-14443-CP",
+      "name": "KOHLER Purist Robe hook",
+      "category": "accessories",
+      "file": "models/products/kohler/K-14443-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-accessories/14443?sku=K-14443-CP",
+      "convertArgs": ["--up", "y", "--front", "+z", "--cluster", "0.05"],
+      "slot": "robeHook"
+    },
+    {
+      "mmn": "K-23529-CP",
+      "name": "KOHLER Parallel Robe hook",
+      "category": "accessories",
+      "file": "models/products/kohler/K-23529-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-accessories/23529?sku=K-23529-CP",
+      "convertArgs": ["--cluster", "0.05"],
+      "slot": "robeHook"
+    },
+    {
+      "mmn": "K-31365-BLL",
+      "name": "KOHLER Essential 30\" x 45\" rectangular framed mirror",
+      "category": "mirrors",
+      "file": "models/products/kohler/K-31365-BLL.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/furniture/31365?sku=K-31365-BLL",
+      "convertArgs": ["--cluster", "0.2"],
+      "slot": "mirrorLarge"
+    },
+    {
+      "mmn": "K-31367-BLL",
+      "name": "KOHLER Essential 22\" round framed mirror",
+      "category": "mirrors",
+      "file": "models/products/kohler/K-31367-BLL.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/furniture/31367?sku=K-31367-BLL",
+      "convertArgs": ["--cluster", "0.2"],
+      "slot": "mirror"
+    },
+    {
+      "mmn": "K-31368",
+      "name": "KOHLER Essential 32\" round framed mirror",
+      "category": "mirrors",
+      "file": "models/products/kohler/K-31368.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/furniture/31368?sku=K-31368",
+      "convertArgs": ["--cluster", "0.2"],
+      "slot": "mirror"
+    },
+    {
+      "mmn": "K-31369-BLL",
+      "name": "KOHLER Essential 36\" round framed mirror",
+      "category": "mirrors",
+      "file": "models/products/kohler/K-31369-BLL.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/furniture/31369?sku=K-31369-BLL",
+      "convertArgs": ["--cluster", "0.2"],
+      "slot": "mirrorLarge"
+    },
+    {
+      "mmn": "K-31364-BLL",
+      "name": "KOHLER Essential 24\" x 36\" rectangular framed mirror",
+      "category": "mirrors",
+      "file": "models/products/kohler/K-31364-BLL.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/furniture/31364?sku=K-31364-BLL",
+      "convertArgs": ["--cluster", "0.2"],
+      "slot": "mirror"
+    },
+    {
+      "mmn": "K-99573-TL-NA",
+      "name": "KOHLER Verdera 40\" x 33\" lighted mirror",
+      "category": "mirrors",
+      "file": "models/products/kohler/K-99573-TL-NA.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/furniture/99573-tl?sku=K-99573-TL-NA",
+      "convertArgs": ["--cluster", "0.2"],
+      "slot": "mirrorLarge"
+    },
+    {
+      "mmn": "K-3048-1-0",
+      "name": "KOHLER Iron/Impressions 25\" Enameled cast iron vanity top with integrated round sink",
+      "category": "vanity_tops",
+      "file": "models/products/kohler/K-3048-1-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-sinks/3048-1?sku=K-3048-1-0",
+      "convertArgs": ["--up", "y", "--front", "+z"],
+      "slot": "vanitySink"
+    },
+    {
+      "mmn": "K-3049-1-0",
+      "name": "KOHLER Iron/Impressions 31\" Enameled cast iron vanity top with integrated rectangular sink",
+      "category": "vanity_tops",
+      "file": "models/products/kohler/K-3049-1-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-sinks/3049-1?sku=K-3049-1-0",
+      "convertArgs": ["--up", "y", "--front", "+z"],
+      "slot": "vanitySink"
+    },
+    {
+      "mmn": "K-3051-1-0",
+      "name": "KOHLER Iron/Impressions 37\" Enameled cast iron vanity top with integrated oval sink",
+      "category": "vanity_tops",
+      "file": "models/products/kohler/K-3051-1-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-sinks/3051-1?sku=K-3051-1-0",
+      "convertArgs": ["--up", "y", "--front", "+z"],
+      "slot": "vanitySink"
+    },
+    {
+      "mmn": "K-3052-1-0",
+      "name": "KOHLER Iron/Impressions 43\" Enameled cast iron vanity top with integrated oval sink",
+      "category": "vanity_tops",
+      "file": "models/products/kohler/K-3052-1-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-sinks/3052-1?sku=K-3052-1-0",
+      "convertArgs": ["--up", "y", "--front", "+z"],
+      "slot": "vanitySink"
+    },
+    {
+      "mmn": "K-3053-1-0",
+      "name": "KOHLER Iron/Impressions 49\" Enameled cast iron vanity top with integrated oval sink",
+      "category": "vanity_tops",
+      "file": "models/products/kohler/K-3053-1-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-sinks/3053-1?sku=K-3053-1-0",
+      "convertArgs": ["--up", "y", "--front", "+z"],
+      "slot": "vanitySink"
+    },
+    {
+      "mmn": "K-14031-BU-96",
+      "name": "KOHLER Marrakesh Vanity-top with single faucet hole",
+      "category": "vanity_tops",
+      "file": "models/products/kohler/K-14031-BU-96.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-sinks/14031-bu?sku=K-14031-BU-96",
+      "convertArgs": [],
+      "slot": "vanitySink"
+    },
+    {
+      "mmn": "K-2035-4-0",
+      "name": "KOHLER Pinoir 22\" oval wall-mount bathroom sink with glazed underside",
+      "category": "bathroom_sinks",
+      "file": "models/fixtures/sink.glb",
+      "note": "Same model as the room's default wall-hung sink, so that file is used.",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-sinks/2035-4?sku=K-2035-4-0",
+      "slot": "sink"
+    },
+    {
+      "mmn": "K-2362-8-0",
+      "name": "KOHLER Cimarron 22-3/4\" rectangular pedestal bathroom sink",
+      "category": "bathroom_sinks",
+      "file": "models/products/kohler/K-2362-8-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-sinks/2362-8?sku=K-2362-8-0",
+      "convertArgs": ["--up", "y", "--front", "+z"],
+      "slot": "sink"
+    },
+    {
+      "mmn": "K-5265-4-0",
+      "name": "KOHLER Veer 21\" rectangular pedestal bathroom sink",
+      "category": "bathroom_sinks",
+      "file": "models/products/kohler/K-5265-4-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-sinks/5265-4?sku=K-5265-4-0",
+      "convertArgs": ["--up", "y", "--front", "+z"],
+      "slot": "sink"
+    },
+    {
+      "mmn": "K-2032-0",
+      "name": "KOHLER Greenwich 20-3/4\" x 18-1/4\" wall-mount/concealed arm carrier bathroom sink with 4\" centerset faucet holes",
+      "category": "bathroom_sinks",
+      "file": "models/products/kohler/K-2032-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/commercial/commercial-lavatories/2032?sku=K-2032-0",
+      "convertArgs": [],
+      "slot": "sink"
+    },
+    {
+      "mmn": "K-2210-G-0",
+      "name": "KOHLER Caxton 19-1/4\" oval undermount bathroom sink with glazed underside, no overflow",
+      "category": "bathroom_sinks",
+      "file": "models/products/kohler/K-2210-G-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-sinks/2210-g?sku=K-2210-G-0",
+      "convertArgs": [],
+      "slot": "vanitySink"
+    },
+    {
+      "mmn": "K-7806-0",
+      "name": "KOHLER Carillon 17-3/4\" round drop-in bathroom sink, no overflow",
+      "category": "bathroom_sinks",
+      "file": "models/products/kohler/K-7806-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-sinks/7806?sku=K-7806-0",
+      "convertArgs": ["--up", "y", "--front", "+z"],
+      "slot": "vanitySink"
+    },
+    {
+      "mmn": "K-97618-0",
+      "name": "KOHLER Choreograph 60\" x 32\" x 72\" shower wall kit",
+      "category": "shower_walls",
+      "file": "models/products/kohler/K-97618-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/97618?sku=K-97618-0",
+      "convertArgs": [],
+      "slot": "showerWalls"
+    },
+    {
+      "mmn": "K-97605-0",
+      "name": "KOHLER Choreograph 32\" x 72\" wall panel",
+      "category": "shower_walls",
+      "file": "models/products/kohler/K-97605-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/97605?sku=K-97605-0",
+      "convertArgs": [],
+      "slot": null,
+      "note": "Single Choreograph wall panel: served but not placed, since the wall kits already show these panels."
+    },
+    {
+      "mmn": "K-97600-0",
+      "name": "KOHLER Choreograph 32\" x 96\" wall panel",
+      "category": "shower_walls",
+      "file": "models/products/kohler/K-97600-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/97600?sku=K-97600-0",
+      "convertArgs": [],
+      "slot": null,
+      "note": "Single Choreograph wall panel: served but not placed, since the wall kits already show these panels."
+    },
+    {
+      "mmn": "K-97615-0",
+      "name": "KOHLER Choreograph 60\" x 32\" x 96\" shower wall kit",
+      "category": "shower_walls",
+      "file": "models/products/kohler/K-97615-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/97615?sku=K-97615-0",
+      "convertArgs": [],
+      "slot": "showerWalls"
+    },
+    {
+      "mmn": "K-97611-0",
+      "name": "KOHLER Choreograph 36\" x 36\" x 96\" shower wall kit",
+      "category": "shower_walls",
+      "file": "models/products/kohler/K-97611-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/97611?sku=K-97611-0",
+      "convertArgs": [],
+      "slot": "showerWalls"
+    },
+    {
+      "mmn": "K-97635-0",
+      "name": "KOHLER Choreograph 96\" corner joint, set of 2",
+      "category": "shower_walls",
+      "file": "models/products/kohler/K-97635-0.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/showers/97635?sku=K-97635-0",
+      "convertArgs": ["--cluster", "0.1"],
+      "slot": "showerWalls"
+    },
+    {
+      "mmn": "K-97621",
+      "name": "KOHLER Choreograph 7\" floating shower shelf",
+      "category": "shower_shelves",
+      "file": "models/products/kohler/K-97621.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-accessories/97621?sku=K-97621",
+      "convertArgs": ["--cluster", "0.15"],
+      "slot": "showerShelf"
+    },
+    {
+      "mmn": "K-97622",
+      "name": "KOHLER Choreograph 14\" floating shower shelf",
+      "category": "shower_shelves",
+      "file": "models/products/kohler/K-97622.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-accessories/97622?sku=K-97622",
+      "convertArgs": ["--cluster", "0.15"],
+      "slot": "showerShelf"
+    },
+    {
+      "mmn": "K-97623",
+      "name": "KOHLER Choreograph 21\" floating shower shelf",
+      "category": "shower_shelves",
+      "file": "models/products/kohler/K-97623.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-accessories/97623?sku=K-97623",
+      "convertArgs": ["--cluster", "0.15"],
+      "slot": "showerShelf"
+    },
+    {
+      "mmn": "K-14440-CP",
+      "name": "KOHLER Purist Glass shelf",
+      "category": "shower_shelves",
+      "file": "models/products/kohler/K-14440-CP.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-accessories/14440?sku=K-14440-CP",
+      "convertArgs": ["--cluster", "0.15"],
+      "slot": "showerShelf"
+    },
+    {
+      "mmn": "K-97630",
+      "name": "KOHLER Choreograph 9\" shower storage",
+      "category": "shower_shelves",
+      "file": "models/products/kohler/K-97630.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-accessories/97630?sku=K-97630",
+      "convertArgs": ["--up", "y", "--front", "+z", "--cluster", "0.35"],
+      "slot": "showerShelf"
+    },
+    {
+      "mmn": "K-34454-NA",
+      "name": "KOHLER Atmo 13-7/8\" x 13-7/8\" bathroom exhaust fan",
+      "category": "exhaust_fans",
+      "file": "models/products/kohler/K-34454-NA.glb",
+      "kohlerUrl": "https://www.studiokohler.com/products/bathroom/bathroom-accessories/exhaust-fans/34454?sku=K-34454-NA",
+      "convertArgs": ["--up", "y", "--front", "+z", "--cluster", "0.15"],
+      "slot": "exhaustFan"
     }
   ]
 }

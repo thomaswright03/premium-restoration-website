@@ -261,7 +261,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // rendering — the ZIP + per-category real-product-pick steps that now
     // follow fixtures automatically, no separate button/gate. See
     // startProductPicks()/advanceProductPick() below.
-    var pickState = null; // { values, scope, laborResult, categories, categoryIndex, zip, picks, mainSteps, totalSteps }
+    var pickState = null; // { values, scope, laborResult, groups, groupIndex, categories, categoryIndex, zip, picks, mainSteps, totalSteps }
 
     function buildGroups(scope) {
       var needs = Pricing.scopeNeeds(scope || {});
@@ -322,7 +322,17 @@ document.addEventListener("DOMContentLoaded", function () {
       return groups;
     }
 
+    // Bumped whenever a flow starts or is cancelled, so a listener left
+    // behind by an earlier run (see BathroomRoom3D.onChange()) knows to stop.
+    var flowRun = 0;
+
+    // The 3D room couldn't start in this browser (see BathroomRoom3D.show()).
+    document.addEventListener("bathroomroom3d:unavailable", function () {
+      appendChatRow("bot", T("room3d.unavailable"));
+    });
+
     function startEstimate() {
+      flowRun++;
       quoteState = { groups: buildGroups(null), index: 0, values: {}, scope: {} };
       pickState = null;
       chatForm.hidden = true;
@@ -331,7 +341,197 @@ document.addEventListener("DOMContentLoaded", function () {
         window.BathroomRoom3D.reset();
         if (bathroomRoom3dEnabled()) window.BathroomRoom3D.show();
         else window.BathroomRoom3D.hide();
+        watchDesign();
       }
+      var saved = readSavedDesign();
+      if (saved) appendSavedDesignOffer(saved);
+      appendGroupForm();
+    }
+
+    // ---------- saved design ----------
+    // How far the customer got (their answers, plumbing walls, doorways,
+    // the products picked in the 3D room, fixtures they moved) is kept in
+    // this browser only, so they can come back to it later. It is never
+    // sent anywhere; the quote form only gets the written summary.
+    var DESIGN_KEY = "pr_saved_design";
+    var DESIGN_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+    var designWatched = false;
+    var designSaveTimer = null;
+
+    function saveDesign() {
+      var room = window.BathroomRoom3D;
+      if (!room || !room.getDesign) return;
+      var step;
+      if (quoteState) {
+        // Nothing answered yet (or back on the first question): keep
+        // whatever was saved before.
+        if (quoteState.index === 0) return;
+        step = quoteState.groups[quoteState.index].id;
+      } else if (pickState) {
+        step = "products";
+      } else {
+        return;
+      }
+      var flow = quoteState || pickState;
+      try {
+        localStorage.setItem(
+          DESIGN_KEY,
+          JSON.stringify({
+            v: 1,
+            savedAt: Date.now(),
+            step: step,
+            values: flow.values,
+            scope: flow.scope,
+            room: room.getDesign(),
+          }),
+        );
+      } catch (e) {
+        /* storage blocked or full: the design just isn't kept */
+      }
+    }
+
+    function saveDesignSoon() {
+      clearTimeout(designSaveTimer);
+      designSaveTimer = setTimeout(saveDesign, 400);
+    }
+
+    function watchDesign() {
+      if (designWatched || !window.BathroomRoom3D.onChange) return;
+      designWatched = true;
+      window.BathroomRoom3D.onChange(saveDesignSoon);
+    }
+
+    function readSavedDesign() {
+      var saved = null;
+      try {
+        saved = JSON.parse(localStorage.getItem(DESIGN_KEY) || "null");
+      } catch (e) {
+        saved = null;
+      }
+      if (
+        !saved ||
+        saved.v !== 1 ||
+        typeof saved.savedAt !== "number" ||
+        Date.now() - saved.savedAt > DESIGN_MAX_AGE_MS ||
+        !saved.scope ||
+        typeof saved.scope !== "object" ||
+        !saved.values ||
+        typeof saved.values !== "object"
+      ) {
+        forgetDesign();
+        return null;
+      }
+      return saved;
+    }
+
+    function forgetDesign() {
+      try {
+        localStorage.removeItem(DESIGN_KEY);
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
+    // Shown above the first question when a design is saved: pick it back
+    // up, or forget it. Ignoring it and answering the first question
+    // starts a new design, which replaces the saved one.
+    function appendSavedDesignOffer(saved) {
+      var run = flowRun;
+      var parts = botRow();
+      var content = document.createElement("div");
+      content.className = "ai-chat-text";
+      var textEl = document.createElement("p");
+      textEl.className = "ai-chat-saved-design";
+      textEl.textContent = T("design.saved", {
+        date: new Date(saved.savedAt).toLocaleDateString(I18n.locale(), {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+      });
+      content.appendChild(textEl);
+      var actionsWrap = document.createElement("div");
+      actionsWrap.className = "ai-chat-group-actions";
+      var forgetBtn = document.createElement("button");
+      forgetBtn.type = "button";
+      forgetBtn.className = "ai-chat-group-cancel";
+      forgetBtn.textContent = T("design.forget");
+      var resumeBtn = document.createElement("button");
+      resumeBtn.type = "button";
+      resumeBtn.className = "ai-chat-group-continue";
+      resumeBtn.textContent = T("design.resume");
+      actionsWrap.appendChild(forgetBtn);
+      actionsWrap.appendChild(resumeBtn);
+      content.appendChild(actionsWrap);
+      parts.inner.appendChild(content);
+      chatMessages.appendChild(parts.row);
+
+      function stillOpen() {
+        return run === flowRun && quoteState && quoteState.index === 0;
+      }
+      forgetBtn.addEventListener("click", function () {
+        forgetDesign();
+        actionsWrap.remove();
+        textEl.textContent = T("design.forgotten");
+      });
+      resumeBtn.addEventListener("click", function () {
+        actionsWrap.remove();
+        if (!stillOpen()) return;
+        textEl.textContent = T("design.resumed");
+        resumeDesign(saved);
+      });
+    }
+
+    // Only answers this version of the site still asks for come back.
+    function savedScope(saved) {
+      var scope = {};
+      Pricing.SCOPE_QUESTIONS.forEach(function (q) {
+        var v = saved.scope[q.key];
+        if (
+          q.options.some(function (o) {
+            return o.value === v;
+          })
+        )
+          scope[q.key] = v;
+      });
+      return scope;
+    }
+
+    function savedValues(saved) {
+      var values = {};
+      Pricing.DIMENSIONS.concat(Pricing.FIXTURES).forEach(function (f) {
+        var v = saved.values[f.key];
+        if (typeof v === "string" || typeof v === "number") values[f.key] = String(v);
+      });
+      return values;
+    }
+
+    // Back to the step the customer was on, with every earlier answer
+    // filled in (the Back button walks through them). Past the room
+    // questions it lands on the fixture counts, so the products and ZIP
+    // are asked again with today's prices.
+    function resumeDesign(saved) {
+      Array.prototype.forEach.call(
+        chatMessages.querySelectorAll('form[data-group="scope"] input, form[data-group="scope"] button'),
+        function (el) {
+          el.disabled = true;
+        },
+      );
+      var groups = buildGroups(savedScope(saved));
+      var index = -1;
+      groups.forEach(function (g, i) {
+        if (g.id === saved.step) index = i;
+      });
+      if (index < 1) index = groups.length - 1;
+      quoteState = { groups: groups, index: index, values: savedValues(saved), scope: savedScope(saved) };
+      // Fixture counts typed in but not sent yet are in the room.
+      var roomCounts = (saved.room && saved.room.fixtures) || {};
+      Pricing.FIXTURES.forEach(function (f) {
+        if (quoteState.values[f.key] == null && roomCounts[f.key] > 0)
+          quoteState.values[f.key] = String(roomCounts[f.key]);
+      });
+      if (window.BathroomRoom3D && window.BathroomRoom3D.loadDesign) window.BathroomRoom3D.loadDesign(saved.room);
+      setProgress(Math.round((index / groups.length) * 100));
       appendGroupForm();
     }
 
@@ -340,6 +540,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // steps that follow them (pickState). Whichever is active gets cleared;
     // the other is already null.
     function cancelFlow() {
+      flowRun++;
       quoteState = null;
       pickState = null;
       if (window.BathroomRoom3D) window.BathroomRoom3D.hide();
@@ -368,6 +569,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (quoteState.index < quoteState.groups.length) {
         setProgress(Math.round((quoteState.index / quoteState.groups.length) * 100));
         appendGroupForm();
+        saveDesign();
         return;
       }
       // Fixtures (always the last group here) just finished — move
@@ -377,6 +579,7 @@ document.addEventListener("DOMContentLoaded", function () {
       var state = quoteState;
       quoteState = null;
       startProductPicks(state.values, state.scope, state.groups.length);
+      saveDesign();
     }
 
     var fieldCounter = 0;
@@ -385,6 +588,26 @@ document.addEventListener("DOMContentLoaded", function () {
     function localNumber(text) {
       if (I18n.lang() === "en") return text;
       return /^\s*\d+,\d+\s*$/.test(text) ? text.replace(",", ".") : text;
+    }
+
+    // A Back button for the room steps (scope, size, plumbing walls, entry
+    // points, fixtures): it locks this step and shows the one before,
+    // filled in with the answers already given, so a too-small room or a
+    // wrong count can be fixed without starting over. onLeave tidies up
+    // the step being left (e.g. stops wall picking).
+    function backButton(onLeave) {
+      if (!quoteState || quoteState.index === 0) return null;
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ai-chat-group-cancel";
+      btn.textContent = T("flow.back");
+      btn.addEventListener("click", function () {
+        if (onLeave) onLeave();
+        quoteState.index--;
+        setProgress(Math.round((quoteState.index / quoteState.groups.length) * 100));
+        appendGroupForm();
+      });
+      return btn;
     }
 
     function appendGroupForm() {
@@ -443,7 +666,13 @@ document.addEventListener("DOMContentLoaded", function () {
             btn.type = "button";
             btn.className = "ai-chat-choice";
             btn.textContent = option.label;
-            btn.setAttribute("aria-pressed", "false");
+            // Back from a later step: the answer already given stays picked.
+            var wasChosen =
+              Object.prototype.hasOwnProperty.call(quoteState.scope, field.key) &&
+              quoteState.scope[field.key] === option.value;
+            if (wasChosen) chosen = option;
+            btn.classList.toggle("selected", wasChosen);
+            btn.setAttribute("aria-pressed", wasChosen ? "true" : "false");
             btn.addEventListener("click", function () {
               chosen = option;
               buttons.forEach(function (other) {
@@ -471,6 +700,7 @@ document.addEventListener("DOMContentLoaded", function () {
           input.placeholder = "0";
           input.id = fieldId;
           input.name = field.key;
+          if (quoteState.values[field.key] != null) input.value = String(quoteState.values[field.key]);
           input.setAttribute("aria-describedby", errorEl.id);
           labelEl.htmlFor = fieldId;
           fieldWrap.appendChild(input);
@@ -520,7 +750,9 @@ document.addEventListener("DOMContentLoaded", function () {
       continueBtn.className = "ai-chat-group-continue";
       var isLast = quoteState.index === quoteState.groups.length - 1 && group.id !== "scope";
       continueBtn.textContent = T(isLast ? "flow.getEstimate" : "flow.continue");
+      var backBtn = backButton(disableForm);
       actionsWrap.appendChild(cancelBtn);
+      if (backBtn) actionsWrap.appendChild(backBtn);
       actionsWrap.appendChild(continueBtn);
       formEl.appendChild(actionsWrap);
 
@@ -579,6 +811,40 @@ document.addEventListener("DOMContentLoaded", function () {
     // on the 3D preview (multi-select) — restricts where toilet/sink/tub/
     // shower can be placed. Skippable: skipping (or picking nothing) just
     // leaves those fixtures unrestricted, same as before this step existed.
+    // Buttons for the four walls, so walls can be chosen without clicking
+    // the 3D room (keyboard, screen readers). Named as the room is first
+    // shown. sync(ids) marks the chosen ones.
+    var WALL_IDS = ["N", "W", "E", "S"];
+    function wallButtons() {
+      var wrap = document.createElement("div");
+      wrap.className = "ai-chat-choices ai-chat-wall-buttons";
+      wrap.setAttribute("role", "group");
+      wrap.setAttribute("aria-label", T("walls.buttons"));
+      var buttons = {};
+      WALL_IDS.forEach(function (id) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "ai-chat-choice";
+        btn.textContent = T("walls.name." + id);
+        btn.setAttribute("aria-pressed", "false");
+        btn.addEventListener("click", function () {
+          window.BathroomRoom3D.pickWall(id);
+        });
+        buttons[id] = btn;
+        wrap.appendChild(btn);
+      });
+      return {
+        el: wrap,
+        sync: function (ids) {
+          WALL_IDS.forEach(function (id) {
+            var on = ids.indexOf(id) !== -1;
+            buttons[id].classList.toggle("selected", on);
+            buttons[id].setAttribute("aria-pressed", on ? "true" : "false");
+          });
+        },
+      };
+    }
+
     function appendPlumbingWallsStep() {
       var parts = botRow();
       var content = document.createElement("div");
@@ -593,6 +859,8 @@ document.addEventListener("DOMContentLoaded", function () {
       statusEl.className = "ai-chat-group-intro";
       statusEl.textContent = T("walls.none");
       content.appendChild(statusEl);
+      var walls = wallButtons();
+      content.appendChild(walls.el);
 
       var actionsWrap = document.createElement("div");
       actionsWrap.className = "ai-chat-group-actions";
@@ -609,7 +877,12 @@ document.addEventListener("DOMContentLoaded", function () {
       continueBtn.className = "ai-chat-group-continue";
       continueBtn.textContent = T("flow.continue");
       continueBtn.disabled = true;
+      var backBtn = backButton(function () {
+        disableActions();
+        window.BathroomRoom3D.endWallPicking();
+      });
       actionsWrap.appendChild(cancelBtn);
+      if (backBtn) actionsWrap.appendChild(backBtn);
       actionsWrap.appendChild(skipBtn);
       actionsWrap.appendChild(continueBtn);
       content.appendChild(actionsWrap);
@@ -621,6 +894,7 @@ document.addEventListener("DOMContentLoaded", function () {
         cancelBtn.disabled = true;
         skipBtn.disabled = true;
         continueBtn.disabled = true;
+        if (backBtn) backBtn.disabled = true;
       }
 
       var selectedIds = [];
@@ -642,8 +916,11 @@ document.addEventListener("DOMContentLoaded", function () {
         finish(selectedIds);
       });
 
+      // Back here from a later step: pick the walls afresh.
+      window.BathroomRoom3D.setPlumbingWalls([]);
       window.BathroomRoom3D.beginWallPicking("multi", function (ids) {
         selectedIds = ids;
+        walls.sync(ids);
         continueBtn.disabled = ids.length === 0;
         statusEl.textContent =
           ids.length === 0 ? T("walls.none") : T(ids.length === 1 ? "walls.one" : "walls.many", { n: ids.length });
@@ -692,11 +969,17 @@ document.addEventListener("DOMContentLoaded", function () {
       continueBtn.type = "submit";
       continueBtn.className = "ai-chat-group-continue";
       continueBtn.textContent = T("flow.continue");
+      var backBtn = backButton(function () {
+        disableAll(content);
+      });
       actionsWrap.appendChild(cancelBtn);
+      if (backBtn) actionsWrap.appendChild(backBtn);
       actionsWrap.appendChild(skipBtn);
       actionsWrap.appendChild(continueBtn);
       formEl.appendChild(actionsWrap);
       content.appendChild(formEl);
+      // Back here from a later step: place the entry points afresh.
+      while (window.BathroomRoom3D.getEntryPoints().length) window.BathroomRoom3D.removeEntryPoint(0);
       parts.inner.appendChild(content);
       chatMessages.appendChild(parts.row);
       scrollToEnd();
@@ -763,6 +1046,8 @@ document.addEventListener("DOMContentLoaded", function () {
         wallStatus.className = "ai-chat-group-intro";
         wallStatus.textContent = T("entry.noWall");
         epContent.appendChild(wallStatus);
+        var epWalls = wallButtons();
+        epContent.appendChild(epWalls.el);
 
         // Visible from the start (not nested inside detailsWrap, which
         // stays hidden until a wall is picked below) — otherwise a visitor
@@ -875,6 +1160,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         window.BathroomRoom3D.beginWallPicking("single", function (ids, justClicked) {
           chosenWallId = justClicked;
+          epWalls.sync(ids);
           wallStatus.textContent = T("entry.wallSelected");
           detailsWrap.hidden = false;
           confirmBtn.disabled = false;
@@ -945,7 +1231,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // grand total, and the usual disclaimers/actions. hasMaterials controls
     // which copy/labels are used throughout (see totalLabel()/
     // excludedLines()/allAssumptions()/estimateDisclaimer() above).
-    function appendCombinedCard(values, scope, result, categories, picks) {
+    function appendCombinedCard(values, scope, result, categories, picks, notes) {
       var fixtureCount = result.plumbingFixtureCount;
       var pickList = categories
         .map(function (c) {
@@ -1025,6 +1311,9 @@ document.addEventListener("DOMContentLoaded", function () {
         materialsSubtotalWrap.appendChild(el("span", null, Pricing.money(materialsSubtotal)));
         card.appendChild(materialsSubtotalWrap);
       }
+      (notes || []).forEach(function (note) {
+        card.appendChild(el("p", "ai-chat-estimate-total-note", note));
+      });
 
       var excluded = el("div", "ai-chat-estimate-excluded");
       excludedLines(fixtureCount, hasMaterials).forEach(function (x) {
@@ -1093,17 +1382,21 @@ document.addEventListener("DOMContentLoaded", function () {
           materialsSubtotal,
           grandTotal,
           hasMaterials,
+          notes,
         );
       });
       actions.appendChild(exportBtn);
 
+      // The products picked in the 3D room go along with the quote too when
+      // they weren't priced above, so we see the design that was chosen.
+      var roomPicks = kohlerPicksEnabled() ? [] : roomPickLines();
       var cta = el("a", "ai-chat-estimate-cta", T("card.contactCta"));
       cta.href = "contact.html?from=estimate";
       cta.addEventListener("click", function () {
         try {
           sessionStorage.setItem(
             "pr_estimate_summary",
-            buildCombinedSummary(values, scope, result, pickList, materialsSubtotal, grandTotal),
+            buildCombinedSummary(values, scope, result, pickList, materialsSubtotal, grandTotal, notes, roomPicks),
           );
         } catch (e) {
           /* storage blocked: the contact form just starts empty */
@@ -1120,8 +1413,28 @@ document.addEventListener("DOMContentLoaded", function () {
       chatInput.focus({ preventScroll: true });
     }
 
-    function buildCombinedSummary(values, scope, result, pickList, materialsSubtotal, grandTotal) {
+    function roomPickLines() {
+      var room = window.BathroomRoom3D;
+      if (!room3dInteractive() || typeof room.getProductPricingItems !== "function") return [];
+      return room.getProductPricingItems().map(function (item) {
+        return (
+          "- " +
+          item.slotLabel +
+          ": " +
+          item.productLabel +
+          (item.mmns.length ? " (" + item.mmns.join(", ") + ")" : "") +
+          (item.qty > 1 ? " × " + item.qty : "")
+        );
+      });
+    }
+
+    function buildCombinedSummary(values, scope, result, pickList, materialsSubtotal, grandTotal, notes, roomPicks) {
       var out = [Pricing.buildEstimateSummary(values, scope, result)];
+      if (roomPicks && roomPicks.length) {
+        out.push("");
+        out.push(T("summary.roomPicks"));
+        out = out.concat(roomPicks);
+      }
       if (pickList.length) {
         out.push("");
         out.push(T("summary.materials"));
@@ -1130,6 +1443,14 @@ document.addEventListener("DOMContentLoaded", function () {
         });
         out.push(T("summary.materialsSubtotal", { total: Pricing.money(materialsSubtotal) }));
         out.push(T("summary.grandTotal", { total: Pricing.money(grandTotal) }));
+      }
+      // What isn't priced (no Home Depot price, the vanity cabinet, the
+      // valves) goes along too, so the total isn't read as complete.
+      if (notes && notes.length) {
+        out.push("");
+        notes.forEach(function (note) {
+          out.push(note);
+        });
       }
       return out.join("\n");
     }
@@ -1143,6 +1464,7 @@ document.addEventListener("DOMContentLoaded", function () {
       materialsSubtotal,
       grandTotal,
       hasMaterials,
+      notes,
     ) {
       if (button.disabled) return;
       var label = button.textContent;
@@ -1195,9 +1517,9 @@ document.addEventListener("DOMContentLoaded", function () {
             lines: lines,
             excluded: excludedLines(fixtureCount, hasMaterials),
             totals: totals,
-            afterTotal: (fixtureCount > 0 ? [plumbingTotalNote(fixtureCount)] : []).concat([
-              estimateDisclaimer(hasMaterials),
-            ]),
+            afterTotal: (notes || [])
+              .concat(fixtureCount > 0 ? [plumbingTotalNote(fixtureCount)] : [])
+              .concat([estimateDisclaimer(hasMaterials)]),
             sections: sections,
             footer: {
               business: businessLine(),
@@ -1282,7 +1604,17 @@ document.addEventListener("DOMContentLoaded", function () {
         materialsEstimatorEnabled() && window.MaterialsPricing
           ? window.MaterialsPricing.categoriesFromLines(result.lines)
           : [];
-      if (!categories.length) {
+      // With the 3D room up, the fixtures it has Kohler products for are
+      // picked there instead (one step per fixture, the camera zoomed in on
+      // it), and priced live at Home Depot for the customer's ZIP once
+      // they're done. Everything else keeps the catalog picker.
+      var groups = kohlerPicksEnabled() ? window.BathroomRoom3D.getProductGroups() : [];
+      if (groups.length) {
+        categories = categories.filter(function (c) {
+          return KOHLER_PRICED_KEYS.indexOf(c.key) === -1;
+        });
+      }
+      if (!categories.length && !groups.length) {
         finishEstimate(values, scope, result, [], {});
         return;
       }
@@ -1290,27 +1622,42 @@ document.addEventListener("DOMContentLoaded", function () {
         values: values,
         scope: scope,
         laborResult: result,
+        groups: groups.map(function (g) {
+          return g.id;
+        }),
+        groupIndex: -1,
         categories: categories,
         categoryIndex: -1,
         zip: "",
         picks: {},
         mainSteps: mainSteps,
-        totalSteps: mainSteps + 1 + categories.length, // +1 for the ZIP step
+        totalSteps: mainSteps + 1 + groups.length + categories.length, // +1 for the ZIP step
       };
       setProgress(Math.round((mainSteps / pickState.totalSteps) * 100));
       appendMaterialsZipForm();
     }
 
     function advanceProductPick() {
+      if (pickState.groupIndex + 1 < pickState.groups.length) {
+        pickState.groupIndex++;
+        setProgress(Math.round(((pickState.mainSteps + 1 + pickState.groupIndex) / pickState.totalSteps) * 100));
+        appendKohlerGroupForm(pickState.groups[pickState.groupIndex]);
+        return;
+      }
       pickState.categoryIndex++;
       if (pickState.categoryIndex < pickState.categories.length) {
-        var stepIndex = pickState.mainSteps + 1 + pickState.categoryIndex;
+        var stepIndex = pickState.mainSteps + 1 + pickState.groups.length + pickState.categoryIndex;
         setProgress(Math.round((stepIndex / pickState.totalSteps) * 100));
         appendMaterialCategoryForm(pickState.categoryIndex);
         return;
       }
       var state = pickState;
       pickState = null;
+      if (state.groups.length) {
+        if (window.BathroomRoom3D) window.BathroomRoom3D.focusProductGroup(null);
+        priceKohlerPicks(state);
+        return;
+      }
       finishEstimate(state.values, state.scope, state.laborResult, state.categories, state.picks);
     }
 
@@ -1318,11 +1665,298 @@ document.addEventListener("DOMContentLoaded", function () {
     // picks happened — renders the combined card and restores the chat
     // input, matching what advance() used to do directly before product
     // picks were folded into this same continuous flow.
-    function finishEstimate(values, scope, result, categories, picks) {
+    function finishEstimate(values, scope, result, categories, picks, notes) {
       setProgress(100);
       chatForm.hidden = false;
-      appendCombinedCard(values, scope, result, categories, picks);
+      appendCombinedCard(values, scope, result, categories, picks, notes);
       setTimeout(hideProgress, 1200);
+    }
+
+    // Catalog categories the 3D room's Kohler products stand in for. The
+    // vanity's cabinet isn't a Kohler product: only its bowl or top and
+    // faucet are priced, and the card says the cabinet isn't.
+    var KOHLER_PRICED_KEYS = [
+      "Toilet_Quantity",
+      "Sink_Quantity",
+      "Bathtub_Quantity",
+      "Shower_Quantity",
+      "Shower_Door_Quantity",
+      "Vanity_Quantity",
+      "Mirror_Quantity",
+      "Mirror_Huge_Quantity",
+      "Shower_Shelf_Quantity",
+    ];
+
+    // Without a pricing service the Kohler picks could only ever come back
+    // "not priced", so the catalog picker (real scraped prices) prices those
+    // fixtures instead, the same as with the 3D room off.
+    function kohlerPicksEnabled() {
+      return !!(
+        materialsEstimatorEnabled() &&
+        productPricingEndpoint() &&
+        room3dInteractive() &&
+        typeof window.BathroomRoom3D.getProductGroups === "function"
+      );
+    }
+
+    function productPricingEndpoint() {
+      return (siteConfig && siteConfig.productPricing && siteConfig.productPricing.endpoint) || "";
+    }
+
+    // One step per placed fixture: the camera zooms in on it and each of
+    // its parts gets a dropdown, the same choices as the switcher above the
+    // canvas (and kept in sync with it). A stand-in still showing (the
+    // generic toilet, the glass enclosure) is swapped for a Kohler product
+    // first, so there's something real to price.
+    function appendKohlerGroupForm(groupId) {
+      var room = window.BathroomRoom3D;
+      room.useRealProducts(groupId);
+      room.focusProductGroup(groupId);
+      var group = currentGroup();
+
+      var parts = botRow();
+      var content = el("div", "ai-chat-text");
+      content.appendChild(el("p", "ai-chat-group-intro", T("products.which", { fixture: group.label })));
+
+      var formEl = document.createElement("form");
+      formEl.className = "ai-chat-group-form";
+      var fieldsWrap = el("div", "ai-chat-product-fields");
+      formEl.appendChild(fieldsWrap);
+
+      function currentGroup() {
+        return (
+          room.getProductGroups().filter(function (g) {
+            return g.id === groupId;
+          })[0] || { id: groupId, label: "", slots: [] }
+        );
+      }
+
+      function fieldsSignature() {
+        return JSON.stringify(currentGroup().slots);
+      }
+      var renderedSignature = "";
+
+      // Redrawn after every pick: one pick can change what another slot
+      // offers (a 36 in. base only takes pivot doors).
+      function renderFields() {
+        fieldsWrap.textContent = "";
+        renderedSignature = fieldsSignature();
+        currentGroup().slots.forEach(function (slot) {
+          var fieldWrap = el("div", "ai-chat-group-field");
+          var id = "ai-chat-product-pick-" + slot.id;
+          var label = el("label", "ai-chat-field-label", slot.label);
+          label.htmlFor = id;
+          fieldWrap.appendChild(label);
+          var select = document.createElement("select");
+          select.id = id;
+          select.className = "ai-chat-product-select";
+          slot.options.forEach(function (opt) {
+            var o = document.createElement("option");
+            o.value = opt.id;
+            o.textContent = opt.label + (opt.reason ? " (" + opt.reason + ")" : "");
+            o.disabled = !!opt.reason;
+            select.appendChild(o);
+          });
+          select.value = slot.value;
+          select.addEventListener("change", function () {
+            room.setProductPick(slot.id, select.value);
+            renderFields();
+            var again = document.getElementById(id);
+            if (again) again.focus({ preventScroll: true });
+          });
+          fieldWrap.appendChild(select);
+          fieldsWrap.appendChild(fieldWrap);
+        });
+      }
+      renderFields();
+
+      // A pick made in the switcher above the room (or one the room had to
+      // change because it no longer fits) shows here too, so these
+      // dropdowns always match what's priced.
+      var run = flowRun;
+      var stopSync = room.onChange(function () {
+        if (run !== flowRun || (continueBtn && continueBtn.disabled)) {
+          stopSync();
+          return;
+        }
+        if (fieldsSignature() !== renderedSignature) renderFields();
+      });
+
+      var actionsWrap = el("div", "ai-chat-group-actions");
+      var cancelBtn = el("button", "ai-chat-group-cancel", T("flow.cancel"));
+      cancelBtn.type = "button";
+      var isLast =
+        pickState.groupIndex === pickState.groups.length - 1 &&
+        pickState.categoryIndex + 1 >= pickState.categories.length;
+      var continueBtn = el("button", "ai-chat-group-continue", T(isLast ? "flow.seeEstimate" : "flow.continue"));
+      continueBtn.type = "submit";
+      actionsWrap.appendChild(cancelBtn);
+      actionsWrap.appendChild(continueBtn);
+      formEl.appendChild(actionsWrap);
+
+      function disableForm() {
+        Array.prototype.forEach.call(formEl.querySelectorAll("select, button"), function (elx) {
+          elx.disabled = true;
+        });
+      }
+
+      cancelBtn.addEventListener("click", function () {
+        disableForm();
+        cancelFlow();
+      });
+
+      formEl.addEventListener("submit", function (e) {
+        e.preventDefault();
+        disableForm();
+        advanceProductPick();
+      });
+
+      content.appendChild(formEl);
+      parts.inner.appendChild(content);
+      chatMessages.appendChild(parts.row);
+      scrollToEnd();
+      var first = formEl.querySelector("select");
+      if (first) first.focus({ preventScroll: true });
+    }
+
+    // Asks the pricing service (site-config.json productPricing.endpoint,
+    // see tools/pricing-service/) for each model's current price at the
+    // Home Depot store nearest the ZIP. Resolves to { store, results:
+    // { MMN: { price, name, url } } }, or null when there's no service or
+    // it didn't answer — the card then says those products aren't priced.
+    function fetchProductPrices(zip, mmns) {
+      var endpoint = productPricingEndpoint();
+      if (!endpoint || !window.fetch) return Promise.resolve(null);
+      var controller = window.AbortController ? new AbortController() : null;
+      var timer = controller
+        ? setTimeout(function () {
+            controller.abort();
+          }, 150000)
+        : null;
+      return fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zip: zip, mmns: mmns }),
+        signal: controller ? controller.signal : undefined,
+      })
+        .then(function (res) {
+          return res.ok ? res.json() : null;
+        })
+        .catch(function () {
+          return null;
+        })
+        .then(function (data) {
+          if (timer) clearTimeout(timer);
+          return data && data.results ? data : null;
+        });
+    }
+
+    // Prices everything the Kohler steps put in the room, then shows the
+    // card: a line per product with its live price (times how many of that
+    // fixture there are), and a note naming anything without one.
+    function priceKohlerPicks(state) {
+      var items = window.BathroomRoom3D.getProductPricingItems();
+      var pricedSignature = JSON.stringify(items);
+      var run = flowRun;
+      var mmns = [];
+      var priceable = items.filter(function (item) {
+        return item.mmns.length > 0;
+      });
+      priceable.forEach(function (item) {
+        item.mmns.forEach(function (m) {
+          if (mmns.indexOf(m) === -1) mmns.push(m);
+        });
+      });
+      var waiting = botRow();
+      waiting.inner.appendChild(el("div", "ai-chat-text", T("products.checking", { zip: state.zip })));
+      chatMessages.appendChild(waiting.row);
+      scrollToEnd();
+
+      fetchProductPrices(state.zip, mmns).then(function (data) {
+        waiting.row.remove();
+        var results = (data && data.results) || {};
+        var retailer = data && data.store ? T("products.retailer", { store: data.store }) : "Home Depot";
+        var categories = state.categories.slice();
+        var unpriced = [];
+        items.forEach(function (item) {
+          var prices = item.mmns.map(function (m) {
+            return results[m] && typeof results[m].price === "number" ? results[m] : null;
+          });
+          var label = item.slotLabel + ": " + item.productLabel;
+          if (!prices.length || prices.indexOf(null) !== -1) {
+            unpriced.push(label);
+            return;
+          }
+          var each = prices.reduce(function (sum, r) {
+            return sum + r.price;
+          }, 0);
+          var key = "kohler:" + item.slotId;
+          categories.push({ key: key, label: item.slotLabel, qty: item.qty, unit: "" });
+          state.picks[key] = {
+            categoryLabel: item.slotLabel,
+            productName: item.productLabel + " (" + item.mmns.join(" + ") + ")",
+            imageUrl: null,
+            retailer: retailer,
+            url: prices[0].url || null,
+            quantityLabel: Pricing.formatQty(item.qty) + " " + T(item.qty === 1 ? "unit.unit" : "unit.units"),
+            cost: Pricing.roundCents(each * item.qty),
+          };
+        });
+        var notes = [];
+        if (unpriced.length) notes.push(T("products.unpriced", { items: unpriced.join("; ") }));
+        var hasVanity = items.some(function (item) {
+          return item.groupId === "vanity";
+        });
+        if (hasVanity) notes.push(T("products.vanityCabinet"));
+        var hasValveTrim = priceable.some(function (item) {
+          return (
+            item.slotId === "showerValve" ||
+            item.slotId === "tubValve" ||
+            (item.slotId === "tubFaucet" && item.needsValve)
+          );
+        });
+        if (hasValveTrim) notes.push(T("products.valveNotIncluded"));
+        var wired = items
+          .filter(function (item) {
+            return item.needsWiring;
+          })
+          .map(function (item) {
+            return item.productLabel;
+          });
+        if (wired.length) notes.push(T("products.wiringNotIncluded", { items: wired.join(", ") }));
+        finishEstimate(state.values, state.scope, state.laborResult, categories, state.picks, notes);
+        if (run === flowRun) offerRepriceOnChange(state, pricedSignature);
+      });
+    }
+
+    // The room stays live under the estimate card. If the products in it
+    // change (a different pick, a fixture moved off, a fit swap), say the
+    // card is out of date and offer to price the room as it is now.
+    function offerRepriceOnChange(state, pricedSignature) {
+      var run = flowRun;
+      var stop = window.BathroomRoom3D.onChange(function () {
+        if (run !== flowRun || quoteState || pickState) {
+          stop();
+          return;
+        }
+        if (JSON.stringify(window.BathroomRoom3D.getProductPricingItems()) === pricedSignature) return;
+        stop();
+        var parts = botRow();
+        var content = el("div", "ai-chat-text");
+        content.appendChild(el("p", "ai-chat-group-intro", T("products.roomChanged")));
+        var btn = el("button", "ai-chat-group-continue", T("products.reprice"));
+        btn.type = "button";
+        btn.addEventListener("click", function () {
+          btn.disabled = true;
+          if (run !== flowRun || quoteState || pickState) return;
+          chatForm.hidden = true;
+          priceKohlerPicks(state);
+        });
+        content.appendChild(btn);
+        parts.inner.appendChild(content);
+        chatMessages.appendChild(parts.row);
+        scrollToEnd();
+      });
     }
 
     function appendMaterialsZipForm() {

@@ -27,6 +27,9 @@
     // photo never leaves the browser. Defaults off, same rollout as above.
     bathroomVisualizer: { enabled: false },
     leadForm: { endpoint: "", serviceName: "", servicePrivacyUrl: "" },
+    // Live Home Depot prices for the Kohler products picked in the 3D room
+    // (tools/pricing-service/). Empty: those products show as not priced.
+    productPricing: { endpoint: "" },
     owner: { legalName: "", contactAddress: "" },
     privacy: { responsePeriod: "" },
   };
@@ -52,9 +55,11 @@
     var me = raw.materialsEstimator || {};
     var bv = raw.bathroomVisualizer || {};
     var lf = raw.leadForm || {};
+    var pp = raw.productPricing || {};
     var owner = raw.owner || {};
     var privacy = raw.privacy || {};
     var endpoint = clean(lf.endpoint);
+    var pricingEndpoint = clean(pp.endpoint);
     return {
       loaded: true,
       priceEstimator: { enabled: pe.enabled === true },
@@ -65,6 +70,10 @@
         endpoint: /^https:\/\/[^\s]+$/.test(endpoint) ? endpoint : "",
         serviceName: clean(lf.serviceName) || T("config.formService"),
         servicePrivacyUrl: /^https:\/\//.test(clean(lf.servicePrivacyUrl)) ? clean(lf.servicePrivacyUrl) : "",
+      },
+      // https://, or http://localhost while testing the service on this machine.
+      productPricing: {
+        endpoint: /^(https:\/\/|http:\/\/localhost[:/])[^\s]+$/.test(pricingEndpoint) ? pricingEndpoint : "",
       },
       owner: { legalName: clean(owner.legalName), contactAddress: clean(owner.contactAddress) },
       privacy: { responsePeriod: localPeriod(clean(privacy.responsePeriod)) },

@@ -783,6 +783,30 @@ body.ai-chat-locked {
   touch-action: none;
 }
 
+.ai-chat-room-3d-hint {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-ink-soft);
+}
+
+/* "Fits, but tight" under the 3D room (js/bathroom-room-3d.js). */
+.ai-chat-room-3d-tight,
+.ai-chat-room-3d-model-note {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-ink);
+}
+
+/* Over a fixture that can be dragged (js/bathroom-room-3d.js), and while
+   dragging it. */
+.ai-chat-room-3d-canvas-wrap.can-drag canvas {
+  cursor: grab;
+}
+
+.ai-chat-room-3d-canvas-wrap.is-dragging canvas {
+  cursor: grabbing;
+}
+
 .ai-chat-room-3d-canvas-wrap canvas {
   display: block;
   width: 100%;
@@ -819,19 +843,35 @@ body.ai-chat-locked {
   cursor: not-allowed;
 }
 
-/* Kohler product switcher: one labelled button row per fixture part, built
-   and shown/hidden by js/bathroom-room-3d.js (PRODUCT_SLOTS) while that
-   fixture is placed. */
+/* Kohler product switcher: a tab per placed fixture, then one labelled
+   dropdown per part of that fixture, built and shown/hidden by
+   js/bathroom-room-3d.js (PRODUCT_GROUPS, PRODUCT_SLOTS). The dropdowns
+   go two or three across once there's room. */
 .ai-chat-room-3d-products {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
 }
 
+.ai-chat-room-3d-products .ai-chat-room-3d-style-switch {
+  gap: var(--space-1);
+}
+
+.ai-chat-room-3d-products .ai-chat-room-3d-style-btn {
+  padding: var(--space-1) var(--space-3);
+}
+
+.ai-chat-room-3d-product-rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  gap: var(--space-2) var(--space-4);
+}
+
 .ai-chat-room-3d-product-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .ai-chat-room-3d-product-label {
@@ -841,13 +881,34 @@ body.ai-chat-locked {
   color: var(--color-ink-soft);
 }
 
-.ai-chat-room-3d-product-row .ai-chat-room-3d-style-switch {
+.ai-chat-room-3d-product-select {
   flex: 1 1 auto;
-  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--fs-sm);
 }
 
-.ai-chat-room-3d-products .ai-chat-room-3d-style-btn {
-  padding: var(--space-1) var(--space-3);
+/* The chat's per-fixture product step (js/script.js appendKohlerGroupForm):
+   one labelled dropdown per part, two across once there's room. */
+.ai-chat-product-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-3);
+}
+
+.ai-chat-product-select {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
 }
 
 /* Walk-in POV toggle + (when more than one entry point exists) the entry
@@ -1618,6 +1679,16 @@ body.ai-chat-locked {
     max-height: 38vh;
     border-left: none;
     border-bottom: 1px solid var(--color-line);
+  }
+
+  /* The room itself comes first and keeps its height; the text and the
+     product dropdowns scroll below it inside the panel. Otherwise the
+     dropdowns fill the panel and push the room out of view. */
+  .ai-chat-room-3d-canvas-wrap {
+    order: -1;
+    flex: 0 0 auto;
+    height: 26vh;
+    min-height: 150px;
   }
 }
 

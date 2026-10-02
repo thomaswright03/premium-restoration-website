@@ -64,7 +64,7 @@ test.describe("3D bathroom room preview", () => {
     await page.waitForFunction(() => window.BathroomRoom3D && window.BathroomRoom3D.available === true);
   });
 
-  test("Kohler product switcher shows a row per placed fixture and swaps the pick", async ({ page }) => {
+  test("Kohler product switcher shows a tab per placed fixture and swaps the pick", async ({ page }) => {
     // Loads the tub, vanity sink, faucet and valve models on top of the
     // usual scene — slow under CI's software WebGL, same as chat.spec.js's
     // full-estimate test.
@@ -78,19 +78,74 @@ test.describe("3D bathroom room preview", () => {
 
     const switcher = page.locator(".ai-chat-room-3d-products");
     await expect(switcher).toBeVisible();
-    for (const label of ["Tub", "Tub faucet", "Vanity sink", "Sink faucet", "Shower valve"]) {
-      await expect(switcher.getByRole("group", { name: label, exact: true })).toBeVisible();
+    const tabs = switcher.getByRole("group", { name: "Kohler products", exact: true });
+    for (const label of ["Tub", "Vanity", "Shower"]) {
+      await expect(tabs.getByRole("button", { name: label, exact: true })).toBeVisible();
     }
-    const tubs = switcher.getByRole("group", { name: "Tub", exact: true });
-    await expect(tubs.getByRole("button", { name: "Freestanding 60 in." })).toHaveAttribute("aria-pressed", "true");
-    await tubs.getByRole("button", { name: "Devonshire 60 in. alcove" }).click();
-    await expect(tubs.getByRole("button", { name: "Devonshire 60 in. alcove" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await expect(tubs.getByRole("button", { name: "Freestanding 60 in." })).toHaveAttribute("aria-pressed", "false");
+    // Fixtures that aren't placed get no tab.
+    await expect(tabs.getByRole("button", { name: "Toilet", exact: true })).toBeHidden();
+
+    await tabs.getByRole("button", { name: "Tub", exact: true }).click();
+    await expect(tabs.getByRole("button", { name: "Tub", exact: true })).toHaveAttribute("aria-pressed", "true");
+    for (const label of ["Tub faucet", "Tub valve", "Tub grab bar"]) {
+      await expect(switcher.getByLabel(label, { exact: true })).toBeVisible();
+    }
+    await expect(switcher.getByLabel("Shower base", { exact: true })).toBeHidden();
+    const tub = switcher.getByLabel("Tub", { exact: true });
+    await expect(tub).toHaveValue("freestanding");
+    await tub.selectOption("K-1184-0");
+    await expect(tub).toHaveValue("K-1184-0");
     const picks = await page.evaluate(() => window.BathroomRoom3D.getProductPicks());
     expect(picks.tub).toBe("K-1184-0");
+
+    // A 36 in. base only comes with the 96 in. wall kit: the 72 in. one is
+    // greyed out with the reason, and the walls show the 96 in. kit.
+    await tabs.getByRole("button", { name: "Shower", exact: true }).click();
+    await switcher.getByLabel("Shower base", { exact: true }).selectOption("K-9396-0");
+    const walls = switcher.getByLabel("Shower walls", { exact: true });
+    await expect(walls).toHaveValue("choreograph-96");
+    await expect(walls.locator('option[value="choreograph-72"]')).toBeDisabled();
+    await expect(walls.locator('option[value="choreograph-72"]')).toHaveText(
+      "Choreograph 72 in. walls (Not made for this base)",
+    );
+  });
+
+  test("dragging a fixture moves it to another wall, and a spot where it won't fit is refused", async ({ page }) => {
+    test.setTimeout(90000);
+    await disableMaterials(page);
+    await startEstimate(page);
+    await answerScope(page, NEEDS_WALLS);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 12, Bathroom_Length_Ft: 10, Bathroom_Height_Ft: 8 });
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Toilet_Quantity: 1, Vanity_Quantity: 1 });
+    await expect(page.locator(".ai-chat-room-3d-hint")).toContainText("Drag a toilet");
+
+    async function dragTo(fixtureKey, x, z) {
+      // Let the camera settle first, so the points stay where they were.
+      await page.waitForTimeout(1500);
+      const from = await page.evaluate((k) => window.BathroomRoom3D.screenPoint(k), fixtureKey);
+      const to = await page.evaluate(([fx, fz]) => window.BathroomRoom3D.screenPoint(null, fx, fz), [x, z]);
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, { steps: 5 });
+      await page.mouse.move(to.x, to.y, { steps: 5 });
+      await page.mouse.up();
+    }
+
+    // To the middle of the south wall.
+    await dragTo("Vanity_Quantity", 6, 9.6);
+    await expect
+      .poll(() => page.evaluate(() => window.BathroomRoom3D.getFixturePositions()))
+      .toEqual({ Vanity_Quantity: { 0: { wallId: "S", offsetFt: 6 } } });
+
+    // Onto the toilet: refused, the vanity stays on the south wall.
+    const toilet = await page.evaluate(() => window.BathroomRoom3D.screenPoint("Toilet_Quantity"));
+    expect(toilet).not.toBeNull();
+    await dragTo("Vanity_Quantity", 1.3, 0.4);
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => window.BathroomRoom3D.getFixturePositions())).toEqual({
+      Vanity_Quantity: { 0: { wallId: "S", offsetFt: 6 } },
+    });
   });
 
   test("picking a real toilet and sink product retints their real 3D models without errors", async ({ page }) => {
@@ -293,4 +348,244 @@ test.describe("3D room preview: wall-click plumbing walls, entry points, walk-in
     await expect(page.locator("#ai-chat-room-3d")).toBeHidden();
     await expect(page.locator("#ai-chat-form")).toBeVisible();
   });
+});
+
+test.describe("sink faucets match the sink's holes", () => {
+  test("a single-hole vanity top only offers single-hole faucets, and a widespread pick moves to one", async ({
+    page,
+  }) => {
+    test.setTimeout(90000);
+    await disableMaterials(page);
+    await startEstimate(page);
+    await answerScope(page, NEEDS_WALLS);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 10, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 });
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Vanity_Quantity: 1 });
+
+    const sink = page.locator("#ai-chat-room-3d-product-vanitySink");
+    const faucet = page.locator("#ai-chat-room-3d-product-vanityFaucet");
+    await faucet.selectOption("K-14410-4-CP");
+    await expect(faucet).toHaveValue("K-14410-4-CP");
+    await sink.selectOption("K-3048-1-0");
+    // The widespread faucet can't go on a one-hole top: the room shows a
+    // single-hole one instead, and the dropdown says why.
+    await expect(faucet).toHaveValue("K-14402-4A-CP");
+    const widespread = faucet.locator('option[value="K-14410-4-CP"]');
+    await expect(widespread).toBeDisabled();
+    await expect(widespread).toContainText("Doesn't fit this sink's faucet holes");
+    const centerset = faucet.locator('option[value="K-35951-4-CP"]');
+    await expect(centerset).toBeDisabled();
+  });
+});
+
+test.describe("going back a step", () => {
+  test("a room too small for its fixtures can be made bigger with Back, keeping every answer", async ({ page }) => {
+    await disableMaterials(page);
+    await startEstimate(page);
+    await answerScope(page, NEEDS_WALLS);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 4, Bathroom_Length_Ft: 4, Bathroom_Height_Ft: 8 });
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Toilet_Quantity: 1, Bathtub_Quantity: 1, Vanity_Quantity: 1 });
+    await expect(page.locator(".ai-chat-group-error").last()).toBeVisible();
+
+    // Back through the fixtures, entry points and plumbing walls steps to the size.
+    const back = () => page.getByRole("button", { name: "← Back" }).last().click();
+    await back();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "How many entry points" })).toHaveCount(2);
+    await back();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "carry the plumbing stack" })).toHaveCount(2);
+    await back();
+    const dims = page.locator('form[data-group="dimensions"]').last();
+    await expect(dims.locator('input[name="Bathroom_Width_Ft"]')).toHaveValue("4");
+    await expect(dims.locator('input[name="Bathroom_Height_Ft"]')).toHaveValue("8");
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8 });
+    await skipRoomInteractionSteps(page);
+
+    // The fixture counts come back filled in, and now they fit.
+    const fixtures = page.locator('form[data-group="fixtures"]').last();
+    await expect(fixtures.locator('input[name="Bathtub_Quantity"]')).toHaveValue("1");
+    await fixtures.locator(".ai-chat-group-continue").click();
+    await expect(page.getByTestId("estimate-card")).toBeVisible();
+    await expect(page.getByTestId("estimate-card")).toContainText("Tile");
+  });
+
+  test("the first step has no Back, and Back on the size keeps the scope answers", async ({ page }) => {
+    await startEstimate(page);
+    await expect(page.getByRole("button", { name: "← Back" })).toHaveCount(0);
+    await answerScope(page, NEEDS_WALLS);
+    await page.getByRole("button", { name: "← Back" }).last().click();
+    const scope = page.locator('form[data-group="scope"]').last();
+    await expect(scope.getByRole("button", { name: "Tile (full height)", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await scope.getByRole("button", { name: /Continue/ }).click();
+    await expect(page.locator('form[data-group="dimensions"]').last()).toBeVisible();
+  });
+});
+
+test.describe("saved design", () => {
+  test("the design is kept in this browser and can be picked up again", async ({ page }) => {
+    await disableMaterials(page);
+    await startEstimate(page);
+    await expect(page.locator(".ai-chat-saved-design")).toHaveCount(0);
+    await answerScope(page, NEEDS_WALLS);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 6, Bathroom_Length_Ft: 9, Bathroom_Height_Ft: 8 });
+    await skipRoomInteractionSteps(page);
+    const fixtures = page.locator('form[data-group="fixtures"]').last();
+    await fixtures.locator('input[name="Toilet_Quantity"]').fill("1");
+    await fixtures.locator('input[name="Vanity_Quantity"]').fill("1");
+    await page.evaluate(() => window.BathroomRoom3D.setProductPick("toilet", "K-3981-0"));
+    await expect
+      .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("pr_saved_design") || "{}")))
+      .toMatchObject({ step: "fixtures", room: { productPicks: { toilet: "K-3981-0" } } });
+
+    // Come back later: the first question offers the saved design.
+    await startEstimate(page);
+    await expect(page.locator(".ai-chat-saved-design")).toContainText("saved in this browser");
+    await page.getByRole("button", { name: "Pick up where I left off →" }).click();
+    const resumed = page.locator('form[data-group="fixtures"]').last();
+    await expect(resumed.locator('input[name="Toilet_Quantity"]')).toHaveValue("1");
+    await expect(resumed.locator('input[name="Vanity_Quantity"]')).toHaveValue("1");
+    expect(await page.evaluate(() => window.BathroomRoom3D.getProductPicks().toilet)).toBe("K-3981-0");
+    await expect(page.locator('form[data-group="scope"] button').first()).toBeDisabled();
+
+    // Back still walks through the earlier answers.
+    await resumed.getByRole("button", { name: "← Back" }).click();
+    await skipRoomInteractionSteps(page);
+    await page.locator('form[data-group="fixtures"]').last().locator(".ai-chat-group-continue").click();
+    await expect(page.getByTestId("estimate-card")).toBeVisible();
+    await expect(page.getByTestId("estimate-card")).toContainText("Tile");
+
+    // The quote form gets the products picked in the room.
+    await page.getByTestId("estimate-card").locator(".ai-chat-estimate-cta").click();
+    await expect(page.locator("#message")).toHaveValue(/Products picked in the 3D room:\n- Toilet: .*\(K-3981-0\)/);
+  });
+
+  test("Forget it removes the saved design", async ({ page }) => {
+    await startEstimate(page);
+    await answerScope(page, NEEDS_WALLS);
+    await expect.poll(() => page.evaluate(() => !!localStorage.getItem("pr_saved_design"))).toBe(true);
+    await startEstimate(page);
+    await page.getByRole("button", { name: "Forget it" }).click();
+    await expect(page.locator(".ai-chat-saved-design")).toContainText("gone from this browser");
+    expect(await page.evaluate(() => localStorage.getItem("pr_saved_design"))).toBeNull();
+    await startEstimate(page);
+    await expect(page.locator(".ai-chat-saved-design")).toHaveCount(0);
+  });
+});
+
+test("the room says when a fixture fits but is tight", async ({ page }) => {
+  await disableMaterials(page);
+  await startEstimate(page);
+  await answerScope(page, NEEDS_WALLS);
+  await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 });
+  await skipRoomInteractionSteps(page);
+  const fixtures = page.locator('form[data-group="fixtures"]').last();
+  const note = page.locator(".ai-chat-room-3d-tight");
+  await fixtures.locator('input[name="Toilet_Quantity"]').fill("1");
+  await expect(note).toBeHidden();
+  await fixtures.locator('input[name="Bathtub_Quantity"]').fill("1");
+  await fixtures.locator('input[name="Vanity_Quantity"]').fill("1");
+  await expect(note).toHaveText("Fits, but tight: Toilet, 15 in. beside it (18 in. recommended).");
+});
+
+test("without WebGL the 3D panel stays hidden, the chat says why, and the estimate still works", async ({ page }) => {
+  await page.addInitScript(() => {
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type, ...rest) {
+      return /webgl/.test(type) ? null : getContext.call(this, type, ...rest);
+    };
+  });
+  await disableMaterials(page);
+  await startEstimate(page);
+  await expect(page.locator(".ai-chat-text", { hasText: "can't run in this browser" })).toBeVisible();
+  await expect(page.locator("#ai-chat-room-3d")).toBeHidden();
+  await answerScope(page, NEEDS_WALLS);
+  await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 6, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 });
+  // No wall-picking steps without the room.
+  await fillGroup(page, "fixtures", { Toilet_Quantity: 1, Vanity_Quantity: 1 });
+  await expect(page.getByTestId("estimate-card")).toBeVisible();
+});
+
+test.describe("a 3D model that fails to load", () => {
+  async function toiletRoom(page) {
+    await disableMaterials(page);
+    await startEstimate(page);
+    await answerScope(page, NEEDS_WALLS);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 6, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 });
+    await skipRoomInteractionSteps(page);
+    await page.locator('form[data-group="fixtures"]').last().locator('input[name="Toilet_Quantity"]').fill("1");
+  }
+
+  test("is tried again, and shows once it loads", async ({ page }) => {
+    let calls = 0;
+    await page.route("**/models/products/kohler/K-3981-0.glb", (route) => {
+      calls++;
+      return calls === 1 ? route.abort() : route.continue();
+    });
+    await toiletRoom(page);
+    await page.evaluate(() => window.BathroomRoom3D.setProductPick("toilet", "K-3981-0"));
+    await expect.poll(() => calls, { timeout: 10000 }).toBe(2);
+    await page.waitForTimeout(500);
+    await expect(page.locator(".ai-chat-room-3d-model-note")).toBeHidden();
+  });
+
+  test("says which product is showing as a stand-in when it keeps failing", async ({ page }) => {
+    await page.route("**/models/products/kohler/K-3981-0.glb", (route) => route.abort());
+    await toiletRoom(page);
+    await page.evaluate(() => window.BathroomRoom3D.setProductPick("toilet", "K-3981-0"));
+    await expect(page.locator(".ai-chat-room-3d-model-note")).toContainText(
+      "Couldn't load the 3D model for Tresham one-piece compact",
+      { timeout: 15000 },
+    );
+  });
+});
+
+test("a room with two toilets prices one towel bar and one exhaust fan, but two paper holders", async ({ page }) => {
+  await disableMaterials(page);
+  await startEstimate(page);
+  await answerScope(page, NEEDS_WALLS);
+  await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 10, Bathroom_Length_Ft: 10, Bathroom_Height_Ft: 8 });
+  await skipRoomInteractionSteps(page);
+  await page.locator('form[data-group="fixtures"]').last().locator('input[name="Toilet_Quantity"]').fill("2");
+  await page.evaluate(() => {
+    window.BathroomRoom3D.setProductPick("exhaustFan", "K-34454-NA");
+    window.BathroomRoom3D.setProductPick("towelBar", "K-14436-CP");
+    window.BathroomRoom3D.setProductPick("paperHolder", "K-14377-CP");
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Object.fromEntries(window.BathroomRoom3D.getProductPricingItems().map((item) => [item.slotId, item.qty])),
+      ),
+    )
+    .toMatchObject({ toilet: 2, paperHolder: 2, towelBar: 1, exhaustFan: 1 });
+  const fan = await page.evaluate(() =>
+    window.BathroomRoom3D.getProductPricingItems().find((item) => item.slotId === "exhaustFan"),
+  );
+  expect(fan.needsWiring).toBe(true);
+});
+
+test("walls can be chosen with buttons instead of clicking the room", async ({ page }) => {
+  await disableMaterials(page);
+  await startEstimate(page);
+  await answerScope(page, NEEDS_WALLS);
+  await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 6, Bathroom_Length_Ft: 9, Bathroom_Height_Ft: 8 });
+  await expect(page.locator("#ai-chat-room-3d canvas")).toHaveAttribute("aria-label", /3D preview of your bathroom/);
+
+  // Plumbing walls: toggle on with the keyboard.
+  const back = page.getByRole("button", { name: "Back right wall" }).last();
+  await back.focus();
+  await page.keyboard.press("Enter");
+  await expect(back).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".ai-chat-group-intro", { hasText: "1 wall selected." })).toBeVisible();
+  await page.getByRole("button", { name: "Continue →" }).last().click();
+
+  // Entry point: one door on the front left wall.
+  await page.locator(".ai-chat-group-continue").last().click();
+  await page.getByRole("button", { name: "Front left wall" }).last().click();
+  await page.getByRole("button", { name: "Confirm entry point" }).click();
+  expect(await page.evaluate(() => window.BathroomRoom3D.getEntryPoints().map((ep) => ep.wallId))).toEqual(["S"]);
+  await expect(page.locator('form[data-group="fixtures"]')).toBeVisible();
 });

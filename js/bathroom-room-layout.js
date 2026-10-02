@@ -4,14 +4,14 @@
 // fixture stand-ins. No DOM, no Three.js — js/bathroom-room-3d.js owns all
 // rendering; this module only ever returns plain data.
 //
-// The layout algorithm is a deterministic first-fit around the room's
-// walls (still no backtracking/optimization, still not a substitute for an
-// actual code review), but it now checks REAL clearance: every candidate
-// placement's footprint, expanded by its own required side/front clearance
-// (see CLEARANCE_IN below), must not overlap any already-placed fixture's
-// own expanded footprint — not just "is there unused linear space on this
-// one wall" like before, so two fixtures on adjacent walls that would
-// physically clip into a shared corner are correctly rejected too.
+// The layout algorithm is a deterministic scan around the room's walls
+// (not a substitute for an actual code review). It checks real clearance:
+// every fixture's footprint plus its side clearance must stay out of every
+// other fixture's footprint and clear floor space in front (CLEARANCE_IN),
+// on any wall, so fixtures on adjacent walls can't clip into a shared
+// corner. Clear floor spaces may overlap each other, as codes allow. When
+// the usual first-fit leaves a fixture out, it slides fixtures along walls
+// and tries other starting walls before giving up (see computeLayout).
 (function (root, factory) {
   var api = factory();
   if (typeof module !== "undefined" && module.exports) {
@@ -29,6 +29,9 @@
   var RENDER_MIN_DIM = 2; // floor for a sane, non-degenerate rendered room
   var MAX_FIXTURE_COUNT = 20; // mirrors Pricing.MAX_FIXTURE_COUNT
   var MAX_FOOTPRINT_FT = 20; // cap on computeLayout({ footprints }) overrides
+  var MAX_SEARCHED_FIXTURES = 6; // see the full search at the end of the wall scan
+  var MAX_SEARCH_TRIES = 256; // every choice for 4 fixtures
+  var SLIDE_STEP_FT = 0.25;
 
   // Per-fixture footprint, in feet, used by the layout algorithm below.
   // wallSpan: how much of a wall's length this fixture consumes.
@@ -45,7 +48,8 @@
     // Bathtub and sink footprints match the real product models the 3D
     // preview loads (models/fixtures/, see FIXTURE_MODELS in
     // js/bathroom-room-3d.js): a 60x34 in. tub and a 22.5x18 in. wall-hung sink.
-    Bathtub_Quantity: { wallSpan: 5.2, depth: 2.9, height: 1.6, mount: "floor" },
+    // The tub takes exactly 60 in. of wall, so it fills a standard 5 ft alcove.
+    Bathtub_Quantity: { wallSpan: 5, depth: 2.9, height: 1.6, mount: "floor" },
     Shower_Quantity: { wallSpan: 3.2, depth: 3.2, height: 6.5, mount: "floor" },
     Shower_Door_Quantity: { wallSpan: 2.5, depth: 0.1, height: 6.5, mount: "attach", attachTo: "Shower_Quantity" },
     Vanity_Quantity: { wallSpan: 2.5, depth: 1.6, height: 2.6, mount: "floor" },
@@ -94,7 +98,8 @@
     Shower_Quantity: { side: 0, front: 24 },
     Vanity_Quantity: { side: 3, front: 21 },
     Cabinet_Quantity: { side: 2, front: 12 },
-    Door_Quantity: { side: 0, front: 24 },
+    // A 30 in. door swings 30 in. into the room.
+    Door_Quantity: { side: 0, front: 30 },
   };
 
   function clearanceFt(fixtureKey) {
@@ -102,10 +107,101 @@
     return { side: c.side / 12, front: c.front / 12 };
   }
 
+  // What's recommended beyond those minimums (NKBA guidelines), in inches:
+  // 18 in. from a toilet's centerline to anything beside it, and 30 in. of
+  // clear floor in front of a toilet, sink or vanity. A fixture with less
+  // still fits; the preview just says it's tight.
+  var RECOMMENDED_IN = {
+    Toilet_Quantity: { side: 18, front: 30 },
+    Sink_Quantity: { front: 30 },
+    Vanity_Quantity: { front: 30 },
+  };
+
+  // A rectangle in a wall's own terms: along the wall from its start, and
+  // depth into the room from it.
+  function wallLocal(wall, r) {
+    var along = [];
+    var depth = [];
+    [r.minX, r.maxX].forEach(function (x) {
+      [r.minZ, r.maxZ].forEach(function (z) {
+        along.push((x - wall.originX) * wall.dirX + (z - wall.originZ) * wall.dirZ);
+        depth.push((x - wall.originX) * wall.normalX + (z - wall.originZ) * wall.normalZ);
+      });
+    });
+    return {
+      a0: Math.min.apply(null, along),
+      a1: Math.max.apply(null, along),
+      d0: Math.min.apply(null, depth),
+      d1: Math.max.apply(null, depth),
+    };
+  }
+
+  // Placed fixtures with less room than RECOMMENDED_IN, each
+  // { fixtureKey, index, sideIn, frontIn } with the inches actually there
+  // (null where that side is fine). Measured to the fixtures themselves,
+  // not their clearance spaces, and to the walls. Doors don't count:
+  // their swing is open floor.
+  function tightClearances(placements, walls, footprintFor) {
+    function wallOf(p) {
+      return walls.filter(function (w) {
+        return w.id === p.wallId;
+      })[0];
+    }
+    var floor = placements
+      .filter(function (p) {
+        var fp = FIXTURE_LAYOUT[p.fixtureKey];
+        return fp && fp.mount === "floor" && p.fixtureKey !== "Door_Quantity" && wallOf(p);
+      })
+      .map(function (p) {
+        var wall = wallOf(p);
+        var fp = footprintFor(p.fixtureKey);
+        var along = (p.x - wall.originX) * wall.dirX + (p.z - wall.originZ) * wall.dirZ;
+        return { p: p, wall: wall, fp: fp, along: along, rect: clearanceRect(wall, along, fp.wallSpan / 2, fp.depth) };
+      });
+    var out = [];
+    floor.forEach(function (f) {
+      var rec = RECOMMENDED_IN[f.p.fixtureKey];
+      if (!rec) return;
+      var half = f.fp.wallSpan / 2;
+      var side = Math.min(f.along, f.wall.span - f.along);
+      var front = f.wall.roomDepth - f.fp.depth;
+      floor.forEach(function (g) {
+        if (g === f) return;
+        var r = wallLocal(f.wall, g.rect);
+        var eps = OVERLAP_EPS_FT;
+        // Beside it, within its depth.
+        if (r.d0 < f.fp.depth - eps && r.d1 > eps) {
+          if (r.a0 >= f.along) side = Math.min(side, r.a0 - f.along);
+          else if (r.a1 <= f.along) side = Math.min(side, f.along - r.a1);
+        }
+        // In front of it, within its width.
+        if (r.a0 < f.along + half - eps && r.a1 > f.along - half + eps && r.d0 >= f.fp.depth - eps) {
+          front = Math.min(front, r.d0 - f.fp.depth);
+        }
+      });
+      var sideIn = Math.round(side * 12);
+      var frontIn = Math.round(front * 12);
+      var tightSide = rec.side && sideIn < rec.side ? sideIn : null;
+      var tightFront = rec.front && frontIn < rec.front ? frontIn : null;
+      if (tightSide !== null || tightFront !== null) {
+        out.push({ fixtureKey: f.p.fixtureKey, index: f.p.index, sideIn: tightSide, frontIn: tightFront });
+      }
+    });
+    return out;
+  }
+
   // Fixtures that need to be on a wall carrying the plumbing stack. Kept
   // local (not read from js/bathroom-pricing.js's needsPlumbing flags) so
   // this module keeps its existing no-cross-file-dependency convention.
-  var PLUMBING_FIXTURE_KEYS = ["Toilet_Quantity", "Sink_Quantity", "Bathtub_Quantity", "Shower_Quantity"];
+  // A vanity carries a sink, so it needs the stack as much as a pedestal
+  // sink does.
+  var PLUMBING_FIXTURE_KEYS = [
+    "Toilet_Quantity",
+    "Sink_Quantity",
+    "Vanity_Quantity",
+    "Bathtub_Quantity",
+    "Shower_Quantity",
+  ];
 
   // Fixed priority order for the floor-standing wall scan. Each type scans
   // from its OWN fixed wall index (priorityIndex % 4), not a shared cursor
@@ -281,8 +377,112 @@
     };
   }
 
+  // Rectangles that only touch don't overlap. EPS absorbs floating-point
+  // error: a fixture packed right after another starts at a sum like
+  // 1.25 + 1.25 + 2.6 - 2.6, which can land a hair before the first one's
+  // edge (2.4999999999999996 vs 2.5) and would otherwise count as a
+  // collision, dropping a fixture from a wall with plenty of room.
+  var OVERLAP_EPS_FT = 1e-6;
+
   function rectsOverlap(a, b) {
-    return a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ;
+    return (
+      a.minX < b.maxX - OVERLAP_EPS_FT &&
+      a.maxX > b.minX + OVERLAP_EPS_FT &&
+      a.minZ < b.maxZ - OVERLAP_EPS_FT &&
+      a.maxZ > b.minZ + OVERLAP_EPS_FT
+    );
+  }
+
+  // Each fixture's envelope: `body` (the fixture plus its side clearance)
+  // and `full` (body plus the clear floor space in front of it). Clear floor
+  // spaces may share floor with each other, as codes allow (the space in
+  // front of a toilet and the tub's can be the same floor), but nothing may
+  // stand in another fixture's body or clear floor space. Two exceptions:
+  // - A doorway: other fixtures' clear floor space may reach it, as long as
+  //   nothing stands in its swing.
+  // - A tub (CLEAR_WIDTH_IN): it only needs a 30 in. wide stretch of clear
+  //   floor somewhere along its front, not the whole length, so a toilet can
+  //   sit beside it the way it does in a standard 5x8 ft bathroom. `zones`
+  //   are the candidate stretches; at least one must stay clear.
+  var CLEAR_WIDTH_IN = { Bathtub_Quantity: 30 };
+  var CLEAR_ZONE_STEPS = 5;
+
+  function envelopeAt(fixtureKey, footprint, wall, alongOffset, halfWidth, depthExtent) {
+    var env = {
+      body: clearanceRect(wall, alongOffset, halfWidth, footprint.depth),
+      full: clearanceRect(wall, alongOffset, halfWidth, depthExtent),
+      isDoor: fixtureKey === "Door_Quantity",
+    };
+    var zoneHalf = (CLEAR_WIDTH_IN[fixtureKey] || 0) / 24;
+    if (zoneHalf && zoneHalf < halfWidth) {
+      env.full = env.body;
+      env.zones = [];
+      for (var k = 0; k < CLEAR_ZONE_STEPS; k++) {
+        var center = alongOffset - halfWidth + zoneHalf + (2 * (halfWidth - zoneHalf) * k) / (CLEAR_ZONE_STEPS - 1);
+        env.zones.push(clearanceRect(wall, center, zoneHalf, depthExtent));
+      }
+    }
+    return env;
+  }
+
+  function zonesLeft(zones, bodies) {
+    return zones.filter(function (z) {
+      return !bodies.some(function (b) {
+        return rectsOverlap(z, b);
+      });
+    });
+  }
+
+  function bodiesOf(placed) {
+    return placed
+      .filter(function (p) {
+        return !p.isDoor;
+      })
+      .map(function (p) {
+        return p.body;
+      });
+  }
+
+  // Whether placed envelope `p` alone rules out `env`.
+  function blocks(p, env) {
+    if (env.isDoor && p.isDoor) return rectsOverlap(env.full, p.full);
+    if (rectsOverlap(env.body, p.body)) return true;
+    if (!env.isDoor) {
+      if (p.zones ? !zonesLeft(p.zones, [env.body]).length : rectsOverlap(env.body, p.full)) return true;
+    }
+    return !p.isDoor && !env.zones && rectsOverlap(env.full, p.body);
+  }
+
+  function conflictsWithPlaced(placed, env) {
+    if (
+      placed.some(function (p) {
+        return blocks(p, env);
+      })
+    ) {
+      return true;
+    }
+    return !!env.zones && !zonesLeft(env.zones, bodiesOf(placed)).length;
+  }
+
+  // The placed list with `env` added, each tub keeping only the clear
+  // stretches nothing stands in.
+  function withPlaced(placed, env) {
+    var out = placed.map(function (p) {
+      if (!p.zones || env.isDoor) return p;
+      return Object.assign({}, p, { zones: zonesLeft(p.zones, [env.body]) });
+    });
+    if (env.zones) env = Object.assign({}, env, { zones: zonesLeft(env.zones, bodiesOf(placed)) });
+    out.push(env);
+    return out;
+  }
+
+  // Where along `wall` a rectangle's along-wall extent ends, so a fixture
+  // blocked by it can be slid to start right after it.
+  function alongEnd(wall, r) {
+    if (wall.dirX !== 0) {
+      return Math.max((r.minX - wall.originX) * wall.dirX, (r.maxX - wall.originX) * wall.dirX);
+    }
+    return Math.max((r.minZ - wall.originZ) * wall.dirZ, (r.maxZ - wall.originZ) * wall.dirZ);
   }
 
   function placeAt(wall, alongOffset, footprint) {
@@ -316,7 +516,6 @@
   // always produces byte-identical placements. No Math.random, no
   // object-iteration-order dependence.
   function computeLayout(input) {
-    input = input || {};
     // parseNumber (not `||`) so a truthy-but-non-numeric value (an object,
     // array, or garbage string someone passes this pure function directly
     // — `||` only catches falsy values, not those) can't reach the
@@ -332,6 +531,13 @@
     var lengthFt =
       parsedLength === null ? DEFAULT_ROOM.lengthFt : clamp(parsedLength, RENDER_MIN_DIM, DIMENSION_BOUNDS.lengthFt);
     var fixtureCounts = input.fixtureCounts || {};
+    // The ceiling, when known: a fixture taller than it (a 6 ft 9 in door, a
+    // 96 in. shower wall kit) doesn't fit, rather than poking through.
+    var parsedHeight = parseNumber(input.heightFt);
+    var ceilingFt = parsedHeight === null ? null : clamp(parsedHeight, RENDER_MIN_DIM, DIMENSION_BOUNDS.heightFt);
+    function tooTall(footprint) {
+      return ceilingFt !== null && footprint.height > ceilingFt + OVERLAP_EPS_FT;
+    }
     // Wall ids restricting the plumbing-needing fixtures (empty/omitted =
     // unrestricted, today's behavior). Multiple walls can carry the stack.
     var plumbingWallIds = Array.isArray(input.plumbingWallIds) ? input.plumbingWallIds : null;
@@ -377,11 +583,6 @@
         .filter(Boolean);
     }
 
-    function scanOrderFor(priorityIdx, instanceIdx) {
-      var start = (priorityIdx + instanceIdx) % walls.length;
-      return walls.slice(start).concat(walls.slice(0, start));
-    }
-
     // Pass 1: floor-standing fixtures. placedRects accumulates every placed
     // fixture's clearance envelope, checked against every NEW candidate
     // regardless of which wall either one is on — this is what catches a
@@ -407,7 +608,7 @@
           droppedCounts.Door_Quantity = (droppedCounts.Door_Quantity || 0) + 1;
           return;
         }
-        if (wall.span < 2 * doorHalfWidth) {
+        if (wall.span < 2 * doorHalfWidth || tooTall(doorFootprint)) {
           droppedCounts.Door_Quantity = (droppedCounts.Door_Quantity || 0) + 1;
           return;
         }
@@ -422,11 +623,8 @@
         // coordinate.
         var rawOffset = typeof ep.offsetFt === "number" && isFinite(ep.offsetFt) ? ep.offsetFt : wall.span / 2;
         var alongOffset = clampEntryOffset(wall.span, rawOffset);
-        var rect = clearanceRect(wall, alongOffset, doorHalfWidth, depthExtent);
-        var conflict = placedRects.some(function (r) {
-          return rectsOverlap(rect, r);
-        });
-        if (conflict) {
+        var doorEnv = envelopeAt("Door_Quantity", doorFootprint, wall, alongOffset, doorHalfWidth, depthExtent);
+        if (conflictsWithPlaced(placedRects, doorEnv)) {
           droppedCounts.Door_Quantity = (droppedCounts.Door_Quantity || 0) + 1;
           return;
         }
@@ -444,66 +642,253 @@
         // still use. The actual conflict-avoidance is placedRects/
         // rectsOverlap below, which checks real overlap regardless of
         // wall.used and already covers this correctly.
-        placedRects.push(rect);
+        placedRects = withPlaced(placedRects, doorEnv);
         placements.push(placement);
         placedByType.Door_Quantity.push(placement);
       });
     }
 
-    FLOOR_PRIORITY.forEach(function (fixtureKey, priorityIdx) {
-      // Handled above instead, when the customer picked explicit points.
-      if (fixtureKey === "Door_Quantity" && explicitEntryPoints) return;
+    // Fixtures the customer dragged to a spot in the 3D preview
+    // (input.fixturePositions: { fixtureKey: { index: { wallId, offsetFt } } }),
+    // reserved next — before the automatic scan, like entry points — and
+    // held to the same plumbing-wall, fit and clearance rules. A position
+    // that no longer works (the room shrank, the wall lost its plumbing)
+    // is ignored and that fixture is placed automatically instead.
+    var fixturePositions =
+      input.fixturePositions && typeof input.fixturePositions === "object" ? input.fixturePositions : {};
+    var reserved = {}; // fixtureKey -> { index: placement }
+    FLOOR_PRIORITY.forEach(function (fixtureKey) {
+      if (fixtureKey === "Door_Quantity") return;
+      var positions = fixturePositions[fixtureKey];
+      if (!positions || typeof positions !== "object") return;
       var footprint = footprintFor(fixtureKey);
-      var clearance = clearanceFt(fixtureKey);
       var halfWidth = expandedHalfWidth(footprint, fixtureKey);
-      var requiredSpan = 2 * halfWidth;
-      var depthExtent = footprint.depth + clearance.front;
+      var depthExtent = footprint.depth + clearanceFt(fixtureKey).front;
       var parsedCount = parseNumber(fixtureCounts[fixtureKey]);
       var count = clamp(Math.floor(parsedCount === null ? 0 : parsedCount), 0, MAX_FIXTURE_COUNT);
-      placedByType[fixtureKey] = [];
       var isPlumbing = plumbingWallIds && plumbingWallIds.length && PLUMBING_FIXTURE_KEYS.indexOf(fixtureKey) !== -1;
+      reserved[fixtureKey] = {};
       for (var i = 0; i < count; i++) {
-        var candidateWalls = scanOrderFor(priorityIdx, i);
-        if (footprint.preferWall) {
-          var preferred = wallByIdOrder([footprint.preferWall])[0];
-          if (preferred && preferred.used === 0) candidateWalls = [preferred];
-        }
-        if (isPlumbing) {
-          candidateWalls = candidateWalls.filter(function (w) {
-            return plumbingWallIds.indexOf(w.id) !== -1;
-          });
-        }
-        var chosen = null;
-        var chosenRect = null;
-        var chosenOffset = 0;
-        for (var w = 0; w < candidateWalls.length; w++) {
-          var wall = candidateWalls[w];
-          if (wall.span - wall.used < requiredSpan) continue;
-          if (depthExtent > wall.roomDepth) continue; // would poke through the opposite wall
-          var alongOffset = wall.used + halfWidth;
-          var rect = clearanceRect(wall, alongOffset, halfWidth, depthExtent);
-          var conflict = placedRects.some(function (r) {
-            return rectsOverlap(rect, r);
-          });
-          if (conflict) continue;
-          chosen = wall;
-          chosenRect = rect;
-          chosenOffset = alongOffset;
-          break;
-        }
-        if (!chosen) {
-          droppedCounts[fixtureKey] = (droppedCounts[fixtureKey] || 0) + 1;
-          continue;
-        }
-        var placement = placeAt(chosen, chosenOffset, footprint);
+        var pos = positions[i];
+        if (!pos || typeof pos.offsetFt !== "number" || !isFinite(pos.offsetFt)) continue;
+        var wall = wallByIdOrder([pos.wallId])[0];
+        if (!wall || wall.span < 2 * halfWidth || depthExtent > wall.roomDepth || tooTall(footprint)) continue;
+        if (isPlumbing && plumbingWallIds.indexOf(wall.id) === -1) continue;
+        var alongOffset = clamp(pos.offsetFt, halfWidth, wall.span - halfWidth);
+        var env = envelopeAt(fixtureKey, footprint, wall, alongOffset, halfWidth, depthExtent);
+        if (conflictsWithPlaced(placedRects, env)) continue;
+        var placement = placeAt(wall, alongOffset, footprint);
         placement.fixtureKey = fixtureKey;
         placement.index = i;
-        chosen.used = chosenOffset + halfWidth;
-        placedRects.push(chosenRect);
-        placements.push(placement);
-        placedByType[fixtureKey].push(placement);
+        placement.offsetFt = alongOffset;
+        placement.moved = true;
+        placedRects = withPlaced(placedRects, env);
+        reserved[fixtureKey][i] = placement;
       }
     });
+
+    // The automatic wall scan, placing fixture types in `order`. `shift`
+    // rotates which wall every fixture type starts from; shift 0 is the
+    // long-standing layout, the others are only tried when it leaves
+    // something out (see below). `startWalls`, when given, instead names the
+    // wall (an index into N, E, S, W) each automatically placed fixture
+    // tries first, in placement order.
+    function autoPlace(shift, order, startWalls) {
+      var autoIdx = 0;
+      var walls = wallsFor(widthFt, lengthFt);
+      var rects = placedRects.slice();
+      var out = placements.slice();
+      var dropped = Object.assign({}, droppedCounts);
+      var byType = {};
+      Object.keys(placedByType).forEach(function (k) {
+        byType[k] = placedByType[k].slice();
+      });
+      var droppedTotal = 0;
+
+      function scanOrder(priorityIdx, instanceIdx) {
+        var start = startWalls ? startWalls[autoIdx] || 0 : (priorityIdx + instanceIdx + shift) % walls.length;
+        return walls.slice(start).concat(walls.slice(0, start));
+      }
+
+      order.forEach(function (fixtureKey) {
+        var priorityIdx = FLOOR_PRIORITY.indexOf(fixtureKey);
+        // Handled above instead, when the customer picked explicit points.
+        if (fixtureKey === "Door_Quantity" && explicitEntryPoints) return;
+        var footprint = footprintFor(fixtureKey);
+        var clearance = clearanceFt(fixtureKey);
+        var halfWidth = expandedHalfWidth(footprint, fixtureKey);
+        var requiredSpan = 2 * halfWidth;
+        var depthExtent = footprint.depth + clearance.front;
+        var parsedCount = parseNumber(fixtureCounts[fixtureKey]);
+        var count = clamp(Math.floor(parsedCount === null ? 0 : parsedCount), 0, MAX_FIXTURE_COUNT);
+        byType[fixtureKey] = [];
+        var isPlumbing = plumbingWallIds && plumbingWallIds.length && PLUMBING_FIXTURE_KEYS.indexOf(fixtureKey) !== -1;
+
+        function fitsAt(wall, alongOffset) {
+          var env = envelopeAt(fixtureKey, footprint, wall, alongOffset, halfWidth, depthExtent);
+          return conflictsWithPlaced(rects, env) ? null : env;
+        }
+
+        for (var i = 0; i < count; i++) {
+          var moved = reserved[fixtureKey] && reserved[fixtureKey][i];
+          if (moved) {
+            out.push(moved);
+            byType[fixtureKey].push(moved);
+            continue;
+          }
+          var candidateWalls = scanOrder(priorityIdx, i);
+          autoIdx++;
+          if (footprint.preferWall) {
+            var preferred = walls.filter(function (w) {
+              return w.id === footprint.preferWall;
+            })[0];
+            if (preferred && preferred.used === 0) candidateWalls = [preferred];
+          }
+          if (isPlumbing) {
+            candidateWalls = candidateWalls.filter(function (w) {
+              return plumbingWallIds.indexOf(w.id) !== -1;
+            });
+          }
+          candidateWalls = candidateWalls.filter(function (w) {
+            // depthExtent > roomDepth would poke through the opposite wall.
+            return (
+              w.span - w.used >= requiredSpan - OVERLAP_EPS_FT && depthExtent <= w.roomDepth && !tooTall(footprint)
+            );
+          });
+          var chosen = null;
+          var chosenRects = null;
+          var chosenOffset = 0;
+          // First each wall's next free spot, as always; then, if none
+          // works, slide along each wall past whatever is in the way.
+          for (var w = 0; w < candidateWalls.length && !chosen; w++) {
+            var at = candidateWalls[w].used + halfWidth;
+            var fit = fitsAt(candidateWalls[w], at);
+            if (fit) {
+              chosen = candidateWalls[w];
+              chosenRects = fit;
+              chosenOffset = at;
+            }
+          }
+          for (var w2 = 0; w2 < candidateWalls.length && !chosen; w2++) {
+            var wall = candidateWalls[w2];
+            var offset = wall.used + halfWidth;
+            for (var step = 0; step < 100 && offset + halfWidth <= wall.span + OVERLAP_EPS_FT; step++) {
+              var env = fitsAt(wall, offset);
+              if (env) {
+                chosen = wall;
+                chosenRects = env;
+                chosenOffset = offset;
+                break;
+              }
+              // Slide past whatever is in the way, or a quarter foot when
+              // it's only a tub's clear stretch.
+              var next = offset + SLIDE_STEP_FT;
+              var probe = envelopeAt(fixtureKey, footprint, wall, offset, halfWidth, depthExtent);
+              rects.forEach(function (r) {
+                if (!blocks(r, probe)) return;
+                var inWay = !probe.isDoor && !r.zones && rectsOverlap(probe.body, r.full) ? r.full : r.body;
+                next = Math.max(next, alongEnd(wall, inWay) + halfWidth);
+              });
+              offset = next;
+            }
+          }
+          if (!chosen) {
+            dropped[fixtureKey] = (dropped[fixtureKey] || 0) + 1;
+            droppedTotal++;
+            continue;
+          }
+          var placement = placeAt(chosen, chosenOffset, footprint);
+          placement.fixtureKey = fixtureKey;
+          placement.index = i;
+          placement.offsetFt = chosenOffset;
+          chosen.used = chosenOffset + halfWidth;
+          chosenRects.owner = placement;
+          rects = withPlaced(rects, chosenRects);
+          out.push(placement);
+          byType[fixtureKey].push(placement);
+        }
+      });
+      return {
+        placements: out,
+        droppedCounts: dropped,
+        placedByType: byType,
+        droppedTotal: droppedTotal,
+        rects: rects,
+      };
+    }
+
+    // Tries the usual layout first. Only if it leaves a fixture out, it also
+    // tries the other three starting walls, and placing the widest fixtures
+    // first (a tub claims its end wall before a toilet takes the corner),
+    // keeping whichever leaves out the fewest. Ties keep the earlier try, so
+    // the result stays deterministic.
+    var widestFirst = FLOOR_PRIORITY.slice().sort(function (a, b) {
+      return (
+        footprintFor(b).wallSpan - footprintFor(a).wallSpan || FLOOR_PRIORITY.indexOf(a) - FLOOR_PRIORITY.indexOf(b)
+      );
+    });
+    var best = autoPlace(0, FLOOR_PRIORITY);
+    [FLOOR_PRIORITY, widestFirst].forEach(function (order) {
+      for (var shift = 0; shift < 4 && best.droppedTotal > 0; shift++) {
+        var attempt = autoPlace(shift, order);
+        if (attempt.droppedTotal < best.droppedTotal) best = attempt;
+      }
+    });
+    // Exactly one fixture still left out (a near miss, not an overfull
+    // room): for a typical bathroom (up to 6 fixtures placed automatically),
+    // try choices of starting wall for each one, up to MAX_SEARCH_TRIES so
+    // it stays quick while the customer types.
+    var autoCount = 0;
+    FLOOR_PRIORITY.forEach(function (fixtureKey) {
+      if (fixtureKey === "Door_Quantity" && explicitEntryPoints) return;
+      var parsed = parseNumber(fixtureCounts[fixtureKey]);
+      var count = clamp(Math.floor(parsed === null ? 0 : parsed), 0, MAX_FIXTURE_COUNT);
+      for (var i = 0; i < count; i++) {
+        if (!(reserved[fixtureKey] && reserved[fixtureKey][i])) autoCount++;
+      }
+    });
+    if (best.droppedTotal === 1 && autoCount <= MAX_SEARCHED_FIXTURES) {
+      var combos = Math.min(Math.pow(4, autoCount), MAX_SEARCH_TRIES);
+      for (var code = 0; code < combos && best.droppedTotal > 0; code++) {
+        var startWalls = [];
+        for (var digit = 0, rest = code; digit < autoCount; digit++, rest = Math.floor(rest / 4)) {
+          startWalls.push(rest % 4);
+        }
+        var tried = autoPlace(0, widestFirst, startWalls);
+        if (tried.droppedTotal < best.droppedTotal) best = tried;
+      }
+    }
+    placements = best.placements;
+    droppedCounts = best.droppedCounts;
+    placedByType = best.placedByType;
+
+    // A toilet placed automatically is packed at the 15 in. minimum from
+    // whatever is beside it. Where there's slack, it's moved up to 3 in. to
+    // get the recommended 18 in. Nothing else moves.
+    (placedByType.Toilet_Quantity || []).forEach(function (t) {
+      if (t.moved) return;
+      var wall = wallByIdOrder([t.wallId])[0];
+      var footprint = footprintFor("Toilet_Quantity");
+      var roomyHalf = Math.max(footprint.wallSpan / 2, RECOMMENDED_IN.Toilet_Quantity.side / 12);
+      var depthExtent = footprint.depth + clearanceFt("Toilet_Quantity").front;
+      var others = best.rects.filter(function (r) {
+        return r.owner !== t;
+      });
+      var shifts = [0];
+      for (var k = 1; k <= 4; k++) shifts.push(k / 16, -k / 16);
+      for (var j = 0; j < shifts.length; j++) {
+        var off = t.offsetFt + shifts[j];
+        if (off - roomyHalf < -OVERLAP_EPS_FT || off + roomyHalf > wall.span + OVERLAP_EPS_FT) continue;
+        var env = envelopeAt("Toilet_Quantity", footprint, wall, off, roomyHalf, depthExtent);
+        if (conflictsWithPlaced(others, env)) continue;
+        var moved = placeAt(wall, off, footprint);
+        t.x = moved.x;
+        t.z = moved.z;
+        t.offsetFt = off;
+        return;
+      }
+    });
+    var tight = tightClearances(placements, walls, footprintFor);
 
     // Shower-door pairing: attaches to the shower instance of the same
     // index, offset outward from the shower's open face. Extra doors beyond
@@ -511,7 +896,9 @@
     var showerDoorFootprint = FIXTURE_LAYOUT.Shower_Door_Quantity;
     var showerDoorCount = clamp(Math.floor(fixtureCounts.Shower_Door_Quantity || 0), 0, MAX_FIXTURE_COUNT);
     var placedShowers = placedByType.Shower_Quantity || [];
-    var showerFootprint = FIXTURE_LAYOUT.Shower_Quantity;
+    // The shower's own size, so a door follows a picked product's (see
+    // footprints above) to its open edge.
+    var showerFootprint = footprintFor("Shower_Quantity");
     for (var d = 0; d < showerDoorCount; d++) {
       var shower = placedShowers[d];
       if (!shower) {
@@ -542,13 +929,18 @@
     // this file gets, rather than stacked exactly on top of the last
     // anchor's attachment where it would render fully overlapping/
     // z-fighting and checkFit() would still wrongly report it as fitting.
+    // Anchors already holding something, across types: a mirror and a large
+    // mirror never share one vanity (they'd sit in exactly the same spot).
+    var usedAnchors = {};
     WALL_MOUNT_PRIORITY.forEach(function (fixtureKey) {
       var footprint = FIXTURE_LAYOUT[fixtureKey];
       var parsedCount = parseNumber(fixtureCounts[fixtureKey]);
       var count = clamp(Math.floor(parsedCount === null ? 0 : parsedCount), 0, MAX_FIXTURE_COUNT);
       var anchorPool = [];
       for (var a = 0; a < footprint.anchors.length; a++) {
-        var pool = placedByType[footprint.anchors[a]] || [];
+        var pool = (placedByType[footprint.anchors[a]] || []).filter(function (p) {
+          return !usedAnchors[p.fixtureKey + ":" + p.index];
+        });
         if (pool.length) {
           anchorPool = pool;
           break;
@@ -560,6 +952,7 @@
           continue;
         }
         var anchor = anchorPool[i2];
+        usedAnchors[anchor.fixtureKey + ":" + anchor.index] = true;
         placements.push({
           fixtureKey: fixtureKey,
           index: i2,
@@ -573,7 +966,7 @@
       }
     });
 
-    return { placements: placements, droppedCounts: droppedCounts };
+    return { placements: placements, droppedCounts: droppedCounts, tight: tight };
   }
 
   // Finish color/texture lookups. Colors are exact hex values from the
@@ -617,6 +1010,7 @@
     MAX_FIXTURE_COUNT: MAX_FIXTURE_COUNT,
     FIXTURE_LAYOUT: FIXTURE_LAYOUT,
     CLEARANCE_IN: CLEARANCE_IN,
+    RECOMMENDED_IN: RECOMMENDED_IN,
     PLUMBING_FIXTURE_KEYS: PLUMBING_FIXTURE_KEYS,
     clampEntryOffset: clampEntryOffset,
     applyDimensionInput: applyDimensionInput,

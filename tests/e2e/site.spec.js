@@ -135,6 +135,11 @@ test.describe("accessibility", () => {
 
     test(`chat, estimate card and admin screens meet contrast (${scheme} theme)`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+      // A pricing service is configured so the Kohler pick step shows (its
+      // contrast is checked below); it never answers, so the card just names
+      // the toilet as not priced.
+      await useConfig(page, { productPricing: { endpoint: "https://pricing.example.com/prices" } });
+      await page.route("https://pricing.example.com/prices", (route) => route.abort());
       await page.goto("/index.html");
       await page.click("#ai-chat-quote-starter");
       const form = page.locator('form[data-group="scope"]');
@@ -186,10 +191,9 @@ test.describe("accessibility", () => {
       await page.locator('input[autocomplete="postal-code"]').fill("84101");
       await page.locator(".ai-chat-group-continue").last().click();
 
-      await expect(page.locator(".ai-chat-group-intro", { hasText: "Which toilets" })).toBeVisible();
+      await expect(page.locator(".ai-chat-group-intro", { hasText: "Next up: Toilet." })).toBeVisible();
       results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
       expect(results.violations.flatMap((v) => v.nodes.map((n) => n.target + " " + n.failureSummary))).toEqual([]);
-      await page.locator(".ai-chat-choice--material").last().click();
       await page.locator(".ai-chat-group-continue").last().click();
 
       await expect(page.getByTestId("estimate-card")).toBeVisible();

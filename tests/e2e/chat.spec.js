@@ -240,13 +240,43 @@ test.describe("chat estimate", () => {
 test.describe("the merged fixtures + real-product-pick flow", () => {
   const NOTHING_BUT_FIXTURES = { demolition: "No", floorFinish: "None", walls: "Neither", paintCeiling: "No" };
 
-  test("moves straight from fixtures into product picks with real photos, retints the 3D view, and ends in one combined card", async ({
+  test("walks each placed fixture's Kohler products with the camera on it, prices them live, and ends in one combined card", async ({
     page,
   }) => {
+    // The pricing service (tools/pricing-service/) stood in for here: it
+    // prices every model it's asked for except the paper holder's.
+    await useConfig(page, { productPricing: { endpoint: "https://pricing.example.com/prices" } });
+    let asked = null;
+    await page.route("https://pricing.example.com/prices", async (route) => {
+      const cors = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      };
+      if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
+      asked = route.request().postDataJSON();
+      const results = {};
+      for (const mmn of asked.mmns) {
+        if (mmn !== "K-14377-CP")
+          results[mmn] = { found: true, price: 100, name: mmn, url: "https://www.homedepot.com/p/" + mmn };
+      }
+      return route.fulfill({
+        status: 200,
+        headers: cors,
+        contentType: "application/json",
+        body: JSON.stringify({ zip: asked.zip, store: "21st South", results }),
+      });
+    });
+
     await startEstimate(page);
     await answerScope(page, NOTHING_BUT_FIXTURES);
     await skipRoomInteractionSteps(page);
-    await fillGroup(page, "fixtures", { Toilet_Quantity: 1, Shower_Quantity: 1, Shower_Door_Quantity: 1 });
+    await fillGroup(page, "fixtures", {
+      Toilet_Quantity: 1,
+      Shower_Quantity: 1,
+      Shower_Door_Quantity: 1,
+      Cabinet_Quantity: 1,
+    });
 
     // The old two-step flow (separate button, separate card) is gone.
     await expect(page.getByRole("button", { name: /Pick Your Materials/ })).toHaveCount(0);
@@ -256,31 +286,42 @@ test.describe("the merged fixtures + real-product-pick flow", () => {
     await page.locator('input[autocomplete="postal-code"]').fill("84101");
     await page.locator(".ai-chat-group-continue").last().click();
 
-    await expect(page.locator(".ai-chat-group-intro", { hasText: "Which toilets" })).toBeVisible();
-    const toiletChoice = page.locator(".ai-chat-choice--material").last();
-    await expect(toiletChoice.locator(".ai-chat-material-thumb")).toHaveCount(1);
-    await toiletChoice.click();
+    // One step per fixture, its switcher tab showing above the canvas. The
+    // generic stand-in toilet is swapped for the first Kohler one.
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Next up: Toilet." })).toBeVisible();
+    await expect(page.locator(".ai-chat-room-3d-products .ai-chat-room-3d-style-btn.selected")).toHaveText("Toilet");
+    await expect(page.locator("#ai-chat-product-pick-toilet")).toHaveValue("K-31648-0");
+    await page.locator("#ai-chat-product-pick-paperHolder").selectOption("K-14377-CP");
+    await expect(page.locator("#ai-chat-room-3d-product-paperHolder")).toHaveValue("K-14377-CP");
+    await page.locator("#ai-chat-product-pick-exhaustFan").selectOption("K-34454-NA");
     await page.locator(".ai-chat-group-continue").last().click();
 
-    await expect(page.locator(".ai-chat-group-intro", { hasText: "Which showers" })).toBeVisible();
-    await page.locator(".ai-chat-choice--material").last().click();
+    // The glass enclosure is swapped for a Kohler base that fits, which
+    // brings its wall kit and a door made for it.
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Next up: Shower." })).toBeVisible();
+    await expect(page.locator("#ai-chat-product-pick-showerBase")).not.toHaveValue("glass-enclosure");
+    await expect(page.locator("#ai-chat-product-pick-showerWalls")).toBeVisible();
+    await expect(page.locator("#ai-chat-product-pick-showerDoor")).not.toHaveValue("standard-door");
     await page.locator(".ai-chat-group-continue").last().click();
 
-    // Every real catalog option here is "Matte Black" — picking one proves
-    // the 3D proxy's best-effort finish retint (guessFinishColor() in
-    // js/materials-pricing.js) actually fires against real product names,
-    // not just in isolation.
-    await expect(page.locator(".ai-chat-group-intro", { hasText: "Which shower doors" })).toBeVisible();
-    const doorChoice = page.locator(".ai-chat-choice--material").last();
-    await expect(doorChoice).toContainText(/Matte Black/i);
-    await doorChoice.click();
+    // Anything without a Kohler product keeps the catalog picker.
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Which cabinets" })).toBeVisible();
+    const cabinetChoice = page.locator(".ai-chat-choice--material").last();
+    await expect(cabinetChoice.locator(".ai-chat-material-thumb")).toHaveCount(1);
+    await cabinetChoice.click();
     await page.locator(".ai-chat-group-continue").last().click();
 
     const card = page.getByTestId("estimate-card");
     await expect(card).toBeVisible();
+    expect(asked.zip).toBe("84101");
+    expect(asked.mmns).toEqual(expect.arrayContaining(["K-31648-0", "K-14377-CP", "K-T73117-4-CP"]));
     await expect(card).toContainText("Labor Subtotal");
     await expect(card).toContainText("Materials Subtotal");
-    await expect(card).toContainText(/Matte Black/i);
+    await expect(card).toContainText("Cimarron two-piece elongated (K-31648-0)");
+    await expect(card).toContainText("Home Depot, 21st South store");
+    await expect(card).toContainText(
+      "No live Home Depot price was found for these, so they aren't in the total: Paper holder: Purist pivoting holder.",
+    );
     await expect(card.locator(".ai-chat-material-thumb").first()).toBeVisible();
     await expect(card.locator(".ai-chat-estimate-total-label")).toHaveText(
       "Estimated Total (Labor + Materials), before plumbing",
@@ -296,6 +337,107 @@ test.describe("the merged fixtures + real-product-pick flow", () => {
     expect(pdf).toContain("Materials Subtotal");
     // jsPDF escapes parentheses as \( \) inside its own PDF text strings.
     expect(pdf).toContain("Estimated Total \\(Labor + Materials\\), before plumbing");
+    // What isn't priced goes on the PDF too, not only the card.
+    await expect(card).toContainText("the valve inside the wall is extra");
+    expect(pdf).toContain("the valve inside the wall is extra");
+    expect(pdf).toContain("Paper holder: Purist pivoting holder");
+    await expect(card).toContainText("the wiring by an electrician isn't in this estimate");
+
+    // And to the quote form with "Contact Us About This".
+    await card.getByRole("link", { name: /Contact Us About This/i }).click();
+    await page.waitForURL(/contact\.html/);
+    const summary = await page.evaluate(() => sessionStorage.getItem("pr_estimate_summary"));
+    expect(summary).toContain("so they aren't in the total: Paper holder: Purist pivoting holder.");
+    expect(summary).toContain("the valve inside the wall is extra");
+  });
+
+  test("a pick made above the room shows in the chat step, and a change after the card offers an updated estimate", async ({
+    page,
+  }) => {
+    await useConfig(page, { productPricing: { endpoint: "https://pricing.example.com/prices" } });
+    const asked = [];
+    await page.route("https://pricing.example.com/prices", async (route) => {
+      const cors = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      };
+      if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
+      const body = route.request().postDataJSON();
+      asked.push(body.mmns);
+      const results = {};
+      for (const mmn of body.mmns) results[mmn] = { found: true, price: 100, name: mmn, url: null };
+      return route.fulfill({
+        status: 200,
+        headers: cors,
+        contentType: "application/json",
+        body: JSON.stringify({ zip: body.zip, store: "21st South", results }),
+      });
+    });
+
+    await startEstimate(page);
+    await answerScope(page, NOTHING_BUT_FIXTURES);
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Toilet_Quantity: 1 });
+    await page.locator('input[autocomplete="postal-code"]').fill("84101");
+    await page.locator(".ai-chat-group-continue").last().click();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Next up: Toilet." })).toBeVisible();
+
+    const switcher = page.locator("#ai-chat-room-3d-product-toilet");
+    const chatPick = page.locator("#ai-chat-product-pick-toilet");
+    const enabledOptions = await chatPick.locator("option:not([disabled])").evaluateAll((os) => os.map((o) => o.value));
+    const [first, second] = enabledOptions.filter((v) => v.startsWith("K-"));
+    await switcher.selectOption(second);
+    await expect(chatPick).toHaveValue(second);
+
+    await page.locator(".ai-chat-group-continue", { hasText: "See My Estimate" }).last().click();
+    await expect(page.getByTestId("estimate-card")).toHaveCount(1);
+    expect(asked[0]).toContain(second);
+
+    await switcher.selectOption(first);
+    const update = page.getByRole("button", { name: "Update my estimate" });
+    await expect(update).toBeVisible();
+    await update.click();
+    await expect(page.getByTestId("estimate-card")).toHaveCount(2);
+    expect(asked[1]).toContain(first);
+    await expect(page.getByTestId("estimate-card").last()).toContainText(first);
+  });
+
+  test("with no pricing service, the fixtures fall back to the catalog picker and are priced", async ({ page }) => {
+    await startEstimate(page);
+    await answerScope(page, NOTHING_BUT_FIXTURES);
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Toilet_Quantity: 1 });
+    await page.locator('input[autocomplete="postal-code"]').fill("84101");
+    await page.locator(".ai-chat-group-continue").last().click();
+    // No Kohler step: it could only end in "not priced" without the service.
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Which toilets" })).toBeVisible();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Next up: Toilet." })).toHaveCount(0);
+    await page.locator(".ai-chat-choice--material:enabled").first().click();
+    await page.locator(".ai-chat-group-continue").last().click();
+    const card = page.getByTestId("estimate-card");
+    await expect(card).toBeVisible();
+    await expect(card).toContainText("Materials Subtotal");
+    await expect(card).not.toContainText("so they aren't in the total");
+  });
+
+  test("when the pricing service doesn't answer, the Kohler picks are named as not priced and the estimate still finishes", async ({
+    page,
+  }) => {
+    await useConfig(page, { productPricing: { endpoint: "https://pricing.example.com/prices" } });
+    await page.route("https://pricing.example.com/prices", (route) => route.abort());
+    await startEstimate(page);
+    await answerScope(page, NOTHING_BUT_FIXTURES);
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Toilet_Quantity: 1 });
+    await page.locator('input[autocomplete="postal-code"]').fill("84101");
+    await page.locator(".ai-chat-group-continue").last().click();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Next up: Toilet." })).toBeVisible();
+    await page.locator(".ai-chat-group-continue", { hasText: "See My Estimate" }).last().click();
+    const card = page.getByTestId("estimate-card");
+    await expect(card).toBeVisible();
+    await expect(card).toContainText("so they aren't in the total: Toilet: Cimarron two-piece elongated.");
+    await expect(card.locator(".ai-chat-estimate-total-label")).toHaveText("Estimated Labor Total, before plumbing");
   });
 
   test("a ZIP typed with a stray leading space is not truncated below 5 real digits", async ({ page }) => {

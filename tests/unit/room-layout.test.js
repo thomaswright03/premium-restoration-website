@@ -130,10 +130,54 @@ test("computeLayout: toilet spacing reflects real centerline clearance (15in), n
   // Toilet wallSpan is 1.7ft (half = 0.85ft), but CLEARANCE_IN.Toilet_Quantity.side
   // is 15in (1.25ft) — the code clearance is the larger of the two and must
   // be what actually determines placement, not the fixture's own half-width.
+  // With room to spare it gets the recommended 18 in. (1.5 ft) instead.
   var result = L.computeLayout({ widthFt: 10, lengthFt: 8, fixtureCounts: { Toilet_Quantity: 1 } });
   var toilet = result.placements[0];
   assert.equal(toilet.wallId, "N");
-  assert.equal(toilet.x, 1.25); // originX(0) + dirX(1) * halfWidth(max(0.85, 15/12) = 1.25)
+  assert.equal(toilet.x, 1.5);
+  assert.deepEqual(result.tight, []);
+  // Where there isn't (a 2.6 ft wide room), the 15 in. minimum still fits.
+  var narrow = L.computeLayout({ widthFt: 2.6, lengthFt: 5, fixtureCounts: { Toilet_Quantity: 1 } });
+  assert.equal(narrow.placements[0].x, 1.25);
+});
+
+test("computeLayout: a fixture with less than the recommended room fits, but is listed as tight", () => {
+  // A standard 5x8 ft bath: the vanity sits right beside the toilet.
+  var bath = L.computeLayout({
+    widthFt: 5,
+    lengthFt: 8,
+    fixtureCounts: { Toilet_Quantity: 1, Bathtub_Quantity: 1, Vanity_Quantity: 1 },
+  });
+  assert.deepEqual(bath.droppedCounts, {});
+  assert.deepEqual(bath.tight, [{ fixtureKey: "Toilet_Quantity", index: 0, sideIn: 15, frontIn: null }]);
+  // A 4x6 ft room: 25 in. in front of the toilet and the vanity, not 30.
+  var small = L.computeLayout({ widthFt: 4, lengthFt: 6, fixtureCounts: { Toilet_Quantity: 1, Vanity_Quantity: 1 } });
+  assert.deepEqual(
+    small.tight.map((t) => [t.fixtureKey, t.sideIn, t.frontIn]),
+    [
+      ["Toilet_Quantity", null, 25],
+      ["Vanity_Quantity", null, 25],
+    ],
+  );
+  // A roomy 8x10 has nothing tight.
+  var roomy = L.computeLayout({ widthFt: 8, lengthFt: 10, fixtureCounts: { Toilet_Quantity: 1, Vanity_Quantity: 1 } });
+  assert.deepEqual(roomy.tight, []);
+});
+
+test("computeLayout: a door's swing keeps 30 in. clear, the width of the door", () => {
+  assert.equal(L.CLEARANCE_IN.Door_Quantity.front, 30);
+  // A 4.2 ft room has 24 in. between a vanity and the door across from it,
+  // not 30, so a vanity dragged there is placed somewhere else.
+  var r = L.computeLayout({
+    widthFt: 4.2,
+    lengthFt: 8,
+    fixtureCounts: { Vanity_Quantity: 1 },
+    entryPoints: [{ wallId: "W", offsetFt: 4, hasDoor: true }],
+    fixturePositions: { Vanity_Quantity: { 0: { wallId: "E", offsetFt: 4 } } },
+  });
+  var vanity = r.placements.filter((p) => p.fixtureKey === "Vanity_Quantity")[0];
+  assert.ok(vanity);
+  assert.ok(!vanity.moved);
 });
 
 test("CLEARANCE_IN exposes representative code-minimum side/front clearances for every floor-standing fixture", () => {
@@ -184,6 +228,75 @@ test("computeLayout: shower door pairs with the shower of the same index, extra 
   var shower = result.placements.filter((p) => p.fixtureKey === "Shower_Quantity")[0];
   assert.equal(doors[0].x, shower.x);
   assert.equal(doors[0].z, shower.z);
+});
+
+test("computeLayout: a toilet and a tub or shower share one plumbing wall when it's long enough", () => {
+  // Packed side by side, the second fixture's envelope starts exactly where
+  // the toilet's ends; floating-point error used to read that as overlap.
+  for (const other of ["Bathtub_Quantity", "Shower_Quantity"]) {
+    for (const widthFt of [8, 10, 12]) {
+      var result = L.computeLayout({
+        widthFt,
+        lengthFt: 10,
+        fixtureCounts: { Toilet_Quantity: 1, [other]: 1 },
+        plumbingWallIds: ["N"],
+      });
+      assert.deepEqual(result.droppedCounts, {}, other + " in a " + widthFt + " ft room");
+      assert.ok(result.placements.every((p) => p.wallId === "N"));
+    }
+  }
+});
+
+test("computeLayout: a fixture dragged to a spot stays there, and one that no longer fits goes back to automatic", () => {
+  var base = { widthFt: 12, lengthFt: 10, fixtureCounts: { Toilet_Quantity: 1, Vanity_Quantity: 1 } };
+  var moved = L.computeLayout(
+    Object.assign({}, base, { fixturePositions: { Vanity_Quantity: { 0: { wallId: "S", offsetFt: 6 } } } }),
+  );
+  var vanity = moved.placements.filter((p) => p.fixtureKey === "Vanity_Quantity")[0];
+  assert.equal(vanity.wallId, "S");
+  assert.equal(vanity.offsetFt, 6);
+  assert.equal(vanity.moved, true);
+  // On top of the toilet, itself dragged there: ignored, placed
+  // automatically instead.
+  var clash = L.computeLayout(
+    Object.assign({}, base, {
+      fixturePositions: {
+        Toilet_Quantity: { 0: { wallId: "N", offsetFt: 1.25 } },
+        Vanity_Quantity: { 0: { wallId: "N", offsetFt: 1.5 } },
+      },
+    }),
+  );
+  var auto = clash.placements.filter((p) => p.fixtureKey === "Vanity_Quantity")[0];
+  assert.ok(auto && !auto.moved);
+  assert.deepEqual(clash.droppedCounts, {});
+  // Not on a plumbing wall: ignored too.
+  var dry = L.computeLayout(
+    Object.assign({}, base, {
+      plumbingWallIds: ["N"],
+      fixturePositions: { Vanity_Quantity: { 0: { wallId: "S", offsetFt: 6 } } },
+    }),
+  );
+  assert.equal(dry.placements.filter((p) => p.fixtureKey === "Vanity_Quantity")[0].wallId, "N");
+});
+
+test("computeLayout: a vanity only goes on a plumbing wall", () => {
+  var result = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    fixtureCounts: { Vanity_Quantity: 1 },
+    plumbingWallIds: ["E"],
+  });
+  assert.equal(result.placements[0].wallId, "E");
+});
+
+test("computeLayout: a shower door sits at the open edge of a resized shower", () => {
+  var base = { widthFt: 10, lengthFt: 8, fixtureCounts: { Shower_Quantity: 1, Shower_Door_Quantity: 1 } };
+  var door = (layout) => layout.placements.filter((p) => p.fixtureKey === "Shower_Door_Quantity")[0];
+  assert.equal(door(L.computeLayout(base)).depthOffset, L.FIXTURE_LAYOUT.Shower_Quantity.depth);
+  var resized = L.computeLayout(
+    Object.assign({}, base, { footprints: { Shower_Quantity: { wallSpan: 5.05, depth: 2.7 } } }),
+  );
+  assert.equal(door(resized).depthOffset, 2.7);
 });
 
 test("computeLayout: extra showers with no matching door simply get none", () => {
@@ -294,7 +407,7 @@ test("demolition has no fixture-layout or finish-color entry point, same convent
 test("PLUMBING_FIXTURE_KEYS exposes exactly the fixtures that need to be on a plumbing wall", () => {
   assert.deepEqual(
     L.PLUMBING_FIXTURE_KEYS.slice().sort(),
-    ["Bathtub_Quantity", "Shower_Quantity", "Sink_Quantity", "Toilet_Quantity"].sort(),
+    ["Bathtub_Quantity", "Shower_Quantity", "Sink_Quantity", "Toilet_Quantity", "Vanity_Quantity"].sort(),
   );
 });
 
@@ -545,4 +658,133 @@ test("computeLayout ignores malformed footprint overrides, keeping the default s
       assert.equal(JSON.stringify(L.computeLayout(Object.assign({}, base, { footprints }))), expected);
     },
   );
+});
+
+const FULL_BATH = { Toilet_Quantity: 1, Bathtub_Quantity: 1, Vanity_Quantity: 1 };
+
+test("computeLayout: a standard 5x8 ft full bath (tub, toilet, vanity, door) fits whichever way round the room is typed", () => {
+  [
+    [5, 8],
+    [8, 5],
+    [5, 9],
+  ].forEach(([widthFt, lengthFt]) => {
+    const r = L.computeLayout({
+      widthFt,
+      lengthFt,
+      fixtureCounts: Object.assign({ Door_Quantity: 1, Mirror_Quantity: 1 }, FULL_BATH),
+    });
+    assert.deepEqual(r.droppedCounts, {}, `${widthFt}x${lengthFt}`);
+  });
+});
+
+test("computeLayout: in a 5x8 ft room the full bath still fits with the door picked on a long wall", () => {
+  ["E", "W"].forEach((wallId) => {
+    const r = L.computeLayout({
+      widthFt: 5,
+      lengthFt: 8,
+      fixtureCounts: FULL_BATH,
+      entryPoints: [{ wallId, offsetFt: 5.25, hasDoor: true }],
+    });
+    assert.deepEqual(r.droppedCounts, {}, wallId);
+  });
+});
+
+test("computeLayout: a 60 in. tub fills a 5 ft alcove wall exactly", () => {
+  const r = L.computeLayout({ widthFt: 5, lengthFt: 6, fixtureCounts: { Bathtub_Quantity: 1 } });
+  assert.deepEqual(r.droppedCounts, {});
+});
+
+test("computeLayout: clear floor spaces may overlap, but nothing stands in front of a toilet", () => {
+  // 4 ft deep: a vanity facing the toilet from the opposite wall would sit
+  // inside the toilet's 21 in. clear space, so only one of them fits.
+  const facing = L.computeLayout({
+    widthFt: 2.5,
+    lengthFt: 5,
+    fixtureCounts: { Toilet_Quantity: 1, Vanity_Quantity: 1 },
+  });
+  assert.equal(Object.keys(facing.droppedCounts).length, 1);
+  // Side by side on one wall, their clear spaces share the same floor.
+  const sideBySide = L.computeLayout({
+    widthFt: 5,
+    lengthFt: 4.7,
+    fixtureCounts: { Toilet_Quantity: 1, Vanity_Quantity: 1 },
+  });
+  assert.deepEqual(sideBySide.droppedCounts, {});
+});
+
+test("computeLayout: a tub keeps at least a 30 in. stretch of clear floor along its front", () => {
+  // Cabinets fill every spot they can around a 5x6 ft room with a tub, but
+  // never the whole 21 in. deep strip in front of the tub.
+  const widthFt = 5;
+  const lengthFt = 6;
+  const r = L.computeLayout({ widthFt, lengthFt, fixtureCounts: { Bathtub_Quantity: 1, Cabinet_Quantity: 6 } });
+  const tub = r.placements.find((p) => p.fixtureKey === "Bathtub_Quantity");
+  assert.ok(tub);
+  const tubDepth = L.FIXTURE_LAYOUT.Bathtub_Quantity.depth;
+  const front = L.CLEARANCE_IN.Bathtub_Quantity.front / 12;
+  const alongX = tub.wallId === "N" || tub.wallId === "S";
+  const fromWall = (p) => ({ N: p.z, S: lengthFt - p.z, W: p.x, E: widthFt - p.x })[tub.wallId];
+  const cab = L.FIXTURE_LAYOUT.Cabinet_Quantity;
+  // Along-wall stretches the cabinets' bodies cover inside the strip.
+  const covered = r.placements
+    .filter((p) => p.fixtureKey === "Cabinet_Quantity")
+    .map((p) => {
+      const sameAxis = p.wallId === tub.wallId || p.wallId === { N: "S", S: "N", E: "W", W: "E" }[tub.wallId];
+      const half = sameAxis ? cab.wallSpan / 2 : cab.depth / 2;
+      const center = alongX ? p.x : p.z;
+      const near = sameAxis ? fromWall(p) - (p.wallId === tub.wallId ? 0 : cab.depth) : fromWall(p) - cab.wallSpan / 2;
+      const far = near + (sameAxis ? cab.depth : cab.wallSpan);
+      const inStrip = far > tubDepth && near < tubDepth + front;
+      return inStrip ? [center - half, center + half] : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a[0] - b[0]);
+  const tubCenter = alongX ? tub.x : tub.z;
+  const tubHalf = L.FIXTURE_LAYOUT.Bathtub_Quantity.wallSpan / 2;
+  let cursor = tubCenter - tubHalf;
+  let widest = 0;
+  covered.forEach(([a, b]) => {
+    widest = Math.max(widest, a - cursor);
+    cursor = Math.max(cursor, b);
+  });
+  widest = Math.max(widest, tubCenter + tubHalf - cursor);
+  assert.ok(widest >= 2.5 - 1e-6, `widest clear stretch ${widest} ft`);
+});
+
+test("computeLayout: a mirror and a large mirror never hang on the same vanity", () => {
+  const one = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    fixtureCounts: { Vanity_Quantity: 1, Mirror_Quantity: 1, Mirror_Huge_Quantity: 1 },
+  });
+  assert.equal(one.droppedCounts.Mirror_Huge_Quantity, 1);
+  // With a pedestal sink as well, the large mirror goes over the sink.
+  const two = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    fixtureCounts: { Vanity_Quantity: 1, Sink_Quantity: 1, Mirror_Quantity: 1, Mirror_Huge_Quantity: 1 },
+  });
+  assert.deepEqual(two.droppedCounts, {});
+  const huge = two.placements.find((p) => p.fixtureKey === "Mirror_Huge_Quantity");
+  assert.equal(huge.attachedTo.fixtureKey, "Sink_Quantity");
+});
+
+test("computeLayout: a fixture taller than the ceiling doesn't fit", () => {
+  const low = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    heightFt: 6,
+    fixtureCounts: { Shower_Quantity: 1, Door_Quantity: 1, Toilet_Quantity: 1 },
+  });
+  assert.deepEqual(low.droppedCounts, { Shower_Quantity: 1, Door_Quantity: 1 });
+  const normal = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    heightFt: 8,
+    fixtureCounts: { Shower_Quantity: 1, Door_Quantity: 1, Toilet_Quantity: 1 },
+  });
+  assert.deepEqual(normal.droppedCounts, {});
+  // No ceiling given: unchanged.
+  const unknown = L.computeLayout({ widthFt: 10, lengthFt: 8, fixtureCounts: { Shower_Quantity: 1 } });
+  assert.deepEqual(unknown.droppedCounts, {});
 });
