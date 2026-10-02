@@ -393,6 +393,26 @@ document.addEventListener("DOMContentLoaded", function () {
       return /^\s*\d+,\d+\s*$/.test(text) ? text.replace(",", ".") : text;
     }
 
+    // A Back button for the room steps (scope, size, plumbing walls, entry
+    // points, fixtures): it locks this step and shows the one before,
+    // filled in with the answers already given, so a too-small room or a
+    // wrong count can be fixed without starting over. onLeave tidies up
+    // the step being left (e.g. stops wall picking).
+    function backButton(onLeave) {
+      if (!quoteState || quoteState.index === 0) return null;
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ai-chat-group-cancel";
+      btn.textContent = T("flow.back");
+      btn.addEventListener("click", function () {
+        if (onLeave) onLeave();
+        quoteState.index--;
+        setProgress(Math.round((quoteState.index / quoteState.groups.length) * 100));
+        appendGroupForm();
+      });
+      return btn;
+    }
+
     function appendGroupForm() {
       var group = quoteState.groups[quoteState.index];
       if (group.id === "plumbing-walls") {
@@ -449,7 +469,13 @@ document.addEventListener("DOMContentLoaded", function () {
             btn.type = "button";
             btn.className = "ai-chat-choice";
             btn.textContent = option.label;
-            btn.setAttribute("aria-pressed", "false");
+            // Back from a later step: the answer already given stays picked.
+            var wasChosen =
+              Object.prototype.hasOwnProperty.call(quoteState.scope, field.key) &&
+              quoteState.scope[field.key] === option.value;
+            if (wasChosen) chosen = option;
+            btn.classList.toggle("selected", wasChosen);
+            btn.setAttribute("aria-pressed", wasChosen ? "true" : "false");
             btn.addEventListener("click", function () {
               chosen = option;
               buttons.forEach(function (other) {
@@ -477,6 +503,7 @@ document.addEventListener("DOMContentLoaded", function () {
           input.placeholder = "0";
           input.id = fieldId;
           input.name = field.key;
+          if (quoteState.values[field.key] != null) input.value = String(quoteState.values[field.key]);
           input.setAttribute("aria-describedby", errorEl.id);
           labelEl.htmlFor = fieldId;
           fieldWrap.appendChild(input);
@@ -526,7 +553,9 @@ document.addEventListener("DOMContentLoaded", function () {
       continueBtn.className = "ai-chat-group-continue";
       var isLast = quoteState.index === quoteState.groups.length - 1 && group.id !== "scope";
       continueBtn.textContent = T(isLast ? "flow.getEstimate" : "flow.continue");
+      var backBtn = backButton(disableForm);
       actionsWrap.appendChild(cancelBtn);
+      if (backBtn) actionsWrap.appendChild(backBtn);
       actionsWrap.appendChild(continueBtn);
       formEl.appendChild(actionsWrap);
 
@@ -615,7 +644,12 @@ document.addEventListener("DOMContentLoaded", function () {
       continueBtn.className = "ai-chat-group-continue";
       continueBtn.textContent = T("flow.continue");
       continueBtn.disabled = true;
+      var backBtn = backButton(function () {
+        disableActions();
+        window.BathroomRoom3D.endWallPicking();
+      });
       actionsWrap.appendChild(cancelBtn);
+      if (backBtn) actionsWrap.appendChild(backBtn);
       actionsWrap.appendChild(skipBtn);
       actionsWrap.appendChild(continueBtn);
       content.appendChild(actionsWrap);
@@ -627,6 +661,7 @@ document.addEventListener("DOMContentLoaded", function () {
         cancelBtn.disabled = true;
         skipBtn.disabled = true;
         continueBtn.disabled = true;
+        if (backBtn) backBtn.disabled = true;
       }
 
       var selectedIds = [];
@@ -648,6 +683,8 @@ document.addEventListener("DOMContentLoaded", function () {
         finish(selectedIds);
       });
 
+      // Back here from a later step: pick the walls afresh.
+      window.BathroomRoom3D.setPlumbingWalls([]);
       window.BathroomRoom3D.beginWallPicking("multi", function (ids) {
         selectedIds = ids;
         continueBtn.disabled = ids.length === 0;
@@ -698,11 +735,17 @@ document.addEventListener("DOMContentLoaded", function () {
       continueBtn.type = "submit";
       continueBtn.className = "ai-chat-group-continue";
       continueBtn.textContent = T("flow.continue");
+      var backBtn = backButton(function () {
+        disableAll(content);
+      });
       actionsWrap.appendChild(cancelBtn);
+      if (backBtn) actionsWrap.appendChild(backBtn);
       actionsWrap.appendChild(skipBtn);
       actionsWrap.appendChild(continueBtn);
       formEl.appendChild(actionsWrap);
       content.appendChild(formEl);
+      // Back here from a later step: place the entry points afresh.
+      while (window.BathroomRoom3D.getEntryPoints().length) window.BathroomRoom3D.removeEntryPoint(0);
       parts.inner.appendChild(content);
       chatMessages.appendChild(parts.row);
       scrollToEnd();

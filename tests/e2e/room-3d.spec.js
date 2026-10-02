@@ -349,3 +349,49 @@ test.describe("3D room preview: wall-click plumbing walls, entry points, walk-in
     await expect(page.locator("#ai-chat-form")).toBeVisible();
   });
 });
+
+test.describe("going back a step", () => {
+  test("a room too small for its fixtures can be made bigger with Back, keeping every answer", async ({ page }) => {
+    await disableMaterials(page);
+    await startEstimate(page);
+    await answerScope(page, NEEDS_WALLS);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 4, Bathroom_Length_Ft: 4, Bathroom_Height_Ft: 8 });
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Toilet_Quantity: 1, Bathtub_Quantity: 1, Vanity_Quantity: 1 });
+    await expect(page.locator(".ai-chat-group-error").last()).toBeVisible();
+
+    // Back through the fixtures, entry points and plumbing walls steps to the size.
+    const back = () => page.getByRole("button", { name: "← Back" }).last().click();
+    await back();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "How many entry points" })).toHaveCount(2);
+    await back();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "carry the plumbing stack" })).toHaveCount(2);
+    await back();
+    const dims = page.locator('form[data-group="dimensions"]').last();
+    await expect(dims.locator('input[name="Bathroom_Width_Ft"]')).toHaveValue("4");
+    await expect(dims.locator('input[name="Bathroom_Height_Ft"]')).toHaveValue("8");
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8 });
+    await skipRoomInteractionSteps(page);
+
+    // The fixture counts come back filled in, and now they fit.
+    const fixtures = page.locator('form[data-group="fixtures"]').last();
+    await expect(fixtures.locator('input[name="Bathtub_Quantity"]')).toHaveValue("1");
+    await fixtures.locator(".ai-chat-group-continue").click();
+    await expect(page.getByTestId("estimate-card")).toBeVisible();
+    await expect(page.getByTestId("estimate-card")).toContainText("Tile");
+  });
+
+  test("the first step has no Back, and Back on the size keeps the scope answers", async ({ page }) => {
+    await startEstimate(page);
+    await expect(page.getByRole("button", { name: "← Back" })).toHaveCount(0);
+    await answerScope(page, NEEDS_WALLS);
+    await page.getByRole("button", { name: "← Back" }).last().click();
+    const scope = page.locator('form[data-group="scope"]').last();
+    await expect(scope.getByRole("button", { name: "Tile (full height)", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await scope.getByRole("button", { name: /Continue/ }).click();
+    await expect(page.locator('form[data-group="dimensions"]').last()).toBeVisible();
+  });
+});

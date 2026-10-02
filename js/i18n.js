@@ -438,6 +438,7 @@
     "flow.cancel": ["Cancel", "Cancelar", "Cancelar"],
     "flow.continue": ["Continue →", "Continuar →", "Continuar →"],
     "flow.skip": ["Skip", "Omitir", "Pular"],
+    "flow.back": ["← Back", "← Atrás", "← Voltar"],
     "flow.getEstimate": ["Get My Estimate →", "Ver mi estimación →", "Ver minha estimativa →"],
     "flow.seeEstimate": ["See My Estimate →", "Ver mi estimación →", "Ver minha estimativa →"],
     "flow.doesNotFit": [
