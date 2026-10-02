@@ -1,4 +1,4 @@
-// Premium Restoration — internal bathroom quoting tool.
+// Eddys Remodeling — internal bathroom quoting tool.
 //
 // SECURITY NOTE: the password gate is client-side only (there is no
 // backend). Anyone who reads this file can find the password and skip the
@@ -609,7 +609,7 @@
     };
     downloadBlob(
       new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }),
-      "premium-restoration-quotes-" + new Date().toISOString().slice(0, 10) + ".json",
+      "eddys-remodeling-quotes-" + new Date().toISOString().slice(0, 10) + ".json",
     );
     toast("Exported " + quotes.length + (quotes.length === 1 ? " quote." : " quotes."));
   }
@@ -744,7 +744,7 @@
             { title: "What this estimate assumes", items: Pricing.estimateAssumptions(values, scope, result) },
           ],
           footer: {
-            business: "Premium Restoration, operated by an individual (not a registered company)",
+            business: "Eddys Remodeling, a Utah limited liability company",
             phone: PHONE,
             email: EMAIL,
             date: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),

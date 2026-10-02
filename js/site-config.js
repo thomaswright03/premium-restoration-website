@@ -1,4 +1,4 @@
-// Premium Restoration — site settings loader.
+// Eddys Remodeling — site settings loader.
 //
 // Reads /site-config.json (the one place for owner-editable settings, see
 // README "Site settings") and applies it to the page:

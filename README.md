@@ -1,6 +1,6 @@
-# Premium Restoration — Website
+# Eddys Remodeling — Website
 
-The website for Premium Restoration, a bathroom-restoration business. Plain HTML/CSS/JS: **no build step and no framework**, so it is easy to hand off, edit and deploy. It is hosted on Vercel as a static site.
+The website for Eddys Remodeling, a bathroom-restoration business. Plain HTML/CSS/JS: **no build step and no framework**, so it is easy to hand off, edit and deploy. It is hosted on Vercel as a static site.
 
 It has three parts:
 
@@ -77,7 +77,7 @@ If you can't see the change after two minutes, check the deployment on the Verce
 | `leadForm.endpoint`          | Blank = the Get a Quote form opens the visitor's email app (current behaviour). An `https://` address of a form service (e.g. Formspree `https://formspree.io/f/xxxxxxx`) = the form sends the request directly (see "Contact / lead form").                                                                                                              |
 | `leadForm.serviceName`       | Name of that form service, shown on the form and in the Privacy Notice (e.g. `"Formspree"`).                                                                                                                                                                                                                                                              |
 | `leadForm.servicePrivacyUrl` | Optional `https://` link to the form service's privacy policy, linked from the Privacy Notice.                                                                                                                                                                                                                                                            |
-| `owner.legalName`            | The owner's legal name. Blank = footers, Privacy Notice, Terms and the PDF say "operated by an individual" with no name (never a bracketed placeholder).                                                                                                                                                                                                  |
+| `owner.legalName`            | The LLC's registered legal name (e.g. "Eddy's Remodeling LLC"). Filled in = shown in brackets after "Eddys Remodeling" in footers, Privacy Notice, Terms and the PDF. Blank = left out (never a bracketed placeholder).                                                                                                                                   |
 | `owner.contactAddress`       | Contact address. Blank = the sentence is left out.                                                                                                                                                                                                                                                                                                        |
 | `privacy.responsePeriod`     | e.g. `"30 days"`. Blank = the Privacy Notice leaves out "and we will respond within …".                                                                                                                                                                                                                                                                   |
 
@@ -192,7 +192,7 @@ There is no licence number, so no licence line appears anywhere. Only if a licen
 
 ## Business identity
 
-Premium Restoration is currently an **unregistered business run by one individual**: no LLC or other entity, no registered business name and no registered address. The Privacy Notice, Terms, every footer and the PDF say this. The owner's name and address come from `site-config.json` (`owner.legalName`, `owner.contactAddress`) and are shown only once filled in. If the business is registered later, update the "unregistered" wording on `privacy.html`, `terms.html`, `scripts/partials/footer.html` and the PDF footers at once.
+Eddys Remodeling is a **Utah limited liability company** (LLC). The Privacy Notice, Terms, every footer and the PDF say this. The registered legal name and address come from `site-config.json` (`owner.legalName`, `owner.contactAddress`) and are shown only once filled in. If the business details change, update `privacy.html`, `terms.html`, `scripts/partials/footer.html` and the PDF footers (`card.business` in `js/i18n.js`, and `js/admin.js`) at once, in all three languages.
 
 ## Contact / lead form
 
@@ -275,7 +275,7 @@ Phone **(385) 356-8733** and email **eduardo.moroni77@gmail.com** appear in `scr
 
 These are decisions or facts only the owner can supply. Until then, the site leaves the related text out rather than showing a placeholder.
 
-- **Legal name** of the owner → `owner.legalName` in `site-config.json`.
+- **Registered legal name** of the LLC → `owner.legalName` in `site-config.json`.
 - **Contact address** → `owner.contactAddress`.
 - **Privacy-request response period** (e.g. "30 days") → `privacy.responsePeriod`.
 - **Customer-record retention period** → then un-comment the wording in `privacy.html`.

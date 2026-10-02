@@ -1,4 +1,4 @@
-// Premium Restoration — languages: English, Spanish and Brazilian Portuguese.
+// Eddys Remodeling — languages: English, Spanish and Brazilian Portuguese.
 //
 // The page text itself is translated in the HTML (es/*.html, pt/*.html; see
 // README "Languages"). This file holds every piece of text the site's
@@ -621,14 +621,14 @@
     "card.exportPdf": ["Export as PDF", "Descargar en PDF", "Baixar em PDF"],
     "card.contactCta": ["Contact Us About This →", "Contáctenos sobre esto →", "Fale conosco sobre isto →"],
     "card.business": [
-      "Premium Restoration, operated by an individual (not a registered company)",
-      "Premium Restoration, operado por una persona física (no una empresa registrada)",
-      "Premium Restoration, operado por uma pessoa física (não é uma empresa registrada)",
+      "Eddys Remodeling, a Utah limited liability company",
+      "Eddys Remodeling, compañía de responsabilidad limitada (LLC) de Utah",
+      "Eddys Remodeling, sociedade de responsabilidade limitada (LLC) de Utah",
     ],
     "card.businessNamed": [
-      "Premium Restoration, operated by {name}, an individual (not a registered company)",
-      "Premium Restoration, operado por {name}, una persona física (no una empresa registrada)",
-      "Premium Restoration, operado por {name}, uma pessoa física (não é uma empresa registrada)",
+      "Eddys Remodeling ({name}), a Utah limited liability company",
+      "Eddys Remodeling ({name}), compañía de responsabilidad limitada (LLC) de Utah",
+      "Eddys Remodeling ({name}), sociedade de responsabilidade limitada (LLC) de Utah",
     ],
     "summary.materials": [
       "Materials picked (real current Home Depot prices):",

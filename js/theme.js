@@ -1,4 +1,4 @@
-// Premium Restoration — Light / Dark / System colour theme switch.
+// Eddys Remodeling — Light / Dark / System colour theme switch.
 //
 // The choice is saved in this browser (localStorage "pr_theme"). "System"
 // (the default) follows the device's setting. A tiny inline script in each

@@ -2,7 +2,7 @@
   "name": "premium-restoration-website",
   "version": "1.0.0",
   "private": true,
-  "description": "Premium Restoration static website (plain HTML/CSS/JS, no build step).",
+  "description": "Eddys Remodeling static website (plain HTML/CSS/JS, no build step).",
   "scripts": {
     "serve": "node scripts/serve.mjs",
     "lint": "eslint --max-warnings=0 .",

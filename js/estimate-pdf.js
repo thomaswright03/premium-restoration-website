@@ -1,4 +1,4 @@
-// Premium Restoration — estimate PDF builder, shared by the public chat
+// Eddys Remodeling — estimate PDF builder, shared by the public chat
 // estimate (js/script.js) and the admin quote export (js/admin.js).
 //
 // jsPDF is self-hosted (js/vendor/jspdf.umd.min.js, MIT licence) and only
@@ -90,7 +90,7 @@
     doc.setFont("times", "bold");
     doc.setFontSize(20);
     doc.setTextColor(20);
-    doc.text("Premium Restoration", left, y);
+    doc.text("Eddys Remodeling", left, y);
     y += 22;
     paragraph(spec.title, 13, 80, "normal", 2);
     if (spec.preparedFor) paragraph(T("pdf.preparedFor", { name: spec.preparedFor }), 11, 60, "normal", 2);
@@ -183,7 +183,7 @@
       doc.setTextColor(90);
       doc.text(T("pdf.generated", { date: f.date }) + "  •  " + f.phone + "  •  " + f.email, left, pageHeight - 38);
       doc.text(T("pdf.page", { i: i, n: total }), right, pageHeight - 38, { align: "right" });
-      doc.text(doc.splitTextToSize(f.business || "Premium Restoration", width)[0], left, pageHeight - 26);
+      doc.text(doc.splitTextToSize(f.business || "Eddys Remodeling", width)[0], left, pageHeight - 26);
     }
     return doc;
   }
