@@ -3503,7 +3503,9 @@ window.BathroomRoom3D = {
   // What to price: one item per showing product slot of each placed
   // fixture, with the Kohler model numbers it puts in the room and how many
   // of that fixture are placed. [{ groupId, slotId, slotLabel, optionId,
-  // productLabel, mmns: [...], qty }]
+  // productLabel, mmns: [...], qty }]. A stand-in with no Kohler product
+  // (the glass enclosure, the plain shower door) comes with no mmns, so the
+  // estimate can say it isn't priced instead of leaving it out silently.
   getProductPricingItems: function () {
     var cur = currentLayout();
     var sel = selectedProducts();
@@ -3512,7 +3514,7 @@ window.BathroomRoom3D = {
       if (!slotShown(slot, cur.placedKeys, sel)) return;
       var opt = sel[slot.id];
       var mmns = optionMmns(slot, opt, sel);
-      if (!mmns.length) return;
+      if (!mmns.length && (opt.id === "none" || slot.id === "showerWalls")) return;
       var qty = cur.layout.placements.filter(function (p) {
         return p.fixtureKey === slot.fixtureKey && !(slot.skip && slot.skip(p));
       }).length;

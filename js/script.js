@@ -1102,6 +1102,7 @@ document.addEventListener("DOMContentLoaded", function () {
           materialsSubtotal,
           grandTotal,
           hasMaterials,
+          notes,
         );
       });
       actions.appendChild(exportBtn);
@@ -1112,7 +1113,7 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
           sessionStorage.setItem(
             "pr_estimate_summary",
-            buildCombinedSummary(values, scope, result, pickList, materialsSubtotal, grandTotal),
+            buildCombinedSummary(values, scope, result, pickList, materialsSubtotal, grandTotal, notes),
           );
         } catch (e) {
           /* storage blocked: the contact form just starts empty */
@@ -1129,7 +1130,7 @@ document.addEventListener("DOMContentLoaded", function () {
       chatInput.focus({ preventScroll: true });
     }
 
-    function buildCombinedSummary(values, scope, result, pickList, materialsSubtotal, grandTotal) {
+    function buildCombinedSummary(values, scope, result, pickList, materialsSubtotal, grandTotal, notes) {
       var out = [Pricing.buildEstimateSummary(values, scope, result)];
       if (pickList.length) {
         out.push("");
@@ -1139,6 +1140,14 @@ document.addEventListener("DOMContentLoaded", function () {
         });
         out.push(T("summary.materialsSubtotal", { total: Pricing.money(materialsSubtotal) }));
         out.push(T("summary.grandTotal", { total: Pricing.money(grandTotal) }));
+      }
+      // What isn't priced (no Home Depot price, the vanity cabinet, the
+      // valves) goes along too, so the total isn't read as complete.
+      if (notes && notes.length) {
+        out.push("");
+        notes.forEach(function (note) {
+          out.push(note);
+        });
       }
       return out.join("\n");
     }
@@ -1152,6 +1161,7 @@ document.addEventListener("DOMContentLoaded", function () {
       materialsSubtotal,
       grandTotal,
       hasMaterials,
+      notes,
     ) {
       if (button.disabled) return;
       var label = button.textContent;
@@ -1204,9 +1214,9 @@ document.addEventListener("DOMContentLoaded", function () {
             lines: lines,
             excluded: excludedLines(fixtureCount, hasMaterials),
             totals: totals,
-            afterTotal: (fixtureCount > 0 ? [plumbingTotalNote(fixtureCount)] : []).concat([
-              estimateDisclaimer(hasMaterials),
-            ]),
+            afterTotal: (notes || [])
+              .concat(fixtureCount > 0 ? [plumbingTotalNote(fixtureCount)] : [])
+              .concat([estimateDisclaimer(hasMaterials)]),
             sections: sections,
             footer: {
               business: businessLine(),
@@ -1546,7 +1556,10 @@ document.addEventListener("DOMContentLoaded", function () {
       var pricedSignature = JSON.stringify(items);
       var run = flowRun;
       var mmns = [];
-      items.forEach(function (item) {
+      var priceable = items.filter(function (item) {
+        return item.mmns.length > 0;
+      });
+      priceable.forEach(function (item) {
         item.mmns.forEach(function (m) {
           if (mmns.indexOf(m) === -1) mmns.push(m);
         });
@@ -1567,7 +1580,7 @@ document.addEventListener("DOMContentLoaded", function () {
             return results[m] && typeof results[m].price === "number" ? results[m] : null;
           });
           var label = item.slotLabel + ": " + item.productLabel;
-          if (prices.indexOf(null) !== -1) {
+          if (!prices.length || prices.indexOf(null) !== -1) {
             unpriced.push(label);
             return;
           }
@@ -1592,6 +1605,10 @@ document.addEventListener("DOMContentLoaded", function () {
           return item.groupId === "vanity";
         });
         if (hasVanity) notes.push(T("products.vanityCabinet"));
+        var hasValveTrim = priceable.some(function (item) {
+          return item.slotId === "showerValve" || item.slotId === "tubValve";
+        });
+        if (hasValveTrim) notes.push(T("products.valveNotIncluded"));
         finishEstimate(state.values, state.scope, state.laborResult, categories, state.picks, notes);
         if (run === flowRun) offerRepriceOnChange(state, pricedSignature);
       });

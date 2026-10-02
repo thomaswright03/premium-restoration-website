@@ -336,6 +336,17 @@ test.describe("the merged fixtures + real-product-pick flow", () => {
     expect(pdf).toContain("Materials Subtotal");
     // jsPDF escapes parentheses as \( \) inside its own PDF text strings.
     expect(pdf).toContain("Estimated Total \\(Labor + Materials\\), before plumbing");
+    // What isn't priced goes on the PDF too, not only the card.
+    await expect(card).toContainText("the valve inside the wall is extra");
+    expect(pdf).toContain("the valve inside the wall is extra");
+    expect(pdf).toContain("Paper holder: Purist pivoting holder");
+
+    // And to the quote form with "Contact Us About This".
+    await card.getByRole("link", { name: /Contact Us About This/i }).click();
+    await page.waitForURL(/contact\.html/);
+    const summary = await page.evaluate(() => sessionStorage.getItem("pr_estimate_summary"));
+    expect(summary).toContain("so they aren't in the total: Paper holder: Purist pivoting holder.");
+    expect(summary).toContain("the valve inside the wall is extra");
   });
 
   test("a pick made above the room shows in the chat step, and a change after the card offers an updated estimate", async ({

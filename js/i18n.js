@@ -669,6 +669,11 @@
       "El mueble del lavabo no es un producto Kohler, así que no tiene precio aquí; solo el lavabo o la cubierta y la llave.",
       "O gabinete em si não é um produto Kohler, então não tem preço aqui; só a cuba ou o tampo e a torneira.",
     ],
+    "products.valveNotIncluded": [
+      "The shower and tub valve prices are for the visible trim only; the valve inside the wall is extra.",
+      "Los precios de las válvulas de la ducha y la bañera son solo del acabado visible; la válvula dentro de la pared es aparte.",
+      "Os preços dos registros do chuveiro e da banheira são só do acabamento visível; a válvula dentro da parede é à parte.",
+    ],
     "products.roomChanged": [
       "You've changed the products in the room since this estimate, so it no longer matches.",
       "Cambió los productos de la habitación después de esta estimación, así que ya no coincide.",
