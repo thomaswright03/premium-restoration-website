@@ -1672,6 +1672,16 @@ body.ai-chat-locked {
     border-left: none;
     border-bottom: 1px solid var(--color-line);
   }
+
+  /* The room itself comes first and keeps its height; the text and the
+     product dropdowns scroll below it inside the panel. Otherwise the
+     dropdowns fill the panel and push the room out of view. */
+  .ai-chat-room-3d-canvas-wrap {
+    order: -1;
+    flex: 0 0 auto;
+    height: 26vh;
+    min-height: 150px;
+  }
 }
 
 /* Cards grid */
