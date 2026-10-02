@@ -798,6 +798,11 @@
       "La llave de la bañera ya tiene sus manijas",
       "A torneira da banheira já tem seus registros",
     ],
+    "room3d.ceilingTooLow": [
+      "Too tall for this ceiling",
+      "Demasiado alto para este techo",
+      "Alto demais para este teto",
+    ],
     "room3d.wrongHoles": [
       "Doesn't fit this sink's faucet holes",
       "No coincide con los orificios de este lavabo",

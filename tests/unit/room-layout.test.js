@@ -724,3 +724,23 @@ test("computeLayout: a mirror and a large mirror never hang on the same vanity",
   const huge = two.placements.find((p) => p.fixtureKey === "Mirror_Huge_Quantity");
   assert.equal(huge.attachedTo.fixtureKey, "Sink_Quantity");
 });
+
+test("computeLayout: a fixture taller than the ceiling doesn't fit", () => {
+  const low = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    heightFt: 6,
+    fixtureCounts: { Shower_Quantity: 1, Door_Quantity: 1, Toilet_Quantity: 1 },
+  });
+  assert.deepEqual(low.droppedCounts, { Shower_Quantity: 1, Door_Quantity: 1 });
+  const normal = L.computeLayout({
+    widthFt: 10,
+    lengthFt: 8,
+    heightFt: 8,
+    fixtureCounts: { Shower_Quantity: 1, Door_Quantity: 1, Toilet_Quantity: 1 },
+  });
+  assert.deepEqual(normal.droppedCounts, {});
+  // No ceiling given: unchanged.
+  const unknown = L.computeLayout({ widthFt: 10, lengthFt: 8, fixtureCounts: { Shower_Quantity: 1 } });
+  assert.deepEqual(unknown.droppedCounts, {});
+});

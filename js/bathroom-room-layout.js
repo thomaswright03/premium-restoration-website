@@ -448,6 +448,13 @@
     var lengthFt =
       parsedLength === null ? DEFAULT_ROOM.lengthFt : clamp(parsedLength, RENDER_MIN_DIM, DIMENSION_BOUNDS.lengthFt);
     var fixtureCounts = input.fixtureCounts || {};
+    // The ceiling, when known: a fixture taller than it (a 6 ft 9 in door, a
+    // 96 in. shower wall kit) doesn't fit, rather than poking through.
+    var parsedHeight = parseNumber(input.heightFt);
+    var ceilingFt = parsedHeight === null ? null : clamp(parsedHeight, RENDER_MIN_DIM, DIMENSION_BOUNDS.heightFt);
+    function tooTall(footprint) {
+      return ceilingFt !== null && footprint.height > ceilingFt + OVERLAP_EPS_FT;
+    }
     // Wall ids restricting the plumbing-needing fixtures (empty/omitted =
     // unrestricted, today's behavior). Multiple walls can carry the stack.
     var plumbingWallIds = Array.isArray(input.plumbingWallIds) ? input.plumbingWallIds : null;
@@ -518,7 +525,7 @@
           droppedCounts.Door_Quantity = (droppedCounts.Door_Quantity || 0) + 1;
           return;
         }
-        if (wall.span < 2 * doorHalfWidth) {
+        if (wall.span < 2 * doorHalfWidth || tooTall(doorFootprint)) {
           droppedCounts.Door_Quantity = (droppedCounts.Door_Quantity || 0) + 1;
           return;
         }
@@ -582,7 +589,7 @@
         var pos = positions[i];
         if (!pos || typeof pos.offsetFt !== "number" || !isFinite(pos.offsetFt)) continue;
         var wall = wallByIdOrder([pos.wallId])[0];
-        if (!wall || wall.span < 2 * halfWidth || depthExtent > wall.roomDepth) continue;
+        if (!wall || wall.span < 2 * halfWidth || depthExtent > wall.roomDepth || tooTall(footprint)) continue;
         if (isPlumbing && plumbingWallIds.indexOf(wall.id) === -1) continue;
         var alongOffset = clamp(pos.offsetFt, halfWidth, wall.span - halfWidth);
         var env = envelopeAt(fixtureKey, footprint, wall, alongOffset, halfWidth, depthExtent);
@@ -661,7 +668,9 @@
           }
           candidateWalls = candidateWalls.filter(function (w) {
             // depthExtent > roomDepth would poke through the opposite wall.
-            return w.span - w.used >= requiredSpan - OVERLAP_EPS_FT && depthExtent <= w.roomDepth;
+            return (
+              w.span - w.used >= requiredSpan - OVERLAP_EPS_FT && depthExtent <= w.roomDepth && !tooTall(footprint)
+            );
           });
           var chosen = null;
           var chosenRects = null;

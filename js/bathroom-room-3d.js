@@ -1201,6 +1201,11 @@ var PRODUCT_SLOTS = [
       },
       {
         id: "choreograph-96",
+        // 96 in. tall: needs at least an 8 ft ceiling.
+        available: function () {
+          return Layout.computeRoomDimensions(state.dims).heightFt >= 8;
+        },
+        unavailableReason: "room3d.ceilingTooLow",
         kit: function (base) {
           return kohlerUrl(base.wide ? "K-97615-0" : "K-97611-0");
         },
@@ -1861,6 +1866,7 @@ function currentLayout() {
   var layoutInput = {
     widthFt: dims.widthFt,
     lengthFt: dims.lengthFt,
+    heightFt: dims.heightFt,
     fixtureCounts: state.fixtures,
     plumbingWallIds: state.plumbingWallIds,
     entryPoints: state.entryPoints,
@@ -3072,6 +3078,7 @@ function rebuildFixtures(s, widthFt, lengthFt, heightFt) {
   var layoutInput = {
     widthFt: widthFt,
     lengthFt: lengthFt,
+    heightFt: heightFt,
     fixtureCounts: state.fixtures,
     plumbingWallIds: state.plumbingWallIds,
     entryPoints: state.entryPoints,
@@ -3435,6 +3442,7 @@ window.BathroomRoom3D = {
     var layoutInput = {
       widthFt: dims.widthFt,
       lengthFt: dims.lengthFt,
+      heightFt: dims.heightFt,
       fixtureCounts: fixtureCounts,
       plumbingWallIds: state.plumbingWallIds,
       entryPoints: state.entryPoints,
