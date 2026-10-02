@@ -669,6 +669,12 @@
       "El mueble del lavabo no es un producto Kohler, así que no tiene precio aquí; solo el lavabo o la cubierta y la llave.",
       "O gabinete em si não é um produto Kohler, então não tem preço aqui; só a cuba ou o tampo e a torneira.",
     ],
+    "products.roomChanged": [
+      "You've changed the products in the room since this estimate, so it no longer matches.",
+      "Cambió los productos de la habitación después de esta estimación, así que ya no coincide.",
+      "Você mudou os produtos do banheiro depois desta estimativa, então ela não corresponde mais.",
+    ],
+    "products.reprice": ["Update my estimate →", "Actualizar mi estimación →", "Atualizar minha estimativa →"],
     "materials.priceAt": ["{price} at {store}", "{price} en {store}", "{price} na {store}"],
     "materials.pickOne": [
       "Pick one option to continue.",

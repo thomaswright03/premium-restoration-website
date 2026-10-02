@@ -322,7 +322,12 @@ document.addEventListener("DOMContentLoaded", function () {
       return groups;
     }
 
+    // Bumped whenever a flow starts or is cancelled, so a listener left
+    // behind by an earlier run (see BathroomRoom3D.onChange()) knows to stop.
+    var flowRun = 0;
+
     function startEstimate() {
+      flowRun++;
       quoteState = { groups: buildGroups(null), index: 0, values: {}, scope: {} };
       pickState = null;
       chatForm.hidden = true;
@@ -340,6 +345,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // steps that follow them (pickState). Whichever is active gets cleared;
     // the other is already null.
     function cancelFlow() {
+      flowRun++;
       quoteState = null;
       pickState = null;
       if (window.BathroomRoom3D) window.BathroomRoom3D.hide();
@@ -1412,10 +1418,16 @@ document.addEventListener("DOMContentLoaded", function () {
         );
       }
 
+      function fieldsSignature() {
+        return JSON.stringify(currentGroup().slots);
+      }
+      var renderedSignature = "";
+
       // Redrawn after every pick: one pick can change what another slot
       // offers (a 36 in. base only takes pivot doors).
       function renderFields() {
         fieldsWrap.textContent = "";
+        renderedSignature = fieldsSignature();
         currentGroup().slots.forEach(function (slot) {
           var fieldWrap = el("div", "ai-chat-group-field");
           var id = "ai-chat-product-pick-" + slot.id;
@@ -1444,6 +1456,18 @@ document.addEventListener("DOMContentLoaded", function () {
         });
       }
       renderFields();
+
+      // A pick made in the switcher above the room (or one the room had to
+      // change because it no longer fits) shows here too, so these
+      // dropdowns always match what's priced.
+      var run = flowRun;
+      var stopSync = room.onChange(function () {
+        if (run !== flowRun || (continueBtn && continueBtn.disabled)) {
+          stopSync();
+          return;
+        }
+        if (fieldsSignature() !== renderedSignature) renderFields();
+      });
 
       var actionsWrap = el("div", "ai-chat-group-actions");
       var cancelBtn = el("button", "ai-chat-group-cancel", T("flow.cancel"));
@@ -1519,6 +1543,8 @@ document.addEventListener("DOMContentLoaded", function () {
     // fixture there are), and a note naming anything without one.
     function priceKohlerPicks(state) {
       var items = window.BathroomRoom3D.getProductPricingItems();
+      var pricedSignature = JSON.stringify(items);
+      var run = flowRun;
       var mmns = [];
       items.forEach(function (item) {
         item.mmns.forEach(function (m) {
@@ -1567,6 +1593,37 @@ document.addEventListener("DOMContentLoaded", function () {
         });
         if (hasVanity) notes.push(T("products.vanityCabinet"));
         finishEstimate(state.values, state.scope, state.laborResult, categories, state.picks, notes);
+        if (run === flowRun) offerRepriceOnChange(state, pricedSignature);
+      });
+    }
+
+    // The room stays live under the estimate card. If the products in it
+    // change (a different pick, a fixture moved off, a fit swap), say the
+    // card is out of date and offer to price the room as it is now.
+    function offerRepriceOnChange(state, pricedSignature) {
+      var run = flowRun;
+      var stop = window.BathroomRoom3D.onChange(function () {
+        if (run !== flowRun || quoteState || pickState) {
+          stop();
+          return;
+        }
+        if (JSON.stringify(window.BathroomRoom3D.getProductPricingItems()) === pricedSignature) return;
+        stop();
+        var parts = botRow();
+        var content = el("div", "ai-chat-text");
+        content.appendChild(el("p", "ai-chat-group-intro", T("products.roomChanged")));
+        var btn = el("button", "ai-chat-group-continue", T("products.reprice"));
+        btn.type = "button";
+        btn.addEventListener("click", function () {
+          btn.disabled = true;
+          if (run !== flowRun || quoteState || pickState) return;
+          chatForm.hidden = true;
+          priceKohlerPicks(state);
+        });
+        content.appendChild(btn);
+        parts.inner.appendChild(content);
+        chatMessages.appendChild(parts.row);
+        scrollToEnd();
       });
     }
 

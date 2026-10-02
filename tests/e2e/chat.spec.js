@@ -338,6 +338,58 @@ test.describe("the merged fixtures + real-product-pick flow", () => {
     expect(pdf).toContain("Estimated Total \\(Labor + Materials\\), before plumbing");
   });
 
+  test("a pick made above the room shows in the chat step, and a change after the card offers an updated estimate", async ({
+    page,
+  }) => {
+    await useConfig(page, { productPricing: { endpoint: "https://pricing.example.com/prices" } });
+    const asked = [];
+    await page.route("https://pricing.example.com/prices", async (route) => {
+      const cors = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      };
+      if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
+      const body = route.request().postDataJSON();
+      asked.push(body.mmns);
+      const results = {};
+      for (const mmn of body.mmns) results[mmn] = { found: true, price: 100, name: mmn, url: null };
+      return route.fulfill({
+        status: 200,
+        headers: cors,
+        contentType: "application/json",
+        body: JSON.stringify({ zip: body.zip, store: "21st South", results }),
+      });
+    });
+
+    await startEstimate(page);
+    await answerScope(page, NOTHING_BUT_FIXTURES);
+    await skipRoomInteractionSteps(page);
+    await fillGroup(page, "fixtures", { Toilet_Quantity: 1 });
+    await page.locator('input[autocomplete="postal-code"]').fill("84101");
+    await page.locator(".ai-chat-group-continue").last().click();
+    await expect(page.locator(".ai-chat-group-intro", { hasText: "Next up: Toilet." })).toBeVisible();
+
+    const switcher = page.locator("#ai-chat-room-3d-product-toilet");
+    const chatPick = page.locator("#ai-chat-product-pick-toilet");
+    const enabledOptions = await chatPick.locator("option:not([disabled])").evaluateAll((os) => os.map((o) => o.value));
+    const [first, second] = enabledOptions.filter((v) => v.startsWith("K-"));
+    await switcher.selectOption(second);
+    await expect(chatPick).toHaveValue(second);
+
+    await page.locator(".ai-chat-group-continue", { hasText: "See My Estimate" }).last().click();
+    await expect(page.getByTestId("estimate-card")).toHaveCount(1);
+    expect(asked[0]).toContain(second);
+
+    await switcher.selectOption(first);
+    const update = page.getByRole("button", { name: "Update my estimate" });
+    await expect(update).toBeVisible();
+    await update.click();
+    await expect(page.getByTestId("estimate-card")).toHaveCount(2);
+    expect(asked[1]).toContain(first);
+    await expect(page.getByTestId("estimate-card").last()).toContainText(first);
+  });
+
   test("with no pricing service, the fixtures fall back to the catalog picker and are priced", async ({ page }) => {
     await startEstimate(page);
     await answerScope(page, NOTHING_BUT_FIXTURES);

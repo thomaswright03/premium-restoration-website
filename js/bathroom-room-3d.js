@@ -3228,6 +3228,21 @@ function markDirty() {
   dirty = true;
 }
 
+// Called after every redraw of the room (a pick, a drag, new counts or
+// sizes), so the chat can keep its own dropdowns and the estimate in step
+// with what the room shows. See onChange().
+var changeListeners = [];
+
+function notifyChange() {
+  changeListeners.slice().forEach(function (fn) {
+    try {
+      fn();
+    } catch (err) {
+      console.error(err);
+    }
+  });
+}
+
 window.BathroomRoom3D = {
   available: false,
 
@@ -3250,6 +3265,7 @@ window.BathroomRoom3D = {
           rebuild();
           dirty = false;
           needsRender = true;
+          notifyChange();
         }
         if (s.cameraLerp) {
           applyCameraLerp(s);
@@ -3356,13 +3372,24 @@ window.BathroomRoom3D = {
   // result; pass null/undefined to clear back to the default color (e.g.
   // if the pick is changed to a product with no recognizable finish word).
   // The 3D product switcher (PRODUCT_SLOTS): shows optionId in slotId's
-  // place. Unknown ids are ignored. Visual only — the estimate never reads
-  // these picks.
+  // place. Unknown ids are ignored. With the Kohler picks on, these are
+  // what the estimate prices (getProductPricingItems()).
   setProductPick: function (slotId, optionId) {
     var slot = productSlot(slotId);
     if (!slot || !productOption(slot, optionId) || state.productPicks[slotId] === optionId) return;
     state.productPicks[slotId] = optionId;
     markDirty();
+  },
+
+  // Calls fn after every redraw of the room. Returns a function that stops
+  // calling it.
+  onChange: function (fn) {
+    changeListeners.push(fn);
+    return function () {
+      changeListeners = changeListeners.filter(function (other) {
+        return other !== fn;
+      });
+    };
   },
 
   getProductPicks: function () {
