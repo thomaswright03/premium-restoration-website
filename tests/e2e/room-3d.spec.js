@@ -474,3 +474,18 @@ test.describe("saved design", () => {
     await expect(page.locator(".ai-chat-saved-design")).toHaveCount(0);
   });
 });
+
+test("the room says when a fixture fits but is tight", async ({ page }) => {
+  await disableMaterials(page);
+  await startEstimate(page);
+  await answerScope(page, NEEDS_WALLS);
+  await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 5, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 });
+  await skipRoomInteractionSteps(page);
+  const fixtures = page.locator('form[data-group="fixtures"]').last();
+  const note = page.locator(".ai-chat-room-3d-tight");
+  await fixtures.locator('input[name="Toilet_Quantity"]').fill("1");
+  await expect(note).toBeHidden();
+  await fixtures.locator('input[name="Bathtub_Quantity"]').fill("1");
+  await fixtures.locator('input[name="Vanity_Quantity"]').fill("1");
+  await expect(note).toHaveText("Fits, but tight: Toilet, 15 in. beside it (18 in. recommended).");
+});

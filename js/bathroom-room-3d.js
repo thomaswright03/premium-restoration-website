@@ -2391,6 +2391,12 @@ function ensureScene() {
     dragHint.className = "ai-chat-room-3d-hint";
     dragHint.textContent = T("room3d.dragHint");
     panel.insertBefore(dragHint, wrap);
+    // "Fits, but tight" (Layout's tight list), under the canvas.
+    var tightNote = document.createElement("p");
+    tightNote.className = "ai-chat-room-3d-tight";
+    tightNote.setAttribute("role", "status");
+    tightNote.hidden = true;
+    wrap.parentNode.insertBefore(tightNote, wrap.nextSibling);
 
     // Persistent (not recreated per rebuildShell call, unlike wall geometry
     // itself) so highlight state survives a dimension change without
@@ -2563,6 +2569,7 @@ function ensureScene() {
       lastEntryPlacements: [],
       dirLight: dir,
       toiletStyleSwitch: toiletStyleSwitch,
+      tightNote: tightNote,
       cameraControls: cameraControls,
       applySize: applySize,
       cameraLerp: null, // { from, to, target, start } while animating, else null
@@ -3069,6 +3076,22 @@ function fixtureFrameBox(p, minX, maxX, minZ, maxZ) {
   };
 }
 
+// Says which placed fixtures have less room than recommended, e.g.
+// "Fits, but tight: Toilet, 15 in. beside it (18 in. recommended)."
+var TIGHT_NAMES = { Toilet_Quantity: "toilet", Sink_Quantity: "sink", Vanity_Quantity: "vanity" };
+
+function showTightNote(s, tight) {
+  if (!s.tightNote) return;
+  var parts = [];
+  tight.forEach(function (t) {
+    var name = T("room3d.group." + TIGHT_NAMES[t.fixtureKey]);
+    if (t.sideIn !== null) parts.push(T("room3d.tightSide", { fixture: name, n: t.sideIn }));
+    if (t.frontIn !== null) parts.push(T("room3d.tightFront", { fixture: name, n: t.frontIn }));
+  });
+  s.tightNote.hidden = !parts.length;
+  s.tightNote.textContent = parts.length ? T("room3d.tight", { list: parts.join("; ") }) : "";
+}
+
 function rebuildFixtures(s, widthFt, lengthFt, heightFt) {
   while (s.fixtureGroup.children.length) {
     var old = s.fixtureGroup.children[0];
@@ -3086,6 +3109,7 @@ function rebuildFixtures(s, widthFt, lengthFt, heightFt) {
   };
   layoutInput.footprints = fittedProductFootprints(layoutInput, true);
   var layout = Layout.computeLayout(layoutInput);
+  showTightNote(s, layout.tight || []);
   s.lastEntryPlacements = layout.placements.filter(function (p) {
     return p.fixtureKey === "Door_Quantity";
   });

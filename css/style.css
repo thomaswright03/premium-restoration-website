@@ -789,6 +789,13 @@ body.ai-chat-locked {
   color: var(--color-ink-soft);
 }
 
+/* "Fits, but tight" under the 3D room (js/bathroom-room-3d.js). */
+.ai-chat-room-3d-tight {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-ink);
+}
+
 /* Over a fixture that can be dragged (js/bathroom-room-3d.js), and while
    dragging it. */
 .ai-chat-room-3d-canvas-wrap.can-drag canvas {

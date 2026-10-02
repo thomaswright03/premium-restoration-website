@@ -130,10 +130,54 @@ test("computeLayout: toilet spacing reflects real centerline clearance (15in), n
   // Toilet wallSpan is 1.7ft (half = 0.85ft), but CLEARANCE_IN.Toilet_Quantity.side
   // is 15in (1.25ft) — the code clearance is the larger of the two and must
   // be what actually determines placement, not the fixture's own half-width.
+  // With room to spare it gets the recommended 18 in. (1.5 ft) instead.
   var result = L.computeLayout({ widthFt: 10, lengthFt: 8, fixtureCounts: { Toilet_Quantity: 1 } });
   var toilet = result.placements[0];
   assert.equal(toilet.wallId, "N");
-  assert.equal(toilet.x, 1.25); // originX(0) + dirX(1) * halfWidth(max(0.85, 15/12) = 1.25)
+  assert.equal(toilet.x, 1.5);
+  assert.deepEqual(result.tight, []);
+  // Where there isn't (a 2.6 ft wide room), the 15 in. minimum still fits.
+  var narrow = L.computeLayout({ widthFt: 2.6, lengthFt: 5, fixtureCounts: { Toilet_Quantity: 1 } });
+  assert.equal(narrow.placements[0].x, 1.25);
+});
+
+test("computeLayout: a fixture with less than the recommended room fits, but is listed as tight", () => {
+  // A standard 5x8 ft bath: the vanity sits right beside the toilet.
+  var bath = L.computeLayout({
+    widthFt: 5,
+    lengthFt: 8,
+    fixtureCounts: { Toilet_Quantity: 1, Bathtub_Quantity: 1, Vanity_Quantity: 1 },
+  });
+  assert.deepEqual(bath.droppedCounts, {});
+  assert.deepEqual(bath.tight, [{ fixtureKey: "Toilet_Quantity", index: 0, sideIn: 15, frontIn: null }]);
+  // A 4x6 ft room: 25 in. in front of the toilet and the vanity, not 30.
+  var small = L.computeLayout({ widthFt: 4, lengthFt: 6, fixtureCounts: { Toilet_Quantity: 1, Vanity_Quantity: 1 } });
+  assert.deepEqual(
+    small.tight.map((t) => [t.fixtureKey, t.sideIn, t.frontIn]),
+    [
+      ["Toilet_Quantity", null, 25],
+      ["Vanity_Quantity", null, 25],
+    ],
+  );
+  // A roomy 8x10 has nothing tight.
+  var roomy = L.computeLayout({ widthFt: 8, lengthFt: 10, fixtureCounts: { Toilet_Quantity: 1, Vanity_Quantity: 1 } });
+  assert.deepEqual(roomy.tight, []);
+});
+
+test("computeLayout: a door's swing keeps 30 in. clear, the width of the door", () => {
+  assert.equal(L.CLEARANCE_IN.Door_Quantity.front, 30);
+  // A 4.2 ft room has 24 in. between a vanity and the door across from it,
+  // not 30, so a vanity dragged there is placed somewhere else.
+  var r = L.computeLayout({
+    widthFt: 4.2,
+    lengthFt: 8,
+    fixtureCounts: { Vanity_Quantity: 1 },
+    entryPoints: [{ wallId: "W", offsetFt: 4, hasDoor: true }],
+    fixturePositions: { Vanity_Quantity: { 0: { wallId: "E", offsetFt: 4 } } },
+  });
+  var vanity = r.placements.filter((p) => p.fixtureKey === "Vanity_Quantity")[0];
+  assert.ok(vanity);
+  assert.ok(!vanity.moved);
 });
 
 test("CLEARANCE_IN exposes representative code-minimum side/front clearances for every floor-standing fixture", () => {

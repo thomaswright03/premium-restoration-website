@@ -98,12 +98,96 @@
     Shower_Quantity: { side: 0, front: 24 },
     Vanity_Quantity: { side: 3, front: 21 },
     Cabinet_Quantity: { side: 2, front: 12 },
-    Door_Quantity: { side: 0, front: 24 },
+    // A 30 in. door swings 30 in. into the room.
+    Door_Quantity: { side: 0, front: 30 },
   };
 
   function clearanceFt(fixtureKey) {
     var c = CLEARANCE_IN[fixtureKey] || { side: 0, front: 0 };
     return { side: c.side / 12, front: c.front / 12 };
+  }
+
+  // What's recommended beyond those minimums (NKBA guidelines), in inches:
+  // 18 in. from a toilet's centerline to anything beside it, and 30 in. of
+  // clear floor in front of a toilet, sink or vanity. A fixture with less
+  // still fits; the preview just says it's tight.
+  var RECOMMENDED_IN = {
+    Toilet_Quantity: { side: 18, front: 30 },
+    Sink_Quantity: { front: 30 },
+    Vanity_Quantity: { front: 30 },
+  };
+
+  // A rectangle in a wall's own terms: along the wall from its start, and
+  // depth into the room from it.
+  function wallLocal(wall, r) {
+    var along = [];
+    var depth = [];
+    [r.minX, r.maxX].forEach(function (x) {
+      [r.minZ, r.maxZ].forEach(function (z) {
+        along.push((x - wall.originX) * wall.dirX + (z - wall.originZ) * wall.dirZ);
+        depth.push((x - wall.originX) * wall.normalX + (z - wall.originZ) * wall.normalZ);
+      });
+    });
+    return {
+      a0: Math.min.apply(null, along),
+      a1: Math.max.apply(null, along),
+      d0: Math.min.apply(null, depth),
+      d1: Math.max.apply(null, depth),
+    };
+  }
+
+  // Placed fixtures with less room than RECOMMENDED_IN, each
+  // { fixtureKey, index, sideIn, frontIn } with the inches actually there
+  // (null where that side is fine). Measured to the fixtures themselves,
+  // not their clearance spaces, and to the walls. Doors don't count:
+  // their swing is open floor.
+  function tightClearances(placements, walls, footprintFor) {
+    function wallOf(p) {
+      return walls.filter(function (w) {
+        return w.id === p.wallId;
+      })[0];
+    }
+    var floor = placements
+      .filter(function (p) {
+        var fp = FIXTURE_LAYOUT[p.fixtureKey];
+        return fp && fp.mount === "floor" && p.fixtureKey !== "Door_Quantity" && wallOf(p);
+      })
+      .map(function (p) {
+        var wall = wallOf(p);
+        var fp = footprintFor(p.fixtureKey);
+        var along = (p.x - wall.originX) * wall.dirX + (p.z - wall.originZ) * wall.dirZ;
+        return { p: p, wall: wall, fp: fp, along: along, rect: clearanceRect(wall, along, fp.wallSpan / 2, fp.depth) };
+      });
+    var out = [];
+    floor.forEach(function (f) {
+      var rec = RECOMMENDED_IN[f.p.fixtureKey];
+      if (!rec) return;
+      var half = f.fp.wallSpan / 2;
+      var side = Math.min(f.along, f.wall.span - f.along);
+      var front = f.wall.roomDepth - f.fp.depth;
+      floor.forEach(function (g) {
+        if (g === f) return;
+        var r = wallLocal(f.wall, g.rect);
+        var eps = OVERLAP_EPS_FT;
+        // Beside it, within its depth.
+        if (r.d0 < f.fp.depth - eps && r.d1 > eps) {
+          if (r.a0 >= f.along) side = Math.min(side, r.a0 - f.along);
+          else if (r.a1 <= f.along) side = Math.min(side, f.along - r.a1);
+        }
+        // In front of it, within its width.
+        if (r.a0 < f.along + half - eps && r.a1 > f.along - half + eps && r.d0 >= f.fp.depth - eps) {
+          front = Math.min(front, r.d0 - f.fp.depth);
+        }
+      });
+      var sideIn = Math.round(side * 12);
+      var frontIn = Math.round(front * 12);
+      var tightSide = rec.side && sideIn < rec.side ? sideIn : null;
+      var tightFront = rec.front && frontIn < rec.front ? frontIn : null;
+      if (tightSide !== null || tightFront !== null) {
+        out.push({ fixtureKey: f.p.fixtureKey, index: f.p.index, sideIn: tightSide, frontIn: tightFront });
+      }
+    });
+    return out;
   }
 
   // Fixtures that need to be on a wall carrying the plumbing stack. Kept
@@ -432,7 +516,6 @@
   // always produces byte-identical placements. No Math.random, no
   // object-iteration-order dependence.
   function computeLayout(input) {
-    input = input || {};
     // parseNumber (not `||`) so a truthy-but-non-numeric value (an object,
     // array, or garbage string someone passes this pure function directly
     // — `||` only catches falsy values, not those) can't reach the
@@ -719,12 +802,19 @@
           placement.index = i;
           placement.offsetFt = chosenOffset;
           chosen.used = chosenOffset + halfWidth;
+          chosenRects.owner = placement;
           rects = withPlaced(rects, chosenRects);
           out.push(placement);
           byType[fixtureKey].push(placement);
         }
       });
-      return { placements: out, droppedCounts: dropped, placedByType: byType, droppedTotal: droppedTotal };
+      return {
+        placements: out,
+        droppedCounts: dropped,
+        placedByType: byType,
+        droppedTotal: droppedTotal,
+        rects: rects,
+      };
     }
 
     // Tries the usual layout first. Only if it leaves a fixture out, it also
@@ -771,6 +861,34 @@
     placements = best.placements;
     droppedCounts = best.droppedCounts;
     placedByType = best.placedByType;
+
+    // A toilet placed automatically is packed at the 15 in. minimum from
+    // whatever is beside it. Where there's slack, it's moved up to 3 in. to
+    // get the recommended 18 in. Nothing else moves.
+    (placedByType.Toilet_Quantity || []).forEach(function (t) {
+      if (t.moved) return;
+      var wall = wallByIdOrder([t.wallId])[0];
+      var footprint = footprintFor("Toilet_Quantity");
+      var roomyHalf = Math.max(footprint.wallSpan / 2, RECOMMENDED_IN.Toilet_Quantity.side / 12);
+      var depthExtent = footprint.depth + clearanceFt("Toilet_Quantity").front;
+      var others = best.rects.filter(function (r) {
+        return r.owner !== t;
+      });
+      var shifts = [0];
+      for (var k = 1; k <= 4; k++) shifts.push(k / 16, -k / 16);
+      for (var j = 0; j < shifts.length; j++) {
+        var off = t.offsetFt + shifts[j];
+        if (off - roomyHalf < -OVERLAP_EPS_FT || off + roomyHalf > wall.span + OVERLAP_EPS_FT) continue;
+        var env = envelopeAt("Toilet_Quantity", footprint, wall, off, roomyHalf, depthExtent);
+        if (conflictsWithPlaced(others, env)) continue;
+        var moved = placeAt(wall, off, footprint);
+        t.x = moved.x;
+        t.z = moved.z;
+        t.offsetFt = off;
+        return;
+      }
+    });
+    var tight = tightClearances(placements, walls, footprintFor);
 
     // Shower-door pairing: attaches to the shower instance of the same
     // index, offset outward from the shower's open face. Extra doors beyond
@@ -848,7 +966,7 @@
       }
     });
 
-    return { placements: placements, droppedCounts: droppedCounts };
+    return { placements: placements, droppedCounts: droppedCounts, tight: tight };
   }
 
   // Finish color/texture lookups. Colors are exact hex values from the
@@ -892,6 +1010,7 @@
     MAX_FIXTURE_COUNT: MAX_FIXTURE_COUNT,
     FIXTURE_LAYOUT: FIXTURE_LAYOUT,
     CLEARANCE_IN: CLEARANCE_IN,
+    RECOMMENDED_IN: RECOMMENDED_IN,
     PLUMBING_FIXTURE_KEYS: PLUMBING_FIXTURE_KEYS,
     clampEntryOffset: clampEntryOffset,
     applyDimensionInput: applyDimensionInput,

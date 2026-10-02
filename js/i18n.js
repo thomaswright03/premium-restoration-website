@@ -796,6 +796,17 @@
     "room3d.slot.mirrorLarge": ["Large mirror", "Espejo grande", "Espelho grande"],
     "room3d.slot.robeHook": ["Robe hook", "Gancho para bata", "Gancho para roupão"],
     "room3d.products": ["Kohler products", "Productos Kohler", "Produtos Kohler"],
+    "room3d.tight": ["Fits, but tight: {list}.", "Cabe, pero justo: {list}.", "Cabe, mas fica apertado: {list}."],
+    "room3d.tightSide": [
+      "{fixture}, {n} in. beside it (18 in. recommended)",
+      "{fixture}, {n} pulg. al costado (se recomiendan 18 pulg.)",
+      "{fixture}, {n} pol. ao lado (o recomendado são 18 pol.)",
+    ],
+    "room3d.tightFront": [
+      "{fixture}, {n} in. clear in front (30 in. recommended)",
+      "{fixture}, {n} pulg. libres al frente (se recomiendan 30 pulg.)",
+      "{fixture}, {n} pol. livres na frente (o recomendado são 30 pol.)",
+    ],
     "room3d.group.toilet": ["Toilet", "Inodoro", "Vaso sanitário"],
     "room3d.group.tub": ["Tub", "Bañera", "Banheira"],
     "room3d.group.vanity": ["Vanity", "Mueble de baño", "Gabinete"],
