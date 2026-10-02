@@ -2379,6 +2379,8 @@ function ensureScene() {
     renderer.toneMappingExposure = 0.95;
     wrap.appendChild(renderer.domElement);
     renderer.domElement.style.touchAction = "none";
+    renderer.domElement.setAttribute("role", "img");
+    renderer.domElement.setAttribute("aria-label", T("room3d.canvasLabel"));
 
     var scene = new THREE.Scene();
     var skyHex = isDark ? 0x211d17 : 0xfaf8f4;
@@ -3860,6 +3862,12 @@ window.BathroomRoom3D = {
     picking = { mode: mode === "multi" ? "multi" : "single", onPick: onPick || null, selected: [] };
     hoveredWallId = null;
     applyWallHighlightState(s);
+  },
+
+  // The same as clicking a wall, for the wall buttons in the chat (a
+  // keyboard or screen-reader path). Only while picking.
+  pickWall: function (wallId) {
+    if (["N", "E", "S", "W"].indexOf(wallId) !== -1) handleWallPick(wallId);
   },
 
   endWallPicking: function () {

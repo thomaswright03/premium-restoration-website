@@ -811,6 +811,40 @@ document.addEventListener("DOMContentLoaded", function () {
     // on the 3D preview (multi-select) — restricts where toilet/sink/tub/
     // shower can be placed. Skippable: skipping (or picking nothing) just
     // leaves those fixtures unrestricted, same as before this step existed.
+    // Buttons for the four walls, so walls can be chosen without clicking
+    // the 3D room (keyboard, screen readers). Named as the room is first
+    // shown. sync(ids) marks the chosen ones.
+    var WALL_IDS = ["N", "W", "E", "S"];
+    function wallButtons() {
+      var wrap = document.createElement("div");
+      wrap.className = "ai-chat-choices ai-chat-wall-buttons";
+      wrap.setAttribute("role", "group");
+      wrap.setAttribute("aria-label", T("walls.buttons"));
+      var buttons = {};
+      WALL_IDS.forEach(function (id) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "ai-chat-choice";
+        btn.textContent = T("walls.name." + id);
+        btn.setAttribute("aria-pressed", "false");
+        btn.addEventListener("click", function () {
+          window.BathroomRoom3D.pickWall(id);
+        });
+        buttons[id] = btn;
+        wrap.appendChild(btn);
+      });
+      return {
+        el: wrap,
+        sync: function (ids) {
+          WALL_IDS.forEach(function (id) {
+            var on = ids.indexOf(id) !== -1;
+            buttons[id].classList.toggle("selected", on);
+            buttons[id].setAttribute("aria-pressed", on ? "true" : "false");
+          });
+        },
+      };
+    }
+
     function appendPlumbingWallsStep() {
       var parts = botRow();
       var content = document.createElement("div");
@@ -825,6 +859,8 @@ document.addEventListener("DOMContentLoaded", function () {
       statusEl.className = "ai-chat-group-intro";
       statusEl.textContent = T("walls.none");
       content.appendChild(statusEl);
+      var walls = wallButtons();
+      content.appendChild(walls.el);
 
       var actionsWrap = document.createElement("div");
       actionsWrap.className = "ai-chat-group-actions";
@@ -884,6 +920,7 @@ document.addEventListener("DOMContentLoaded", function () {
       window.BathroomRoom3D.setPlumbingWalls([]);
       window.BathroomRoom3D.beginWallPicking("multi", function (ids) {
         selectedIds = ids;
+        walls.sync(ids);
         continueBtn.disabled = ids.length === 0;
         statusEl.textContent =
           ids.length === 0 ? T("walls.none") : T(ids.length === 1 ? "walls.one" : "walls.many", { n: ids.length });
@@ -1009,6 +1046,8 @@ document.addEventListener("DOMContentLoaded", function () {
         wallStatus.className = "ai-chat-group-intro";
         wallStatus.textContent = T("entry.noWall");
         epContent.appendChild(wallStatus);
+        var epWalls = wallButtons();
+        epContent.appendChild(epWalls.el);
 
         // Visible from the start (not nested inside detailsWrap, which
         // stays hidden until a wall is picked below) — otherwise a visitor
@@ -1121,6 +1160,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         window.BathroomRoom3D.beginWallPicking("single", function (ids, justClicked) {
           chosenWallId = justClicked;
+          epWalls.sync(ids);
           wallStatus.textContent = T("entry.wallSelected");
           detailsWrap.hidden = false;
           confirmBtn.disabled = false;

@@ -478,6 +478,15 @@
       "¿Qué pared o paredes tienen la bajante de plomería? Haga clic en ellas directamente en la vista 3D; elija todas las que correspondan. El inodoro, el lavabo, el mueble de baño, la bañera y la ducha solo se colocarán en las paredes que elija.",
       "Qual parede ou quais paredes têm a prumada hidráulica? Clique nelas direto na visualização 3D; escolha todas as que se aplicam. O vaso, a pia, o gabinete, a banheira e o chuveiro só serão colocados nas paredes que você escolher.",
     ],
+    "walls.buttons": [
+      "Or choose a wall here (as the room is first shown)",
+      "O elija una pared aquí (como se ve el baño al principio)",
+      "Ou escolha uma parede aqui (como o banheiro aparece no início)",
+    ],
+    "walls.name.N": ["Back right wall", "Pared del fondo a la derecha", "Parede do fundo à direita"],
+    "walls.name.W": ["Back left wall", "Pared del fondo a la izquierda", "Parede do fundo à esquerda"],
+    "walls.name.E": ["Front right wall", "Pared del frente a la derecha", "Parede da frente à direita"],
+    "walls.name.S": ["Front left wall", "Pared del frente a la izquierda", "Parede da frente à esquerda"],
     "walls.none": ["No walls selected yet.", "Todavía no hay paredes elegidas.", "Nenhuma parede escolhida ainda."],
     "walls.one": ["1 wall selected.", "1 pared elegida.", "1 parede escolhida."],
     "walls.many": ["{n} walls selected.", "{n} paredes elegidas.", "{n} paredes escolhidas."],
@@ -770,6 +779,11 @@
     "room3d.walkIn": ["Walk in", "Entrar", "Entrar"],
     "room3d.overview": ["Overview", "Vista general", "Visão geral"],
     "room3d.entry": ["Entry {n}", "Entrada {n}", "Entrada {n}"],
+    "room3d.canvasLabel": [
+      "3D preview of your bathroom. Walls and products can also be chosen with the buttons in the chat.",
+      "Vista previa 3D de su baño. Las paredes y los productos también se pueden elegir con los botones del chat.",
+      "Prévia em 3D do seu banheiro. As paredes e os produtos também podem ser escolhidos com os botões do chat.",
+    ],
     "room3d.dragHint": [
       "Drag a toilet, tub, shower, vanity, sink or cabinet to move it. The outline turns red where it won't fit.",
       "Arrastre un inodoro, bañera, ducha, mueble de baño, lavabo o gabinete para moverlo. El contorno se pone rojo donde no cabe.",

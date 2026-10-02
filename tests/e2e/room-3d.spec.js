@@ -566,3 +566,26 @@ test("a room with two toilets prices one towel bar and one exhaust fan, but two 
   );
   expect(fan.needsWiring).toBe(true);
 });
+
+test("walls can be chosen with buttons instead of clicking the room", async ({ page }) => {
+  await disableMaterials(page);
+  await startEstimate(page);
+  await answerScope(page, NEEDS_WALLS);
+  await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 6, Bathroom_Length_Ft: 9, Bathroom_Height_Ft: 8 });
+  await expect(page.locator("#ai-chat-room-3d canvas")).toHaveAttribute("aria-label", /3D preview of your bathroom/);
+
+  // Plumbing walls: toggle on with the keyboard.
+  const back = page.getByRole("button", { name: "Back right wall" }).last();
+  await back.focus();
+  await page.keyboard.press("Enter");
+  await expect(back).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".ai-chat-group-intro", { hasText: "1 wall selected." })).toBeVisible();
+  await page.getByRole("button", { name: "Continue →" }).last().click();
+
+  // Entry point: one door on the front left wall.
+  await page.locator(".ai-chat-group-continue").last().click();
+  await page.getByRole("button", { name: "Front left wall" }).last().click();
+  await page.getByRole("button", { name: "Confirm entry point" }).click();
+  expect(await page.evaluate(() => window.BathroomRoom3D.getEntryPoints().map((ep) => ep.wallId))).toEqual(["S"]);
+  await expect(page.locator('form[data-group="fixtures"]')).toBeVisible();
+});
