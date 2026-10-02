@@ -3484,6 +3484,72 @@ window.BathroomRoom3D = {
     return Object.assign({}, state.productPicks);
   },
 
+  // The customer's room as plain data, for saving in this browser: the
+  // answers that shape it, the plumbing walls and doorways, the products
+  // picked in the switcher and where fixtures were dragged.
+  getDesign: function () {
+    return JSON.parse(
+      JSON.stringify({
+        scope: state.scope,
+        dims: state.dims,
+        fixtures: state.fixtures,
+        toiletStyle: state.selectedToiletStyle,
+        plumbingWallIds: state.plumbingWallIds,
+        entryPoints: state.entryPoints,
+        productPicks: state.productPicks,
+        fixturePositions: state.fixturePositions,
+      }),
+    );
+  },
+
+  // Puts a getDesign() result back. Anything that no longer exists (a
+  // product taken off the list, a wall id from an older version) is left
+  // at its default instead.
+  loadDesign: function (design) {
+    if (!design || typeof design !== "object") return;
+    var obj = function (v) {
+      return v && typeof v === "object" && !Array.isArray(v) ? JSON.parse(JSON.stringify(v)) : {};
+    };
+    var picks = defaultProductPicks();
+    var saved = obj(design.productPicks);
+    Object.keys(saved).forEach(function (slotId) {
+      var slot = productSlot(slotId);
+      if (slot && productOption(slot, saved[slotId])) picks[slotId] = saved[slotId];
+    });
+    var dims = obj(design.dims);
+    state.scope = obj(design.scope);
+    state.dims = { widthFt: dims.widthFt || null, lengthFt: dims.lengthFt || null, heightFt: dims.heightFt || null };
+    state.fixtures = obj(design.fixtures);
+    state.selectedToiletStyle = design.toiletStyle === "B" ? "B" : "A";
+    state.plumbingWallIds = (Array.isArray(design.plumbingWallIds) ? design.plumbingWallIds : []).filter(function (id) {
+      return ["N", "E", "S", "W"].indexOf(id) !== -1;
+    });
+    var size = Layout.computeRoomDimensions(state.dims);
+    state.entryPoints = (Array.isArray(design.entryPoints) ? design.entryPoints : [])
+      .filter(function (ep) {
+        return ep && ["N", "E", "S", "W"].indexOf(ep.wallId) !== -1 && isFinite(ep.offsetFt);
+      })
+      .slice(0, 4)
+      .map(function (ep) {
+        var span = wallSpanFor(ep.wallId, size.widthFt, size.lengthFt);
+        return {
+          wallId: ep.wallId,
+          offsetFt: Layout.clampEntryOffset(span, +ep.offsetFt),
+          hasDoor: ep.hasDoor !== false,
+        };
+      });
+    state.productPicks = picks;
+    state.fixturePositions = obj(design.fixturePositions);
+    if (threeState && threeState.toiletStyleSwitch) {
+      Array.prototype.forEach.call(threeState.toiletStyleSwitch.children, function (btn, i) {
+        var on = (i === 0 ? "A" : "B") === state.selectedToiletStyle;
+        btn.classList.toggle("selected", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    }
+    markDirty();
+  },
+
   // Where the customer has dragged fixtures to (see state.fixturePositions).
   getFixturePositions: function () {
     return JSON.parse(JSON.stringify(state.fixturePositions));

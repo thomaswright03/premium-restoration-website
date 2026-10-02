@@ -336,7 +336,197 @@ document.addEventListener("DOMContentLoaded", function () {
         window.BathroomRoom3D.reset();
         if (bathroomRoom3dEnabled()) window.BathroomRoom3D.show();
         else window.BathroomRoom3D.hide();
+        watchDesign();
       }
+      var saved = readSavedDesign();
+      if (saved) appendSavedDesignOffer(saved);
+      appendGroupForm();
+    }
+
+    // ---------- saved design ----------
+    // How far the customer got (their answers, plumbing walls, doorways,
+    // the products picked in the 3D room, fixtures they moved) is kept in
+    // this browser only, so they can come back to it later. It is never
+    // sent anywhere; the quote form only gets the written summary.
+    var DESIGN_KEY = "pr_saved_design";
+    var DESIGN_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+    var designWatched = false;
+    var designSaveTimer = null;
+
+    function saveDesign() {
+      var room = window.BathroomRoom3D;
+      if (!room || !room.getDesign) return;
+      var step;
+      if (quoteState) {
+        // Nothing answered yet (or back on the first question): keep
+        // whatever was saved before.
+        if (quoteState.index === 0) return;
+        step = quoteState.groups[quoteState.index].id;
+      } else if (pickState) {
+        step = "products";
+      } else {
+        return;
+      }
+      var flow = quoteState || pickState;
+      try {
+        localStorage.setItem(
+          DESIGN_KEY,
+          JSON.stringify({
+            v: 1,
+            savedAt: Date.now(),
+            step: step,
+            values: flow.values,
+            scope: flow.scope,
+            room: room.getDesign(),
+          }),
+        );
+      } catch (e) {
+        /* storage blocked or full: the design just isn't kept */
+      }
+    }
+
+    function saveDesignSoon() {
+      clearTimeout(designSaveTimer);
+      designSaveTimer = setTimeout(saveDesign, 400);
+    }
+
+    function watchDesign() {
+      if (designWatched || !window.BathroomRoom3D.onChange) return;
+      designWatched = true;
+      window.BathroomRoom3D.onChange(saveDesignSoon);
+    }
+
+    function readSavedDesign() {
+      var saved = null;
+      try {
+        saved = JSON.parse(localStorage.getItem(DESIGN_KEY) || "null");
+      } catch (e) {
+        saved = null;
+      }
+      if (
+        !saved ||
+        saved.v !== 1 ||
+        typeof saved.savedAt !== "number" ||
+        Date.now() - saved.savedAt > DESIGN_MAX_AGE_MS ||
+        !saved.scope ||
+        typeof saved.scope !== "object" ||
+        !saved.values ||
+        typeof saved.values !== "object"
+      ) {
+        forgetDesign();
+        return null;
+      }
+      return saved;
+    }
+
+    function forgetDesign() {
+      try {
+        localStorage.removeItem(DESIGN_KEY);
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
+    // Shown above the first question when a design is saved: pick it back
+    // up, or forget it. Ignoring it and answering the first question
+    // starts a new design, which replaces the saved one.
+    function appendSavedDesignOffer(saved) {
+      var run = flowRun;
+      var parts = botRow();
+      var content = document.createElement("div");
+      content.className = "ai-chat-text";
+      var textEl = document.createElement("p");
+      textEl.className = "ai-chat-saved-design";
+      textEl.textContent = T("design.saved", {
+        date: new Date(saved.savedAt).toLocaleDateString(I18n.locale(), {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+      });
+      content.appendChild(textEl);
+      var actionsWrap = document.createElement("div");
+      actionsWrap.className = "ai-chat-group-actions";
+      var forgetBtn = document.createElement("button");
+      forgetBtn.type = "button";
+      forgetBtn.className = "ai-chat-group-cancel";
+      forgetBtn.textContent = T("design.forget");
+      var resumeBtn = document.createElement("button");
+      resumeBtn.type = "button";
+      resumeBtn.className = "ai-chat-group-continue";
+      resumeBtn.textContent = T("design.resume");
+      actionsWrap.appendChild(forgetBtn);
+      actionsWrap.appendChild(resumeBtn);
+      content.appendChild(actionsWrap);
+      parts.inner.appendChild(content);
+      chatMessages.appendChild(parts.row);
+
+      function stillOpen() {
+        return run === flowRun && quoteState && quoteState.index === 0;
+      }
+      forgetBtn.addEventListener("click", function () {
+        forgetDesign();
+        actionsWrap.remove();
+        textEl.textContent = T("design.forgotten");
+      });
+      resumeBtn.addEventListener("click", function () {
+        actionsWrap.remove();
+        if (!stillOpen()) return;
+        textEl.textContent = T("design.resumed");
+        resumeDesign(saved);
+      });
+    }
+
+    // Only answers this version of the site still asks for come back.
+    function savedScope(saved) {
+      var scope = {};
+      Pricing.SCOPE_QUESTIONS.forEach(function (q) {
+        var v = saved.scope[q.key];
+        if (
+          q.options.some(function (o) {
+            return o.value === v;
+          })
+        )
+          scope[q.key] = v;
+      });
+      return scope;
+    }
+
+    function savedValues(saved) {
+      var values = {};
+      Pricing.DIMENSIONS.concat(Pricing.FIXTURES).forEach(function (f) {
+        var v = saved.values[f.key];
+        if (typeof v === "string" || typeof v === "number") values[f.key] = String(v);
+      });
+      return values;
+    }
+
+    // Back to the step the customer was on, with every earlier answer
+    // filled in (the Back button walks through them). Past the room
+    // questions it lands on the fixture counts, so the products and ZIP
+    // are asked again with today's prices.
+    function resumeDesign(saved) {
+      Array.prototype.forEach.call(
+        chatMessages.querySelectorAll('form[data-group="scope"] input, form[data-group="scope"] button'),
+        function (el) {
+          el.disabled = true;
+        },
+      );
+      var groups = buildGroups(savedScope(saved));
+      var index = -1;
+      groups.forEach(function (g, i) {
+        if (g.id === saved.step) index = i;
+      });
+      if (index < 1) index = groups.length - 1;
+      quoteState = { groups: groups, index: index, values: savedValues(saved), scope: savedScope(saved) };
+      // Fixture counts typed in but not sent yet are in the room.
+      var roomCounts = (saved.room && saved.room.fixtures) || {};
+      Pricing.FIXTURES.forEach(function (f) {
+        if (quoteState.values[f.key] == null && roomCounts[f.key] > 0)
+          quoteState.values[f.key] = String(roomCounts[f.key]);
+      });
+      if (window.BathroomRoom3D && window.BathroomRoom3D.loadDesign) window.BathroomRoom3D.loadDesign(saved.room);
+      setProgress(Math.round((index / groups.length) * 100));
       appendGroupForm();
     }
 
@@ -374,6 +564,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (quoteState.index < quoteState.groups.length) {
         setProgress(Math.round((quoteState.index / quoteState.groups.length) * 100));
         appendGroupForm();
+        saveDesign();
         return;
       }
       // Fixtures (always the last group here) just finished — move
@@ -383,6 +574,7 @@ document.addEventListener("DOMContentLoaded", function () {
       var state = quoteState;
       quoteState = null;
       startProductPicks(state.values, state.scope, state.groups.length);
+      saveDesign();
     }
 
     var fieldCounter = 0;
@@ -1150,13 +1342,16 @@ document.addEventListener("DOMContentLoaded", function () {
       });
       actions.appendChild(exportBtn);
 
+      // The products picked in the 3D room go along with the quote too when
+      // they weren't priced above, so we see the design that was chosen.
+      var roomPicks = kohlerPicksEnabled() ? [] : roomPickLines();
       var cta = el("a", "ai-chat-estimate-cta", T("card.contactCta"));
       cta.href = "contact.html?from=estimate";
       cta.addEventListener("click", function () {
         try {
           sessionStorage.setItem(
             "pr_estimate_summary",
-            buildCombinedSummary(values, scope, result, pickList, materialsSubtotal, grandTotal, notes),
+            buildCombinedSummary(values, scope, result, pickList, materialsSubtotal, grandTotal, notes, roomPicks),
           );
         } catch (e) {
           /* storage blocked: the contact form just starts empty */
@@ -1173,8 +1368,28 @@ document.addEventListener("DOMContentLoaded", function () {
       chatInput.focus({ preventScroll: true });
     }
 
-    function buildCombinedSummary(values, scope, result, pickList, materialsSubtotal, grandTotal, notes) {
+    function roomPickLines() {
+      var room = window.BathroomRoom3D;
+      if (!room3dInteractive() || typeof room.getProductPricingItems !== "function") return [];
+      return room.getProductPricingItems().map(function (item) {
+        return (
+          "- " +
+          item.slotLabel +
+          ": " +
+          item.productLabel +
+          (item.mmns.length ? " (" + item.mmns.join(", ") + ")" : "") +
+          (item.qty > 1 ? " × " + item.qty : "")
+        );
+      });
+    }
+
+    function buildCombinedSummary(values, scope, result, pickList, materialsSubtotal, grandTotal, notes, roomPicks) {
       var out = [Pricing.buildEstimateSummary(values, scope, result)];
+      if (roomPicks && roomPicks.length) {
+        out.push("");
+        out.push(T("summary.roomPicks"));
+        out = out.concat(roomPicks);
+      }
       if (pickList.length) {
         out.push("");
         out.push(T("summary.materials"));

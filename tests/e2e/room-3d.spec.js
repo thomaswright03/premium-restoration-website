@@ -423,3 +423,54 @@ test.describe("going back a step", () => {
     await expect(page.locator('form[data-group="dimensions"]').last()).toBeVisible();
   });
 });
+
+test.describe("saved design", () => {
+  test("the design is kept in this browser and can be picked up again", async ({ page }) => {
+    await disableMaterials(page);
+    await startEstimate(page);
+    await expect(page.locator(".ai-chat-saved-design")).toHaveCount(0);
+    await answerScope(page, NEEDS_WALLS);
+    await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 6, Bathroom_Length_Ft: 9, Bathroom_Height_Ft: 8 });
+    await skipRoomInteractionSteps(page);
+    const fixtures = page.locator('form[data-group="fixtures"]').last();
+    await fixtures.locator('input[name="Toilet_Quantity"]').fill("1");
+    await fixtures.locator('input[name="Vanity_Quantity"]').fill("1");
+    await page.evaluate(() => window.BathroomRoom3D.setProductPick("toilet", "K-3981-0"));
+    await expect
+      .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("pr_saved_design") || "{}")))
+      .toMatchObject({ step: "fixtures", room: { productPicks: { toilet: "K-3981-0" } } });
+
+    // Come back later: the first question offers the saved design.
+    await startEstimate(page);
+    await expect(page.locator(".ai-chat-saved-design")).toContainText("saved in this browser");
+    await page.getByRole("button", { name: "Pick up where I left off →" }).click();
+    const resumed = page.locator('form[data-group="fixtures"]').last();
+    await expect(resumed.locator('input[name="Toilet_Quantity"]')).toHaveValue("1");
+    await expect(resumed.locator('input[name="Vanity_Quantity"]')).toHaveValue("1");
+    expect(await page.evaluate(() => window.BathroomRoom3D.getProductPicks().toilet)).toBe("K-3981-0");
+    await expect(page.locator('form[data-group="scope"] button').first()).toBeDisabled();
+
+    // Back still walks through the earlier answers.
+    await resumed.getByRole("button", { name: "← Back" }).click();
+    await skipRoomInteractionSteps(page);
+    await page.locator('form[data-group="fixtures"]').last().locator(".ai-chat-group-continue").click();
+    await expect(page.getByTestId("estimate-card")).toBeVisible();
+    await expect(page.getByTestId("estimate-card")).toContainText("Tile");
+
+    // The quote form gets the products picked in the room.
+    await page.getByTestId("estimate-card").locator(".ai-chat-estimate-cta").click();
+    await expect(page.locator("#message")).toHaveValue(/Products picked in the 3D room:\n- Toilet: .*\(K-3981-0\)/);
+  });
+
+  test("Forget it removes the saved design", async ({ page }) => {
+    await startEstimate(page);
+    await answerScope(page, NEEDS_WALLS);
+    await expect.poll(() => page.evaluate(() => !!localStorage.getItem("pr_saved_design"))).toBe(true);
+    await startEstimate(page);
+    await page.getByRole("button", { name: "Forget it" }).click();
+    await expect(page.locator(".ai-chat-saved-design")).toContainText("gone from this browser");
+    expect(await page.evaluate(() => localStorage.getItem("pr_saved_design"))).toBeNull();
+    await startEstimate(page);
+    await expect(page.locator(".ai-chat-saved-design")).toHaveCount(0);
+  });
+});

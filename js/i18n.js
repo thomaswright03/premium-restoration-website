@@ -192,6 +192,11 @@
     "summary.work": ["- Work: {scope}", "- Trabajo: {scope}", "- Serviço: {scope}"],
     "summary.fixtures": ["- Fixtures: {list}", "- Instalaciones: {list}", "- Instalações: {list}"],
     "summary.none": ["none", "ninguna", "nenhuma"],
+    "summary.roomPicks": [
+      "Products picked in the 3D room:",
+      "Productos elegidos en el baño 3D:",
+      "Produtos escolhidos no banheiro 3D:",
+    ],
     "summary.total": [
       "- Estimated labor total: {total} — rough and non-binding; excludes plumbing, electrical, materials, permits and taxes.",
       "- Total estimado de mano de obra: {total}. Aproximado y no vinculante; no incluye plomería, electricidad, materiales, permisos ni impuestos.",
@@ -439,6 +444,23 @@
     "flow.continue": ["Continue →", "Continuar →", "Continuar →"],
     "flow.skip": ["Skip", "Omitir", "Pular"],
     "flow.back": ["← Back", "← Atrás", "← Voltar"],
+    "design.saved": [
+      "You have a bathroom design saved in this browser from {date}.",
+      "Tiene un diseño de baño guardado en este navegador del {date}.",
+      "Você tem um projeto de banheiro salvo neste navegador em {date}.",
+    ],
+    "design.resume": ["Pick up where I left off →", "Seguir donde lo dejé →", "Continuar de onde parei →"],
+    "design.forget": ["Forget it", "Olvidarlo", "Esquecer"],
+    "design.forgotten": [
+      "Done. The saved design is gone from this browser.",
+      "Listo. El diseño guardado se borró de este navegador.",
+      "Pronto. O projeto salvo foi apagado deste navegador.",
+    ],
+    "design.resumed": [
+      "Here's your saved design. Your earlier answers are filled in, and Back goes through them.",
+      "Aquí está su diseño guardado. Sus respuestas anteriores ya están puestas y Atrás las recorre.",
+      "Aqui está o seu projeto salvo. As suas respostas anteriores já estão preenchidas, e Voltar passa por elas.",
+    ],
     "flow.getEstimate": ["Get My Estimate →", "Ver mi estimación →", "Ver minha estimativa →"],
     "flow.seeEstimate": ["See My Estimate →", "Ver mi estimación →", "Ver minha estimativa →"],
     "flow.doesNotFit": [
