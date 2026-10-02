@@ -2578,6 +2578,7 @@ function ensureScene() {
     applySize();
     window.BathroomRoom3D.available = true;
   } catch (err) {
+    console.warn("3D preview unavailable:", err);
     threeState = false;
   }
   return threeState;
@@ -3354,6 +3355,8 @@ function notifyChange() {
   });
 }
 
+var unavailableAnnounced = false;
+
 window.BathroomRoom3D = {
   available: false,
 
@@ -3369,7 +3372,17 @@ window.BathroomRoom3D = {
     requestAnimationFrame(function () {
       if (panel && panel.hidden) return; // hidden again before this ran
       var s = ensureScene();
-      if (!s || s.running) return;
+      if (!s) {
+        // No WebGL (or it failed to start): no empty box. The chat says so
+        // once and carries on without the room steps.
+        if (panel) panel.hidden = true;
+        if (!unavailableAnnounced) {
+          unavailableAnnounced = true;
+          document.dispatchEvent(new CustomEvent("bathroomroom3d:unavailable"));
+        }
+        return;
+      }
+      if (s.running) return;
       s.running = true;
       s.renderer.setAnimationLoop(function tick() {
         if (dirty) {

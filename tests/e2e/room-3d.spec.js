@@ -489,3 +489,21 @@ test("the room says when a fixture fits but is tight", async ({ page }) => {
   await fixtures.locator('input[name="Vanity_Quantity"]').fill("1");
   await expect(note).toHaveText("Fits, but tight: Toilet, 15 in. beside it (18 in. recommended).");
 });
+
+test("without WebGL the 3D panel stays hidden, the chat says why, and the estimate still works", async ({ page }) => {
+  await page.addInitScript(() => {
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type, ...rest) {
+      return /webgl/.test(type) ? null : getContext.call(this, type, ...rest);
+    };
+  });
+  await disableMaterials(page);
+  await startEstimate(page);
+  await expect(page.locator(".ai-chat-text", { hasText: "can't run in this browser" })).toBeVisible();
+  await expect(page.locator("#ai-chat-room-3d")).toBeHidden();
+  await answerScope(page, NEEDS_WALLS);
+  await fillGroup(page, "dimensions", { Bathroom_Width_Ft: 6, Bathroom_Length_Ft: 8, Bathroom_Height_Ft: 8 });
+  // No wall-picking steps without the room.
+  await fillGroup(page, "fixtures", { Toilet_Quantity: 1, Vanity_Quantity: 1 });
+  await expect(page.getByTestId("estimate-card")).toBeVisible();
+});

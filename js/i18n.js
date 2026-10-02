@@ -796,6 +796,11 @@
     "room3d.slot.mirrorLarge": ["Large mirror", "Espejo grande", "Espelho grande"],
     "room3d.slot.robeHook": ["Robe hook", "Gancho para bata", "Gancho para roupão"],
     "room3d.products": ["Kohler products", "Productos Kohler", "Produtos Kohler"],
+    "room3d.unavailable": [
+      "The 3D preview can't run in this browser, so it's hidden. Your estimate works the same without it.",
+      "La vista previa 3D no funciona en este navegador, así que está oculta. Su estimación funciona igual sin ella.",
+      "A prévia em 3D não funciona neste navegador, então ela está oculta. A sua estimativa funciona do mesmo jeito sem ela.",
+    ],
     "room3d.tight": ["Fits, but tight: {list}.", "Cabe, pero justo: {list}.", "Cabe, mas fica apertado: {list}."],
     "room3d.tightSide": [
       "{fixture}, {n} in. beside it (18 in. recommended)",

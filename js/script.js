@@ -326,6 +326,11 @@ document.addEventListener("DOMContentLoaded", function () {
     // behind by an earlier run (see BathroomRoom3D.onChange()) knows to stop.
     var flowRun = 0;
 
+    // The 3D room couldn't start in this browser (see BathroomRoom3D.show()).
+    document.addEventListener("bathroomroom3d:unavailable", function () {
+      appendChatRow("bot", T("room3d.unavailable"));
+    });
+
     function startEstimate() {
       flowRun++;
       quoteState = { groups: buildGroups(null), index: 0, values: {}, scope: {} };
